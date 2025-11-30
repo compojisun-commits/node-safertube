@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>튜브링 - 유튜브 수업 자료 안전하게</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Noto Sans KR', sans-serif;
+      background-color: #ffffff;
+      min-height: 100vh;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 24px 64px;
+      height: 82px;
+    }
+
+    .logo {
+      font-size: 24px;
+      font-weight: 600;
+      color: #000000;
+      letter-spacing: -0.48px;
+      cursor: pointer;
+    }
+
+    .nav-buttons {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }
+
+    .signup-link {
+      font-size: 16px;
+      font-weight: 500;
+      color: #000000;
+      text-decoration: none;
+      letter-spacing: -0.08px;
+      cursor: pointer;
+    }
+
+    .signup-link:hover {
+      opacity: 0.7;
+    }
+
+    .login-btn {
+      background-color: #dc3232;
+      color: #ffffff;
+      font-size: 16px;
+      font-weight: 500;
+      padding: 8px 16px;
+      border-radius: 12px;
+      border: none;
+      cursor: pointer;
+      letter-spacing: -0.08px;
+      transition: background-color 0.2s;
+    }
+
+    .login-btn:hover {
+      background-color: #c42b2b;
+    }
+
+    /* Main Content */
+    .main-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: 60px;
+    }
+
+    /* Lifebuoy Logo */
+    .logo-container {
+      width: 160px;
+      height: 160px;
+      margin-bottom: 20px;
+    }
+
+    .lifebuoy-svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Headline Text */
+    .headline {
+      text-align: center;
+      font-size: 16px;
+      line-height: 24px;
+      letter-spacing: 0.8px;
+      color: #000000;
+      margin-bottom: 40px;
+    }
+
+    .headline p {
+      margin-bottom: 4px;
+    }
+
+    .highlight {
+      font-weight: 700;
+      color: #dc3232;
+    }
+
+    /* Search Container */
+    .search-container {
+      width: 100%;
+      max-width: 688px;
+      padding: 0 20px;
+    }
+
+    .search-box {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      height: 52px;
+      border: 1px solid #dadce0;
+      border-radius: 26px;
+      background-color: #ffffff;
+      padding: 0 16px;
+      transition: box-shadow 0.2s;
+    }
+
+    .search-box:hover {
+      box-shadow: 0 1px 6px rgba(32, 33, 36, 0.28);
+    }
+
+    .search-box:focus-within {
+      box-shadow: 0 1px 6px rgba(32, 33, 36, 0.28);
+    }
+
+    .search-icon {
+      width: 20px;
+      height: 20px;
+      margin-right: 14px;
+      flex-shrink: 0;
+    }
+
+    .search-icon svg {
+      fill: #9aa0a6;
+    }
+
+    .search-input {
+      flex: 1;
+      border: none;
+      outline: none;
+      font-size: 16px;
+      font-family: 'Noto Sans KR', sans-serif;
+      color: #000000;
+    }
+
+    .search-input::placeholder {
+      color: #9aa0a6;
+    }
+
+    /* Action Buttons */
+    .action-buttons {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin-top: 24px;
+    }
+
+    .btn-wishlist {
+      background-color: #fbbc05;
+      border: 1px solid #fbbc05;
+      color: #000000;
+      font-size: 14px;
+      font-weight: 500;
+      padding: 9px 17px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-family: 'Noto Sans KR', sans-serif;
+      transition: box-shadow 0.2s;
+    }
+
+    .btn-wishlist:hover {
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    }
+
+    .btn-analyze {
+      background-color: #ea4335;
+      border: 1px solid #ea4335;
+      color: #f8f9fa;
+      font-size: 14px;
+      font-weight: 500;
+      padding: 9px 17px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-family: 'Noto Sans KR', sans-serif;
+      transition: box-shadow 0.2s;
+    }
+
+    .btn-analyze:hover {
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .header {
+        padding: 16px 24px;
+      }
+
+      .logo {
+        font-size: 20px;
+      }
+
+      .search-container {
+        padding: 0 16px;
+      }
+
+      .action-buttons {
+        flex-direction: column;
+        align-items: center;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="logo">튜브링</div>
+    <nav class="nav-buttons">
+      <a href="#" class="signup-link">회원가입</a>
+      <button class="login-btn">로그인</button>
+    </nav>
+  </header>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <!-- Lifebuoy Logo with Play Button -->
+    <div class="logo-container">
+      <svg class="lifebuoy-svg" viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- Outer ring (lifebuoy) -->
+        <circle cx="80" cy="80" r="70" stroke="#dc3232" stroke-width="24" fill="none"/>
+        
+        <!-- White sections of lifebuoy -->
+        <path d="M80 10 A70 70 0 0 1 150 80" stroke="#ffffff" stroke-width="24" fill="none" stroke-linecap="butt"/>
+        <path d="M150 80 A70 70 0 0 1 80 150" stroke="#f0f0f0" stroke-width="24" fill="none" stroke-linecap="butt"/>
+        <path d="M80 150 A70 70 0 0 1 10 80" stroke="#ffffff" stroke-width="24" fill="none" stroke-linecap="butt"/>
+        <path d="M10 80 A70 70 0 0 1 80 10" stroke="#f0f0f0" stroke-width="24" fill="none" stroke-linecap="butt"/>
+        
+        <!-- Red sections -->
+        <path d="M80 10 A70 70 0 0 1 130 30" stroke="#dc3232" stroke-width="24" fill="none" stroke-linecap="round"/>
+        <path d="M150 80 A70 70 0 0 1 130 130" stroke="#dc3232" stroke-width="24" fill="none" stroke-linecap="round"/>
+        <path d="M80 150 A70 70 0 0 1 30 130" stroke="#dc3232" stroke-width="24" fill="none" stroke-linecap="round"/>
+        <path d="M10 80 A70 70 0 0 1 30 30" stroke="#dc3232" stroke-width="24" fill="none" stroke-linecap="round"/>
+        
+        <!-- Inner white circle -->
+        <circle cx="80" cy="80" r="40" fill="#ffffff"/>
+        
+        <!-- Play button -->
+        <path d="M70 55 L105 80 L70 105 Z" fill="#1a9ef5"/>
+      </svg>
+    </div>
+
+    <!-- Headline -->
+    <div class="headline">
+      <p>유튜브의 바다에서</p>
+      <p>수업 자료만 <span class="highlight">안전하게</span> 건져내세요</p>
+    </div>
+
+    <!-- Search Container -->
+    <div class="search-container">
+      <div class="search-box">
+        <div class="search-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#9aa0a6">
+            <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+          </svg>
+        </div>
+        <input type="text" class="search-input" placeholder="유튜브 영상 링크를 붙여넣으세요">
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="action-buttons">
+        <button class="btn-wishlist">찜보따리 넣기</button>
+        <button class="btn-analyze">영상 분석하기</button>
+      </div>
+    </div>
+  </main>
+</body>
+</html>
+
