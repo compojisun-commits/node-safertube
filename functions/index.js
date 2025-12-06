@@ -8,6 +8,7 @@ const { getAuth } = require("firebase-admin/auth");
 const { GoogleGenAI } = require("@google/genai");
 const { YoutubeTranscript } = require("youtube-transcript");
 const nodemailer = require("nodemailer");
+const { getTrustedChannelIds } = require("./trustedChannels");
 
 initializeApp();
 const db = getFirestore();
@@ -15,6 +16,45 @@ const auth = getAuth();
 
 // Gemini API 초기화
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+// ========================================
+// YouTube API 키 관리
+// ========================================
+
+// 여러 개의 API 키를 배열로 관리
+const YOUTUBE_API_KEYS = [
+  process.env.YOUTUBE_API_KEY,
+  process.env.YOUTUBE_API_KEY_2,
+  process.env.YOUTUBE_API_KEY_3,
+  process.env.YOUTUBE_API_KEY_4,
+  process.env.YOUTUBE_API_KEY_5,
+].filter(Boolean); // undefined 제거
+
+// 현재 사용 중인 API 키 인덱스 (메모리에 저장)
+let currentYouTubeKeyIndex = 0;
+
+/**
+ * 현재 사용할 YouTube API 키 가져오기
+ */
+function getCurrentYouTubeApiKey() {
+  if (YOUTUBE_API_KEYS.length === 0) {
+    throw new Error("YouTube API 키가 설정되지 않았습니다");
+  }
+  return YOUTUBE_API_KEYS[currentYouTubeKeyIndex];
+}
+
+/**
+ * 다음 YouTube API 키로 전환
+ */
+function switchToNextYouTubeKey() {
+  const prevIndex = currentYouTubeKeyIndex;
+  currentYouTubeKeyIndex =
+    (currentYouTubeKeyIndex + 1) % YOUTUBE_API_KEYS.length;
+  console.log(
+    `🔄 YouTube API 키 전환: ${prevIndex} → ${currentYouTubeKeyIndex} (총 ${YOUTUBE_API_KEYS.length}개)`
+  );
+  return currentYouTubeKeyIndex;
+}
 
 // ========================================
 // API 호출 최적화 유틸리티
@@ -428,18 +468,16 @@ exports.analyzeVideo = onDocumentCreated(
         // 10분 이하: 기존 방식 (전체 비디오 한번에 분석)
         console.log(`⚡ 짧은 영상 - 일반 분석 방식 적용`);
 
-        // Gemini 2.0 Flash로 YouTube URL 직접 분석 (Rate Limiting 적용)
-        const response = await callGeminiWithRateLimit(
-          "gemini-2.0-flash",
-          {
-            parts: [
-              {
-                fileData: {
-                  fileUri: videoUrl,
-                },
+        // Gemini 2.5 Flash로 YouTube URL 직접 분석 (Rate Limiting 적용)
+        const response = await callGeminiWithRateLimit("gemini-2.5-flash", {
+          parts: [
+            {
+              fileData: {
+                fileUri: videoUrl,
               },
-              {
-                text: `YouTube 영상을 "${selectedFilter.name}"(${selectedFilter.criteria}) 학생 시청 적합성 분석. JSON 응답:
+            },
+            {
+              text: `YouTube 영상을 "${selectedFilter.name}"(${selectedFilter.criteria}) 학생 시청 적합성 분석. JSON 응답:
 
 **영상 총 길이: 약 ${videoDurationMinutes}분**
 **필수: 영상을 처음(0:00)부터 끝(${videoDurationMinutes}:00)까지 전체를 분석하세요!**
@@ -472,10 +510,9 @@ exports.analyzeVideo = onDocumentCreated(
 - 비슷한 비속어가 반복되면 가장 심각한 것 하나만 선택
 
 **점수:** 85-100(안전)/65-84(주의)/40-64(보호자동반)/0-39(부적절)`,
-              },
-            ],
-          }
-        );
+            },
+          ],
+        });
 
         const text = response.text;
 
@@ -619,7 +656,7 @@ async function analyzeChunk(
     `📹 청크 ${chunkIndex + 1} 분석 중 (${startMin}:00 ~ ${endMin}:00)...`
   );
 
-  const response = await callGeminiWithRateLimit("gemini-2.0-flash", {
+  const response = await callGeminiWithRateLimit("gemini-2.5-flash", {
     parts: [
       {
         fileData: {
@@ -705,9 +742,9 @@ function mergeChunkResults(chunkResults, videoDuration) {
 
   chunkResults.forEach((chunk, idx) => {
     console.log(
-      `  청크 ${idx + 1}: warnings ${
-        (chunk.warnings || []).length
-      }개, flow ${(chunk.flow || []).length}개`
+      `  청크 ${idx + 1}: warnings ${(chunk.warnings || []).length}개, flow ${
+        (chunk.flow || []).length
+      }개`
     );
     allWarnings.push(...(chunk.warnings || []));
     allFlow.push(...(chunk.flow || []));
@@ -766,9 +803,7 @@ function mergeChunkResults(chunkResults, videoDuration) {
     // 타임스탬프 순으로 재정렬
     finalFlow.sort(sortByTimestamp);
 
-    console.log(
-      `📊 Flow 간소화: ${allFlow.length}개 → ${finalFlow.length}개`
-    );
+    console.log(`📊 Flow 간소화: ${allFlow.length}개 → ${finalFlow.length}개`);
   } else {
     console.log(`📊 Flow ${allFlow.length}개 - 간소화 불필요`);
   }
@@ -811,7 +846,9 @@ function filterDuplicateWarnings(warnings) {
   });
 
   // 타임스탬프 순 정렬
-  filtered.sort((a, b) => parseTimestamp(a.timestamp) - parseTimestamp(b.timestamp));
+  filtered.sort(
+    (a, b) => parseTimestamp(a.timestamp) - parseTimestamp(b.timestamp)
+  );
 
   // 10초 이내 중복 제거
   const result = [];
@@ -889,13 +926,16 @@ async function analyzeVideoInChunks(
   console.log(`📦 ${numChunks}개 청크로 분할하여 분석`);
 
   // Firestore에 총 청크 수 업데이트
-  await db.collection("analysisRequests").doc(docId).update({
-    totalChunks: numChunks,
-    completedChunks: 0,
-    partialResults: {
-      chunks: [],
-    },
-  });
+  await db
+    .collection("analysisRequests")
+    .doc(docId)
+    .update({
+      totalChunks: numChunks,
+      completedChunks: 0,
+      partialResults: {
+        chunks: [],
+      },
+    });
 
   // 완료된 청크를 저장할 배열
   const chunkResults = new Array(numChunks);
@@ -937,7 +977,9 @@ async function analyzeVideoInChunks(
         completedCount++;
 
         console.log(
-          `⚡ 청크 ${chunkIndex + 1}/${numChunks} 완료 - 즉시 Firestore 업데이트`
+          `⚡ 청크 ${
+            chunkIndex + 1
+          }/${numChunks} 완료 - 즉시 Firestore 업데이트`
         );
 
         // Firestore에 즉시 업데이트 (순서 상관없이)
@@ -980,23 +1022,21 @@ async function analyzeVideoInChunks(
     .map((f) => `${f.timestamp}: ${f.description}`)
     .join("\n");
 
-  const summaryResponse = await callGeminiWithRateLimit(
-    "gemini-2.0-flash",
-    {
-      parts: [
-        {
-          text: `다음은 ${videoDurationMinutes}분 길이의 YouTube 영상을 분석한 타임라인입니다.
+  const summaryResponse = await callGeminiWithRateLimit("gemini-2.5-flash", {
+    parts: [
+      {
+        text: `다음은 ${videoDurationMinutes}분 길이의 YouTube 영상을 분석한 타임라인입니다.
 이 정보를 바탕으로 영상 전체 내용을 3-5문장으로 요약하고, "${
-            selectedFilter.name
-          }" 학생에게 적합한지 0-100 점수를 매겨주세요.
+          selectedFilter.name
+        }" 학생에게 적합한지 0-100 점수를 매겨주세요.
 
 **영상 타임라인:**
 ${flowSummary}
 
 **감지된 경고 사항:**
 ${mergedResults.warnings.length}개 (${mergedResults.warnings
-            .map((w) => w.timestamp)
-            .join(", ")})
+          .map((w) => w.timestamp)
+          .join(", ")})
 
 JSON 응답:
 {
@@ -1006,10 +1046,9 @@ JSON 응답:
 }
 
 **점수 기준:** 85-100(안전)/65-84(주의)/40-64(보호자동반)/0-39(부적절)`,
-        },
-      ],
-    }
-  );
+      },
+    ],
+  });
 
   let summary = "영상 요약 정보";
   let safetyScore = 70;
@@ -1364,11 +1403,12 @@ exports.recommendVideos = onDocumentCreated(
         };
       }
 
-      // YouTube 검색 (최대 10개, 필터 적용)
+      // YouTube 검색 (최대 10개, 필터 적용, 신뢰채널 필터)
       const searchResults = await searchYouTubeVideos(
         searchKeywords,
         10,
-        appliedFilters
+        appliedFilters,
+        subject // 과목을 전달하여 신뢰채널 필터 적용
       );
 
       if (!searchResults || searchResults.length === 0) {
@@ -1417,7 +1457,9 @@ exports.recommendVideos = onDocumentCreated(
           console.log(
             `✓ ${video.title} 분석 완료 (안전도: ${analysis.safetyScore})`
           );
-          const filteredWarnings = filterDuplicateWarnings(analysis.warnings || []);
+          const filteredWarnings = filterDuplicateWarnings(
+            analysis.warnings || []
+          );
           return {
             videoId: video.videoId,
             videoUrl: video.videoUrl,
@@ -1579,34 +1621,41 @@ ${intention && intention.trim() ? `**수업 의도:** ${intention}` : ""}
 
 검색어만 출력:`;
       } else if (intention && intention.trim()) {
-        // 수업 의도가 있으면 최우선적으로 고려
-        prompt = `YouTube 검색어 3-5개 생성 (쉼표 구분, 한국어, 2-4단어):
+        // 수업 의도가 있으면 과목과 연계하여 구체적인 검색어 생성
+        prompt = `${subject} 수업을 위한 YouTube 검색어 3-5개 생성 (쉼표 구분, 한국어):
 
-**수업 의도 (최우선 고려):** ${intention}
+**과목:** ${subject}
+**수업 의도 및 준비물:** ${intention}
+${objective ? `**목표:** ${objective}` : ""}
 
-주제: ${subject}
-${objective ? `목표: ${objective}` : ""}
+**검색어 생성 규칙:**
+1. 과목(${subject})과 수업 의도를 반드시 연계하여 검색어를 만드세요
+2. 수업 의도에서 핵심 키워드를 추출하고, 그것을 ${subject} 활동으로 연결하세요
+3. 구체적이고 실행 가능한 활동 중심으로 검색어를 생성하세요
 
-**중요:** 수업 의도를 최우선적으로 반영하여 검색어를 생성하세요.
-수업 의도에 맞는 구체적이고 핵심적인 키워드를 선택하세요.
+**예시:**
+- 수업 의도: "색상환" → 검색어: "색상환 그리기", "색상환 활용 그림", "색상환 만들기"
+- 수업 의도: "크리스마스 트리 만들기" → 검색어: "크리스마스 트리 만들기", "크리스마스 트리 미술", "트리 꾸미기"
+- 수업 의도: "줄넘기" → 검색어: "줄넘기 기초", "줄넘기 연속뛰기", "줄넘기 수업"
 
-예시) 민주주의 발전, 4.19 혁명, 시민 참여
-
-검색어만 출력:`;
+검색어만 출력 (쉼표로 구분):`;
       } else {
-        // 수업 의도가 없을 때는 기존 방식
-        prompt = `YouTube 검색어 3-5개 생성 (쉼표 구분, 한국어, 2-4단어):
+        // 수업 의도가 없을 때는 과목에 맞는 일반적인 검색어
+        prompt = `${subject} 수업을 위한 YouTube 검색어 3-5개 생성 (쉼표 구분, 한국어):
 
-주제: ${subject}
-${objective ? `목표: ${objective}` : ""}
+**과목:** ${subject}
+${objective ? `**목표:** ${objective}` : ""}
 
-예시) 팔만대장경, 고려청자, 고려시대 문화유산
+**조건:**
+- ${subject} 수업에 활용할 수 있는 영상
+- 초등학생/중학생이 보기 적합한 내용
+- 교육적이고 실용적인 내용
 
-검색어만 출력:`;
+검색어만 출력 (쉼표로 구분):`;
       }
     }
 
-    const response = await callGeminiWithRateLimit("gemini-2.0-flash", {
+    const response = await callGeminiWithRateLimit("gemini-2.5-flash", {
       parts: [
         {
           text: prompt,
@@ -1633,14 +1682,18 @@ ${objective ? `목표: ${objective}` : ""}
 async function searchYouTubeVideos(
   searchKeywords,
   maxResults = 10,
-  filters = {}
+  filters = {},
+  subject = null,
+  _retryCount = 0
 ) {
   try {
-    const youtubeApiKey = process.env.YOUTUBE_API_KEY;
+    const youtubeApiKey = getCurrentYouTubeApiKey();
 
-    if (!youtubeApiKey) {
-      throw new Error("YouTube API 키가 설정되지 않았습니다");
-    }
+    // 신뢰 채널 ID 가져오기
+    const trustedChannelIds = subject ? getTrustedChannelIds(subject) : [];
+    console.log(
+      `📌 과목: ${subject}, 신뢰채널 수: ${trustedChannelIds.length}개`
+    );
 
     let allVideos = [];
     const seenVideoIds = new Set();
@@ -1683,8 +1736,31 @@ async function searchYouTubeVideos(
       const searchResponse = await fetch(searchUrl);
 
       if (!searchResponse.ok) {
-        const errorData = await searchResponse.json();
-        console.error("YouTube API 응답:", errorData);
+        const errorData = await searchResponse.json().catch(() => ({}));
+        const errorMsg =
+          errorData.error?.message || `HTTP ${searchResponse.status}`;
+
+        // 403 에러 (할당량 초과)이고 재시도 가능한 경우 다음 키로 전환
+        if (
+          searchResponse.status === 403 &&
+          _retryCount < YOUTUBE_API_KEYS.length - 1
+        ) {
+          console.warn(
+            `⚠️ YouTube API 키 할당량 초과. 다음 키로 전환 시도... (${
+              _retryCount + 1
+            }/${YOUTUBE_API_KEYS.length})`
+          );
+          switchToNextYouTubeKey();
+          return searchYouTubeVideos(
+            searchKeywords,
+            maxResults,
+            filters,
+            subject,
+            _retryCount + 1
+          );
+        }
+
+        console.error("YouTube API 응답:", errorMsg);
         continue; // 다음 검색어 시도
       }
 
@@ -1715,11 +1791,42 @@ async function searchYouTubeVideos(
     // 비디오 ID 목록 추출
     const videoIds = allVideos.map((item) => item.id.videoId);
 
-    // 영상 상세 정보 가져오기 (길이, 조회수 포함)
+    // 영상 상세 정보 가져오기 (길이, 조회수, 채널 정보 포함)
     const detailsUrl = `https://www.googleapis.com/youtube/v3/videos?part=contentDetails,snippet,statistics&id=${videoIds.join(
       ","
     )}&key=${youtubeApiKey}`;
     const detailsResponse = await fetch(detailsUrl);
+
+    if (!detailsResponse.ok) {
+      const errorData = await detailsResponse.json().catch(() => ({}));
+      const errorMsg =
+        errorData.error?.message || `HTTP ${detailsResponse.status}`;
+
+      // 403 에러이고 재시도 가능한 경우 다음 키로 전환
+      if (
+        detailsResponse.status === 403 &&
+        _retryCount < YOUTUBE_API_KEYS.length - 1
+      ) {
+        console.warn(
+          `⚠️ YouTube API 키 할당량 초과 (details). 다음 키로 전환 시도... (${
+            _retryCount + 1
+          }/${YOUTUBE_API_KEYS.length})`
+        );
+        switchToNextYouTubeKey();
+        return searchYouTubeVideos(
+          searchKeywords,
+          maxResults,
+          filters,
+          subject,
+          _retryCount + 1
+        );
+      }
+
+      throw new Error(
+        `YouTube details failed: ${detailsResponse.status} - ${errorMsg}`
+      );
+    }
+
     const detailsData = await detailsResponse.json();
 
     // 결과 파싱
@@ -1729,10 +1836,24 @@ async function searchYouTubeVideos(
         videoId: item.id,
         videoUrl: `https://www.youtube.com/watch?v=${item.id}`,
         title: item.snippet.title,
+        channelId: item.snippet.channelId,
+        channelTitle: item.snippet.channelTitle,
         duration, // 초 단위
         viewCount: parseInt(item.statistics?.viewCount || "0"),
+        likeCount: parseInt(item.statistics?.likeCount || "0"),
       };
     });
+
+    // 신뢰채널 필터링 적용 (신뢰채널이 있을 경우)
+    if (trustedChannelIds.length > 0) {
+      const beforeCount = videos.length;
+      videos = videos.filter((v) => trustedChannelIds.includes(v.channelId));
+      console.log(
+        `✅ 신뢰채널 필터 적용: ${beforeCount}개 → ${videos.length}개 (${
+          beforeCount - videos.length
+        }개 제외)`
+      );
+    }
 
     // 40분 이상 필터 적용
     if (filters.minDuration === 40) {
@@ -1767,6 +1888,14 @@ async function searchYouTubeVideos(
         `${filters.preferredMaxDuration / 60}분 기준: 이상적(${
           idealVideos.length
         }개), 짧음(${shorterVideos.length}개), 김(${longerVideos.length}개)`
+      );
+    }
+
+    // 영상이 많을 경우 조회수 순으로 정렬하여 상위 영상만 선택
+    if (videos.length > maxResults) {
+      videos.sort((a, b) => b.viewCount - a.viewCount);
+      console.log(
+        `📊 조회수 순으로 정렬: 상위 ${maxResults}개 선택 (전체 ${videos.length}개)`
       );
     }
 
@@ -1816,7 +1945,7 @@ async function analyzeVideoForRecommendation(
     }
 
     // Gemini 2.0 Flash로 빠른 분석 (처음 2-3분만 확인)
-    const response = await callGeminiWithRetry("gemini-2.0-flash", {
+    const response = await callGeminiWithRetry("gemini-2.5-flash", {
       parts: [
         {
           fileData: {

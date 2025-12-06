@@ -3,7 +3,7 @@
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const YOUTUBE_API_KEY = import.meta.env.VITE_YOUTUBE_API_KEY;
 const GEMINI_API_URL =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 
 /**
  * YouTube 영상 길이 가져오기
@@ -539,7 +539,7 @@ ${allWarnings
           ],
           generationConfig: {
             temperature: 0.1, // 일관성을 위해 낮은 값
-            maxOutputTokens: 1024, // 점수 계산 설명을 위해 증가
+            maxOutputTokens: 8192, // 점수 계산 설명을 위해 증가
             responseMimeType: "application/json",
           },
         }),
