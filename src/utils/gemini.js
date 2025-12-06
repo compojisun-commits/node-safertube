@@ -4,6 +4,71 @@ const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const GEMINI_API_URL =
   "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 
+export async function checkSimilarityWithGemini(text1, text2) {
+  try {
+    const prompt = `다음 두 텍스트의 유사도를 0에서 100 사이의 점수로 평가하세요.
+
+텍스트 1:
+${text1}
+
+텍스트 2:
+${text2}
+
+**유사도 평가 기준:**
+- 두 텍스트의 의미적 유사성을 평가
+- 0: 전혀 유사하지 않음
+- 100: 거의 동일한 의미
+
+**무조건 JSON만 출력:
+{
+  "score": 0-100
+}`;
+
+    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                text: prompt,
+              },
+            ],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.5, // 안정적인 결과를 위해 낮은 온도 설정
+          maxOutputTokens: 500, // 유사도 점수만 출력하므로 적은 토큰 사용
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Gemini API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+
+    // JSON 파싱
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      return 0; // 유사도 계산 실패 시 기본값 반환
+    }
+
+    const analysis = JSON.parse(jsonMatch[0]);
+    return typeof analysis.similarityScore === "number"
+      ? analysis.similarityScore
+      : 0;
+  } catch (error) {
+    console.error("유사도 계산 실패:", error);
+    return 0; // 오류 발생 시 기본값 반환
+  }
+}
+
 /**
  * Gemini API로 빠른 영상 분석 (자막 기반)
  */

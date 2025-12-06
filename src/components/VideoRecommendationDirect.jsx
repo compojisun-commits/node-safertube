@@ -5,6 +5,7 @@ import {
   generateSearchKeywords,
   generateAlternativeKeywords,
   quickAnalyzeVideo,
+  checkSimilarityWithGemini,
 } from "../utils/gemini";
 import { searchYouTubeVideos, getVideoTranscript } from "../utils/youtube";
 import {
@@ -503,6 +504,92 @@ export default function VideoRecommendationDirect({ onBack }) {
     }
   };
 
+  //목록을 추천하는 기능, 키워드에 등록됨.
+  const recommendListsAdd = async () => {
+    try {
+      const docName = `${gradeLevel}-${subject}`; // 학년-과목 형식의 문서 ID
+      const keywordDocRef = doc(db, "recommendKeywords", docName);
+      const keywordDoc = await getDoc(keywordDocRef);
+
+      const newEntry = {
+        keywords: previousKeywords.join(", "), // 검색했던 키워드
+        videos: sortedVideos, // 정렬된 영상 목록
+        likes: 1, // 기본 좋아요 수
+      };
+
+      if (!keywordDoc.exists()) {
+        // 문서가 없는 경우 새로 생성
+        await setDoc(keywordDocRef, {
+          gradeLevel,
+          subject,
+          lists: [newEntry], // lists 배열에 새 객체 추가
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now(),
+        });
+        console.log(`✅ 새 문서 생성 및 저장: ${docName}`);
+      } else {
+        // 문서가 있는 경우 lists 배열 확인
+        const data = keywordDoc.data();
+        const lists = data.lists || [];
+
+        // 유사도가 높은 항목 찾기
+        let updated = false;
+
+        const updatedLists = await Promise.all(
+          lists.map(async (item) => {
+            // Gemini 2.5 Flash를 사용해 유사도 계산
+            const keywordSimilarity = await checkSimilarityWithGemini(
+              item.keywords,
+              newEntry.keywords
+            );
+
+            const videoSimilarity = await checkSimilarityWithGemini(
+              JSON.stringify(item.videos),
+              JSON.stringify(newEntry.videos)
+            );
+
+            const isSimilar =
+              keywordSimilarity.score > 85 && // 키워드 유사도 85% 이상
+              videoSimilarity.score > 85; // 영상 유사도 85% 이상
+
+            if (isSimilar) {
+              updated = true;
+              return { ...item, likes: (item.likes || 0) + 1 }; // likes 값 증가
+            }
+            return item;
+          })
+        );
+
+        if (!updated) {
+          // 유사한 항목이 없으면 새 항목 추가
+          updatedLists.push({ ...newEntry, likes: 1 });
+        }
+
+        // Firestore 문서 업데이트
+        await updateDoc(keywordDocRef, {
+          lists: updatedLists,
+          updatedAt: Timestamp.now(),
+        });
+        console.log(`✅ 기존 문서 업데이트: ${docName}`);
+      }
+
+      await Swal.fire({
+        title: "저장 완료!",
+        text: "추천 목록이 성공적으로 저장되었습니다.",
+        icon: "success",
+        confirmButtonColor: "#4285f4",
+      });
+    } catch (error) {
+      console.error("추천 목록 저장 오류:", error);
+      await Swal.fire({
+        title: "오류",
+        text: "추천 목록을 저장하는 중 오류가 발생했습니다.",
+        icon: "error",
+        confirmButtonColor: "#4285f4",
+      });
+    }
+  };
+
   // 새로고침 핸들러 (4개 더 추가)
   const handleRefresh = async () => {
     if (!user) {
@@ -677,6 +764,12 @@ export default function VideoRecommendationDirect({ onBack }) {
             추천 영상 ({sortedVideos.length}개)
           </h2>
           <div className="flex gap-2">
+            <button
+              onClick={recommendListsAdd}
+              className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm"
+            >
+              👍 목록추천
+            </button>
             <button
               onClick={handleRefresh}
               className="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 text-sm"
