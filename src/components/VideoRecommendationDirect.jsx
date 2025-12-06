@@ -1,11 +1,26 @@
-import { useState } from "react";
+import { useState, useEffect, use } from "react";
 import { useAuth } from "../context/AuthContext";
 import Swal from "sweetalert2";
-import { generateSearchKeywords, quickAnalyzeVideo } from "../utils/gemini";
+import {
+  generateSearchKeywords,
+  generateAlternativeKeywords,
+  quickAnalyzeVideo,
+} from "../utils/gemini";
 import { searchYouTubeVideos, getVideoTranscript } from "../utils/youtube";
+import {
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  arrayUnion,
+  Timestamp,
+} from "firebase/firestore";
+import { db } from "../firebase/config";
+import { addToJjim } from "../utils/jjim";
+import { addLikeSubject, removeLikeSubject } from "../utils/likeSubject";
 
 export default function VideoRecommendationDirect({ onBack }) {
-  const { user } = useAuth();
+  const { user, loginWithGoogle } = useAuth();
   const [loading, setLoading] = useState(false);
   const [recommendations, setRecommendations] = useState(null);
 
@@ -14,6 +29,37 @@ export default function VideoRecommendationDirect({ onBack }) {
   const [subject, setSubject] = useState("미술");
   const [intention, setIntention] = useState("");
   const [preferredDuration, setPreferredDuration] = useState("");
+
+  // 정렬 및 좋아요/찜 상태
+  const [sortBy, setSortBy] = useState("views"); // 'safetyScore', 'views', 'likes'
+  const [likedVideos, setLikedVideos] = useState({});
+  const [jjimedVideos, setJjimedVideos] = useState({});
+  const [previousKeywords, setPreviousKeywords] = useState([]); // 이전 검색 키워드 저장
+  const [playingVideo, setPlayingVideo] = useState(null); // 현재 재생 중인 영상
+
+  //
+  const [sortedVideos, setSortedVideos] = useState([]);
+
+  useEffect(() => {
+    if (recommendations) {
+      const sorted = sortVideos(recommendations.videos);
+      setSortedVideos(sorted);
+    }
+  }, [recommendations, sortBy]);
+
+  // 정렬 함수
+  const sortVideos = (videos) => {
+    const sorted = [...videos];
+    console.log(sorted);
+    if (sortBy === "safetyScore") {
+      return sorted.sort((a, b) => (b.safetyScore || 0) - (a.safetyScore || 0));
+    } else if (sortBy === "likes") {
+      return sorted.sort((a, b) => (b.likeCount || 0) - (a.likeCount || 0));
+    }
+    // 조회수 순
+    // 기본값: viewCount
+    return sorted.sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0));
+  };
 
   // 하루 한도 체크
   const checkDailyLimit = () => {
@@ -26,7 +72,10 @@ export default function VideoRecommendationDirect({ onBack }) {
     if (limitData.date !== today) {
       limitData.date = today;
       limitData.count = 0;
-      localStorage.setItem("safertube_recommend_limit", JSON.stringify(limitData));
+      localStorage.setItem(
+        "safertube_recommend_limit",
+        JSON.stringify(limitData)
+      );
     }
 
     const maxLimit = user ? 10 : 3;
@@ -47,7 +96,10 @@ export default function VideoRecommendationDirect({ onBack }) {
 
     limitData.date = today;
     limitData.count = (limitData.count || 0) + 1;
-    localStorage.setItem("safertube_recommend_limit", JSON.stringify(limitData));
+    localStorage.setItem(
+      "safertube_recommend_limit",
+      JSON.stringify(limitData)
+    );
   };
 
   const handleSubmit = async (e) => {
@@ -74,7 +126,9 @@ export default function VideoRecommendationDirect({ onBack }) {
       if (limitCheck.exceeded) {
         await Swal.fire({
           title: "하루 한도 초과",
-          html: `오늘의 무료 추천 한도를 모두 사용했습니다.<br/>사용량: <b>${limitCheck.count}/${limitCheck.max}</b><br/><br/>${
+          html: `오늘의 무료 추천 한도를 모두 사용했습니다.<br/>사용량: <b>${
+            limitCheck.count
+          }/${limitCheck.max}</b><br/><br/>${
             !user ? "<small>로그인하면 10개까지 사용 가능!</small>" : ""
           }`,
           icon: "warning",
@@ -96,7 +150,12 @@ export default function VideoRecommendationDirect({ onBack }) {
         timer: 1500,
       });
 
-      const keywords = await generateSearchKeywords(subject, intention, gradeLevel);
+      const keywords = await generateSearchKeywords(
+        subject,
+        intention,
+        gradeLevel
+      );
+      setPreviousKeywords(keywords); // 초기 키워드 저장
       console.log("🔍 검색어:", keywords);
 
       // 2단계: YouTube 검색
@@ -108,7 +167,12 @@ export default function VideoRecommendationDirect({ onBack }) {
         timer: 1500,
       });
 
-      const videos = await searchYouTubeVideos(keywords, 10, preferredDuration);
+      const videos = await searchYouTubeVideos(
+        keywords,
+        10,
+        preferredDuration,
+        subject
+      );
       console.log(`📺 ${videos.length}개 영상 발견`);
 
       if (videos.length === 0) {
@@ -155,6 +219,8 @@ export default function VideoRecommendationDirect({ onBack }) {
             safetyScore: analysis.safetyScore,
             safetyDescription: analysis.summary,
             summary: analysis.summary,
+            viewCount: video.viewCount,
+            likeCount: video.likeCount,
             warnings: [],
             warningCount: 0,
             chapters: [],
@@ -169,6 +235,8 @@ export default function VideoRecommendationDirect({ onBack }) {
             duration: video.duration,
             durationFormatted: video.durationFormatted,
             thumbnail: video.thumbnail,
+            viewCount: video.viewCount,
+            likeCount: video.likeCount,
             safetyScore: 70,
             safetyDescription: "분석 중 오류 발생",
             summary: "분석 중 오류가 발생했습니다",
@@ -182,8 +250,8 @@ export default function VideoRecommendationDirect({ onBack }) {
 
       const results = await Promise.all(analysisPromises);
 
-      // 안전도 순으로 정렬
-      results.sort((a, b) => b.safetyScore - a.safetyScore);
+      // 조회수 순으로 정렬
+      results.sort((a, b) => b.viewCount - a.viewCount);
 
       console.log("✅ 분석 완료:", results.length);
 
@@ -219,12 +287,385 @@ export default function VideoRecommendationDirect({ onBack }) {
     }
   };
 
+  // 랜덤 키워드 생성
+  const handleRandomKeyword = async () => {
+    try {
+      const docName = `${gradeLevel}-${subject}`;
+      const keywordDocRef = doc(db, "recommendKeywords", docName);
+      const keywordDoc = await getDoc(keywordDocRef);
+
+      if (!keywordDoc.exists()) {
+        await Swal.fire({
+          title: "키워드 없음",
+          text: `${gradeLevel} ${subject}에 대한 추천 키워드가 아직 없습니다.`,
+          icon: "info",
+          confirmButtonColor: "#4285f4",
+        });
+        return;
+      }
+
+      const data = keywordDoc.data();
+      const keywords = data.keywords || [];
+
+      if (keywords.length === 0) {
+        await Swal.fire({
+          title: "키워드 없음",
+          text: "저장된 키워드가 없습니다.",
+          icon: "info",
+          confirmButtonColor: "#4285f4",
+        });
+        return;
+      }
+
+      const randomKeyword =
+        keywords[Math.floor(Math.random() * keywords.length)];
+      setIntention(randomKeyword);
+
+      await Swal.fire({
+        title: "키워드 생성!",
+        text: `"${randomKeyword}" 키워드를 선택했습니다.`,
+        icon: "success",
+        confirmButtonColor: "#4285f4",
+        timer: 1500,
+      });
+    } catch (error) {
+      console.error("랜덤 키워드 생성 오류:", error);
+      await Swal.fire({
+        title: "오류",
+        text: "키워드를 가져오는 중 오류가 발생했습니다.",
+        icon: "error",
+        confirmButtonColor: "#4285f4",
+      });
+    }
+  };
+
+  // 키워드 자동 저장 함수
+  const saveKeywordIfNeeded = async () => {
+    if (!intention || !gradeLevel || !subject) return;
+
+    const likedCount = Object.values(likedVideos).filter(Boolean).length;
+    const jjimedCount = Object.values(jjimedVideos).filter(Boolean).length;
+    const totalCount = likedCount + jjimedCount;
+
+    if (totalCount >= 2) {
+      try {
+        const docName = `${gradeLevel}-${subject}`;
+        const keywordDocRef = doc(db, "recommendKeywords", docName);
+        const keywordDoc = await getDoc(keywordDocRef);
+        const keyword = intention.trim();
+
+        if (!keywordDoc.exists()) {
+          await setDoc(keywordDocRef, {
+            gradeLevel,
+            subject,
+            keywords: [keyword],
+            createdAt: Timestamp.now(),
+            updatedAt: Timestamp.now(),
+          });
+          console.log(`✅ 키워드 저장: "${keyword}"`);
+        } else {
+          const data = keywordDoc.data();
+          const keywords = data.keywords || [];
+          if (!keywords.includes(keyword)) {
+            await updateDoc(keywordDocRef, {
+              keywords: arrayUnion(keyword),
+              updatedAt: Timestamp.now(),
+            });
+            console.log(`✅ 키워드 저장: "${keyword}"`);
+          }
+        }
+      } catch (error) {
+        console.error("키워드 저장 오류:", error);
+      }
+    }
+  };
+
+  // 찜하기 핸들러
+  const handleJjim = async (video) => {
+    if (!user) {
+      const result = await Swal.fire({
+        title: "로그인이 필요합니다",
+        text: "찜하기 기능을 사용하려면 로그인이 필요합니다.",
+        icon: "info",
+        showCancelButton: true,
+        confirmButtonColor: "#4285f4",
+        cancelButtonColor: "#6c757d",
+        confirmButtonText: "로그인",
+        cancelButtonText: "취소",
+      });
+      if (result.isConfirmed) {
+        await loginWithGoogle();
+      }
+      return;
+    }
+
+    try {
+      await addToJjim({
+        user,
+        videoUrl: video.videoUrl,
+        videoId: video.videoId,
+        title: video.title,
+        analysis: {
+          safetyScore: video.safetyScore,
+          summary: video.summary,
+          warnings: [],
+        },
+      });
+
+      setJjimedVideos((prev) => {
+        const newState = { ...prev, [video.videoId]: true };
+        setTimeout(() => saveKeywordIfNeeded(), 100);
+        return newState;
+      });
+
+      await Swal.fire({
+        title: "찜 완료!",
+        text: "내 찜보따리에 추가되었습니다.",
+        icon: "success",
+        confirmButtonColor: "#4285f4",
+        timer: 1500,
+      });
+    } catch (error) {
+      console.error("찜하기 오류:", error);
+      await Swal.fire({
+        title: "오류",
+        text: error.message || "찜하기 중 오류가 발생했습니다.",
+        icon: "error",
+        confirmButtonColor: "#4285f4",
+      });
+    }
+  };
+
+  // 좋아요 핸들러
+  const handleLike = async (video) => {
+    if (!user) {
+      const result = await Swal.fire({
+        title: "로그인이 필요합니다",
+        text: "좋아요 기능을 사용하려면 로그인이 필요합니다.",
+        icon: "info",
+        showCancelButton: true,
+        confirmButtonColor: "#4285f4",
+        cancelButtonColor: "#6c757d",
+        confirmButtonText: "로그인",
+        cancelButtonText: "취소",
+      });
+      if (result.isConfirmed) {
+        await loginWithGoogle();
+      }
+      return;
+    }
+
+    try {
+      const isLiked = likedVideos[video.videoId];
+
+      if (isLiked) {
+        await removeLikeSubject({ user, subject, videoId: video.videoId });
+        setLikedVideos((prev) => ({ ...prev, [video.videoId]: false }));
+        await Swal.fire({
+          title: "좋아요 취소",
+          text: "좋아요가 취소되었습니다.",
+          icon: "info",
+          confirmButtonColor: "#6c757d",
+          timer: 1000,
+        });
+      } else {
+        await addLikeSubject({
+          user,
+          subject,
+          videoId: video.videoId,
+          videoUrl: video.videoUrl,
+          title: video.title,
+          summary: video.summary || "",
+          duration: video.duration || 0,
+          safetyScore: video.safetyScore || 0,
+        });
+        setLikedVideos((prev) => {
+          const newState = { ...prev, [video.videoId]: true };
+          setTimeout(() => saveKeywordIfNeeded(), 100);
+          return newState;
+        });
+        await Swal.fire({
+          title: "좋아요!",
+          text: `${subject} 좋아요 목록에 추가되었습니다.`,
+          icon: "success",
+          confirmButtonColor: "#4285f4",
+          timer: 1500,
+        });
+      }
+    } catch (error) {
+      console.error("좋아요 오류:", error);
+      await Swal.fire({
+        title: "오류",
+        text: error.message || "좋아요 처리 중 오류가 발생했습니다.",
+        icon: "error",
+        confirmButtonColor: "#4285f4",
+      });
+    }
+  };
+
+  // 새로고침 핸들러 (4개 더 추가)
+  const handleRefresh = async () => {
+    if (!user) {
+      const result = await Swal.fire({
+        title: "로그인이 필요합니다",
+        text: "새로고침 기능은 로그인 후 사용 가능합니다.",
+        icon: "info",
+        showCancelButton: true,
+        confirmButtonColor: "#4285f4",
+        cancelButtonColor: "#6c757d",
+        confirmButtonText: "로그인",
+        cancelButtonText: "취소",
+      });
+      if (result.isConfirmed) {
+        await loginWithGoogle();
+      }
+      return;
+    }
+
+    // 새로고침 횟수 체크
+    const refreshKey = `refresh_direct_${gradeLevel}_${subject}_${intention}`;
+    const refreshCount = parseInt(localStorage.getItem(refreshKey) || "0");
+
+    if (refreshCount >= 2) {
+      await Swal.fire({
+        title: "새로고침 한도 초과",
+        text: "이 검색 조건은 이미 2번 새로고침했습니다.",
+        icon: "warning",
+        confirmButtonColor: "#4285f4",
+      });
+      return;
+    }
+
+    const confirmResult = await Swal.fire({
+      title: "새로고침",
+      html: `같은 조건으로 4개의 영상을 더 추가할까요?<br/><small>남은 횟수: ${
+        2 - refreshCount
+      }/2</small>`,
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonColor: "#4285f4",
+      cancelButtonColor: "#6c757d",
+      confirmButtonText: "추가",
+      cancelButtonText: "취소",
+    });
+
+    if (!confirmResult.isConfirmed) return;
+
+    setLoading(true);
+
+    try {
+      // 다른 키워드 생성 (중복 방지)
+      const keywords = await generateAlternativeKeywords(
+        subject,
+        intention,
+        gradeLevel,
+        previousKeywords
+      );
+      console.log("🔍 새로고침 검색어:", keywords);
+
+      // 기존 영상 ID 목록
+      const existingVideoIds = new Set(
+        recommendations.videos.map((v) => v.videoId)
+      );
+
+      const videos = await searchYouTubeVideos(
+        keywords,
+        4,
+        preferredDuration,
+        subject
+      );
+
+      // 중복 영상 필터링
+      const newVideos = videos.filter((v) => !existingVideoIds.has(v.videoId));
+
+      if (newVideos.length === 0) {
+        await Swal.fire({
+          title: "검색 결과 없음",
+          text: "추가 영상을 찾을 수 없습니다. (중복 제외됨)",
+          icon: "warning",
+          confirmButtonColor: "#4285f4",
+        });
+        setLoading(false);
+        return;
+      }
+
+      const analysisPromises = newVideos.map(async (video) => {
+        try {
+          const transcript = await getVideoTranscript(video.videoId);
+          const analysis = await quickAnalyzeVideo(
+            video.videoId,
+            transcript,
+            gradeLevel,
+            subject,
+            intention
+          );
+          return {
+            ...video,
+            safetyScore: analysis.safetyScore,
+            safetyDescription: analysis.summary,
+            summary: analysis.summary,
+            warnings: [],
+            warningCount: 0,
+            chapters: [],
+            flow: [],
+          };
+        } catch (error) {
+          console.error(`분석 실패 (${video.videoId}):`, error);
+          return {
+            ...video,
+            safetyScore: 70,
+            safetyDescription: "분석 중 오류 발생",
+            summary: "분석 중 오류가 발생했습니다",
+            warnings: [],
+            warningCount: 0,
+            chapters: [],
+            flow: [],
+          };
+        }
+      });
+
+      const results = await Promise.all(analysisPromises);
+
+      // 기존 영상에 새 영상 추가
+      setRecommendations((prev) => ({
+        ...prev,
+        videos: [...prev.videos, ...results],
+      }));
+
+      // 사용한 키워드 추가
+      setPreviousKeywords((prev) => [...prev, ...keywords]);
+
+      // 새로고침 횟수 증가
+      localStorage.setItem(refreshKey, (refreshCount + 1).toString());
+
+      await Swal.fire({
+        title: "추가 완료!",
+        text: `${results.length}개 영상이 추가되었습니다.`,
+        icon: "success",
+        confirmButtonColor: "#4285f4",
+        timer: 1500,
+      });
+    } catch (error) {
+      console.error("새로고침 오류:", error);
+      await Swal.fire({
+        title: "오류",
+        text: "새로고침 중 오류가 발생했습니다.",
+        icon: "error",
+        confirmButtonColor: "#4285f4",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleReset = () => {
     setRecommendations(null);
     setGradeLevel("초등 6학년");
     setSubject("미술");
     setIntention("");
     setPreferredDuration("");
+    setLikedVideos({});
+    setJjimedVideos({});
   };
 
   // 결과 화면
@@ -233,60 +674,161 @@ export default function VideoRecommendationDirect({ onBack }) {
       <div className="w-full max-w-6xl mx-auto bg-white p-4 sm:p-6 md:p-8 rounded-lg shadow-xl">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
-            추천 영상 ({recommendations.videos.length}개)
+            추천 영상 ({sortedVideos.length}개)
           </h2>
+          <div className="flex gap-2">
+            <button
+              onClick={handleRefresh}
+              className="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 text-sm"
+            >
+              🔄 새로고침
+            </button>
+            <button
+              onClick={handleReset}
+              className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-sm"
+            >
+              ✨ 처음부터
+            </button>
+          </div>
+        </div>
+
+        {/* 정렬 버튼 */}
+        <div className="flex gap-2 mb-4 flex-wrap">
           <button
-            onClick={handleReset}
-            className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
+            onClick={() => setSortBy("safetyScore")}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+              sortBy === "safetyScore"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+            }`}
           >
-            다시 검색
+            🛡️ 안전도순
+          </button>
+          <button
+            onClick={() => setSortBy("views")}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+              sortBy === "views"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+            }`}
+          >
+            ▶️ 조회수순
+          </button>
+          <button
+            onClick={() => setSortBy("likes")}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+              sortBy === "likes"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+            }`}
+          >
+            👍 좋아요순
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {recommendations.videos.map((video, idx) => (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {sortedVideos.map((video, idx) => (
             <div
-              key={video.videoId}
-              className="border rounded-lg p-4 hover:shadow-lg transition"
+              key={`${video.videoId}_${idx}`}
+              className="border rounded-xl p-6 hover:shadow-2xl transition bg-white"
             >
-              <div className="flex gap-4">
-                <img
-                  src={video.thumbnail}
-                  alt={video.title}
-                  className="w-32 h-24 object-cover rounded"
-                />
-                <div className="flex-1">
-                  <h3 className="font-bold text-sm mb-1 line-clamp-2">
-                    {idx + 1}. {video.title}
-                  </h3>
-                  <p className="text-xs text-gray-600 mb-2">
-                    {video.durationFormatted}
-                  </p>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span
-                      className={`text-xs font-bold px-2 py-1 rounded ${
-                        video.safetyScore >= 85
-                          ? "bg-green-100 text-green-800"
-                          : video.safetyScore >= 65
-                          ? "bg-yellow-100 text-yellow-800"
-                          : "bg-red-100 text-red-800"
-                      }`}
-                    >
-                      안전도: {video.safetyScore}점
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-700 line-clamp-2">
-                    {video.summary}
-                  </p>
-                  <a
-                    href={video.videoUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-block mt-2 text-xs text-blue-600 hover:underline"
-                  >
-                    영상 보기 →
-                  </a>
+              {/* 썸네일 또는 플레이어 */}
+              {playingVideo === video.videoId ? (
+                <div className="w-full h-72 mb-4">
+                  <iframe
+                    width="100%"
+                    height="100%"
+                    src={`https://www.youtube.com/embed/${video.videoId}?autoplay=1`}
+                    title={video.title}
+                    frameBorder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    className="rounded-lg"
+                  ></iframe>
                 </div>
+              ) : (
+                <div
+                  className="relative w-full h-72 mb-4 cursor-pointer"
+                  onClick={() => setPlayingVideo(video.videoId)}
+                >
+                  <img
+                    src={video.thumbnail}
+                    alt={video.title}
+                    className="w-full h-full object-cover rounded-lg"
+                  />
+                  {/* 재생 버튼 오버레이 */}
+                  <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30 rounded-lg hover:bg-opacity-40 transition">
+                    <div className="w-20 h-20 bg-red-600 rounded-full flex items-center justify-center shadow-lg">
+                      <svg
+                        className="w-10 h-10 text-white ml-1"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 제목 */}
+              <h3 className="font-bold text-lg mb-2 line-clamp-2">
+                {idx + 1}. {video.title}
+              </h3>
+
+              {/* 길이 & 안전도 */}
+              <div className="flex items-center gap-3 mb-3">
+                <p className="text-sm text-gray-600">
+                  ⏱️ {video.durationFormatted}
+                </p>
+                <span
+                  className={`text-sm font-bold px-3 py-1 rounded-full ${
+                    video.safetyScore >= 85
+                      ? "bg-green-100 text-green-800"
+                      : video.safetyScore >= 65
+                      ? "bg-yellow-100 text-yellow-800"
+                      : "bg-red-100 text-red-800"
+                  }`}
+                >
+                  🛡️ 안전도: {video.safetyScore}점
+                </span>
+              </div>
+
+              {/* 요약 */}
+              <p className="text-sm text-gray-700 line-clamp-3 mb-4">
+                {video.summary}
+              </p>
+
+              {/* 액션 버튼들 */}
+              <div className="flex gap-2 flex-wrap">
+                <button
+                  onClick={() => handleJjim(video)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                    jjimedVideos[video.videoId]
+                      ? "bg-yellow-500 text-white"
+                      : "bg-gray-200 text-gray-700 hover:bg-yellow-100"
+                  }`}
+                >
+                  ⭐ {jjimedVideos[video.videoId] ? "찜 완료" : "찜하기"}
+                </button>
+                <button
+                  onClick={() => handleLike(video)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                    likedVideos[video.videoId]
+                      ? "bg-pink-500 text-white"
+                      : "bg-gray-200 text-gray-700 hover:bg-pink-100"
+                  }`}
+                >
+                  ❤️ {likedVideos[video.videoId] ? "좋아요 취소" : "좋아요"}
+                </button>
+                <a
+                  href={video.videoUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition"
+                >
+                  📺 YouTube 보기
+                </a>
               </div>
             </div>
           ))}
@@ -345,11 +887,9 @@ export default function VideoRecommendationDirect({ onBack }) {
           <div className="flex flex-wrap gap-1.5 sm:gap-2">
             {[
               { short: "미술", full: "미술" },
-              { short: "실과", full: "실과" },
               { short: "체육", full: "체육" },
-              { short: "음악", full: "음악" },
-              { short: "창체", full: "창의적 체험활동" },
-              { short: "미정", full: "미정" },
+              { short: "안전교육", full: "안전교육" },
+              { short: "짜투리영상", full: "짜투리영상" },
             ].map((subj) => (
               <button
                 key={subj.full}
@@ -357,33 +897,34 @@ export default function VideoRecommendationDirect({ onBack }) {
                 onClick={() => setSubject(subj.full)}
                 className={`px-3 sm:px-4 py-1.5 sm:py-2 text-sm sm:text-base font-semibold rounded-lg border transition-all ${
                   subject === subj.full
-                    ? subj.full === "미정"
-                      ? "text-white bg-purple-600 border-purple-600"
-                      : "text-white bg-blue-600 border-blue-600"
+                    ? "text-white bg-blue-600 border-blue-600"
                     : "text-gray-700 bg-white border-gray-300 hover:bg-blue-50 hover:border-blue-400"
                 }`}
               >
                 {subj.short}
-                {subj.full === "미정" && <span className="ml-1 text-xs">✨</span>}
               </button>
             ))}
           </div>
-          {subject === "미정" && (
-            <p className="text-xs sm:text-sm text-purple-600 mt-2 font-medium">
-              ✨ 해당 학년에 적합한 재미있고 교육적인 영상을 추천해드립니다
-            </p>
-          )}
         </div>
 
-        {/* 3. 수업 의도 */}
+        {/* 3. 수업 의도 및 준비물 */}
         <div>
-          <label className="block text-base sm:text-lg font-semibold text-gray-700 mb-2">
-            3. 수업 의도 (선택)
-          </label>
+          <div className="flex justify-between items-center mb-2">
+            <label className="block text-base sm:text-lg font-semibold text-gray-700">
+              3. 수업 의도 및 준비물 (선택)
+            </label>
+            <button
+              type="button"
+              onClick={handleRandomKeyword}
+              className="px-3 py-1.5 text-xs sm:text-sm font-medium bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
+            >
+              🎲 랜덤 생성
+            </button>
+          </div>
           <textarea
             value={intention}
             onChange={(e) => setIntention(e.target.value)}
-            placeholder="예: 학생들이 민주주의의 중요성을 이해하고..."
+            placeholder="크리스마스 트리 만들기"
             rows={3}
             className="w-full px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />

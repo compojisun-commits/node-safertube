@@ -1,12 +1,19 @@
 // Gemini API 직접 호출 유틸리티
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent";
+const GEMINI_API_URL =
+  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 
 /**
  * Gemini API로 빠른 영상 분석 (자막 기반)
  */
-export async function quickAnalyzeVideo(videoId, transcript, gradeLevel, subject, intention) {
+export async function quickAnalyzeVideo(
+  videoId,
+  transcript,
+  gradeLevel,
+  subject,
+  intention
+) {
   try {
     // 평가 컨텍스트 생성
     let contextText = "";
@@ -25,8 +32,8 @@ export async function quickAnalyzeVideo(videoId, transcript, gradeLevel, subject
       "초등 4학년": "만 10세 수준",
       "초등 5학년": "만 11세 수준",
       "초등 6학년": "만 12세 수준",
-      "중학생": "만 13-15세 수준",
-      "고등학생": "만 16-18세 수준",
+      중학생: "만 13-15세 수준",
+      고등학생: "만 16-18세 수준",
     };
 
     const gradeDescription = gradeFilters[gradeLevel] || "초등 고학년 수준";
@@ -47,7 +54,13 @@ JSON만 출력:
 
 **빠른 분석 기준:**
 - 명백한 부적절 콘텐츠만 체크 (폭력/성적/욕설)
-- ${subject === "미정" ? "재미있고 교육적이면 높은 점수" : intention ? "수업 의도와 관련 있으면 높은 점수" : "수업용으로 적합하면 높은 점수"}
+- ${
+      subject === "미정"
+        ? "재미있고 교육적이면 높은 점수"
+        : intention
+        ? "수업 의도와 관련 있으면 높은 점수"
+        : "수업용으로 적합하면 높은 점수"
+    }
 - 교육적 맥락은 관대히 평가
 - **점수:** 85-100(안전)/65-84(주의)/40-64(보호자동반)/0-39(부적절)
 
@@ -70,7 +83,7 @@ JSON만 출력:`;
         ],
         generationConfig: {
           temperature: 0.7,
-          maxOutputTokens: 500,
+          maxOutputTokens: 4000,
         },
       }),
     });
@@ -94,7 +107,8 @@ JSON만 출력:`;
     const analysis = JSON.parse(jsonMatch[0]);
 
     return {
-      safetyScore: typeof analysis.safetyScore === "number" ? analysis.safetyScore : 75,
+      safetyScore:
+        typeof analysis.safetyScore === "number" ? analysis.safetyScore : 75,
       summary: analysis.summary || "영상 내용 분석 완료",
     };
   } catch (error) {
@@ -131,6 +145,10 @@ ${intention ? `**수업 의도:** ${intention}` : ""}
 
 **수업 의도 (최우선 고려):** ${intention}
 주제: ${subject}
+학년: ${gradeLevel}
+
+"${intention}" 내용을 포함하면서 ${subject} 수업에서 보여줄 수 있는 검색어를 만드세요.
+예: "색상환" → 색상환, 색상환 그리기, 색상환 활용
 
 검색어만 출력:`;
     } else {
@@ -159,7 +177,7 @@ ${intention ? `**수업 의도:** ${intention}` : ""}
         ],
         generationConfig: {
           temperature: 0.9,
-          maxOutputTokens: 200,
+          maxOutputTokens: 4000,
         },
       }),
     });
@@ -181,6 +199,84 @@ ${intention ? `**수업 의도:** ${intention}` : ""}
     return keywords.length > 0 ? keywords : [subject || "교육 영상"];
   } catch (error) {
     console.error("검색어 생성 실패:", error);
+    return [subject || "교육 영상"];
+  }
+}
+
+/**
+ * Gemini API로 "다른" 검색어 생성 (새로고침용)
+ */
+export async function generateAlternativeKeywords(
+  subject,
+  intention,
+  gradeLevel,
+  previousKeywords = []
+) {
+  try {
+    let prompt;
+
+    if (intention) {
+      prompt = `YouTube 검색어 3-5개 생성 (쉼표 구분, 한국어, 2-4단어):
+
+**수업 의도 (최우선 고려):** ${intention}
+주제: ${subject}
+학년: ${gradeLevel}
+
+**이전 검색어 (사용 금지):** ${previousKeywords.join(", ")}
+
+"${intention}" 내용을 포함하되, 이전 검색어와 완전히 다른 새로운 검색어를 만드세요.
+예: 이전 "색상환, 색상환 그리기" → 새로운 "색상환 설명, 색상환 활용법, 쉬운 색상환"
+
+검색어만 출력:`;
+    } else {
+      prompt = `YouTube 검색어 3-5개 생성 (쉼표 구분, 한국어, 2-4단어):
+
+주제: ${subject}
+학년: ${gradeLevel}
+
+**이전에 사용한 검색어 (중복 금지):** ${previousKeywords.join(", ")}
+
+이전 검색어와 다른 새로운 검색어만 출력:`;
+    }
+
+    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                text: prompt,
+              },
+            ],
+          },
+        ],
+        generationConfig: {
+          temperature: 1.0, // 더 다양한 결과를 위해 높임
+          maxOutputTokens: 4000,
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Gemini API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
+    const keywords = text
+      .trim()
+      .split(",")
+      .map((k) => k.trim())
+      .filter((k) => k.length > 0);
+
+    return keywords.length > 0 ? keywords : [subject || "교육 영상"];
+  } catch (error) {
+    console.error("대체 검색어 생성 실패:", error);
     return [subject || "교육 영상"];
   }
 }
