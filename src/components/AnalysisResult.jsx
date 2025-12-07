@@ -167,17 +167,32 @@ export default function AnalysisResult({ requestId, directResult, progress, onRe
         setLoading(false);
       } else {
         // status가 없으면 완료된 결과로 간주
+        // ★ directResult에 이미 videoId/videoUrl이 있으면 우선 사용
+        const vid = directResult.videoId || requestId;
+        const vurl = directResult.videoUrl || (vid ? `https://www.youtube.com/watch?v=${vid}` : '');
         setResult({
           status: "completed",
           analysis: directResult,  // analysis 필드로 설정 (기존 코드와 호환)
-          videoId: requestId,
-          videoUrl: `https://www.youtube.com/watch?v=${requestId}`,
+          videoId: vid,
+          videoUrl: vurl,
         });
         setLoading(false);
       }
       return;
     }
   }, [directResult, requestId]);
+
+  // 결과를 로컬 스토리지에 캐싱 (찜보따리와 동기화용)
+  useEffect(() => {
+    if (result?.analysis && result?.videoId) {
+      try {
+        const key = `analysis_result_${result.videoId}`;
+        localStorage.setItem(key, JSON.stringify(result.analysis));
+      } catch (e) {
+        console.warn('failed to cache analysis to localStorage', e);
+      }
+    }
+  }, [result?.analysis, result?.videoId]);
 
   useEffect(() => {
     if (!requestId || directResult) return;
@@ -694,6 +709,80 @@ export default function AnalysisResult({ requestId, directResult, progress, onRe
                           </span>
                         </div>
                       </div>
+                      
+                      {/* 🆕 콘텐츠 깊이 분석 - 가로 나열 */}
+                      <div className="depth-analysis-row">
+                        {/* 추상화 레벨 */}
+                        <div className="depth-item">
+                          <span className="depth-label">🧠 추상화</span>
+                          <div className="depth-dots">
+                            {[1, 2, 3, 4, 5].map((level) => (
+                              <span 
+                                key={level}
+                                className={`depth-dot ${level <= (analysis.comprehensionAnalysis.abstractConceptLevel || 1) ? 'active' : ''}`}
+                              />
+                            ))}
+                          </div>
+                          <span className="depth-value">
+                            {(analysis.comprehensionAnalysis.abstractConceptLevel || 1) <= 2 ? '구체적' :
+                             (analysis.comprehensionAnalysis.abstractConceptLevel || 1) <= 3 ? '경험적' : '추상적'}
+                          </span>
+                        </div>
+
+                        {/* 어휘 밀도 */}
+                        <div className="depth-item">
+                          <span className="depth-label">📝 어휘밀도</span>
+                          <span className={`depth-badge depth-${(analysis.comprehensionAnalysis.lexicalDensity || 'Medium').toLowerCase()}`}>
+                            {analysis.comprehensionAnalysis.lexicalDensity === 'Low' ? '가벼움' :
+                             analysis.comprehensionAnalysis.lexicalDensity === 'High' ? '빽빽함' : '보통'}
+                          </span>
+                        </div>
+
+                        {/* 문장 복잡도 */}
+                        <div className="depth-item">
+                          <span className="depth-label">💬 문장</span>
+                          <span className={`depth-badge complexity-${(analysis.comprehensionAnalysis.sentenceComplexity || 'Simple').toLowerCase()}`}>
+                            {analysis.comprehensionAnalysis.sentenceComplexity === 'Complex' ? '복잡' : '단순'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* 🎬 KMRB 등급 결과 */}
+                      {analysis.ratingResult && (
+                        <div className={`comprehension-card rating-result-card ${analysis.ratingResult.isClassroomSafe ? 'classroom-safe' : 'classroom-unsafe'}`}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                            <div>
+                              <h5 className="metrics-title" style={{ marginBottom: '8px' }}>🎬 영상등급위원회 판정</h5>
+                              <span className={`rating-badge ${
+                                analysis.ratingResult.finalRating?.includes('전체') ? 'all' :
+                                analysis.ratingResult.finalRating?.includes('12세') ? 'age12' :
+                                analysis.ratingResult.finalRating?.includes('15세') ? 'age15' : 'adult'
+                              }`}>
+                                {analysis.ratingResult.finalRating || '전체관람가'}
+                              </span>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                              <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>교실 상영 점수</div>
+                              <div style={{ fontSize: '24px', fontWeight: '800', color: analysis.ratingResult.isClassroomSafe ? '#16a34a' : '#dc2626' }}>
+                                {analysis.ratingResult.schoolSafetyScore || '-'}점
+                              </div>
+                            </div>
+                          </div>
+                          <div style={{ marginTop: '12px', padding: '10px', background: 'rgba(255,255,255,0.5)', borderRadius: '8px' }}>
+                            <span style={{ fontSize: '12px', fontWeight: '600', color: analysis.ratingResult.isClassroomSafe ? '#166534' : '#991b1b' }}>
+                              {analysis.ratingResult.isClassroomSafe ? '✅ 초등 교실 상영 가능' : '⚠️ 초등 교실 상영 주의 필요'}
+                            </span>
+                          </div>
+                          {analysis.ratingResult.warningKeywords?.length > 0 && (
+                            <div className="warning-keywords">
+                              <span style={{ fontSize: '11px', color: '#64748b', marginRight: '6px' }}>⚠️ 주의 표현:</span>
+                              {analysis.ratingResult.warningKeywords.map((keyword, idx) => (
+                                <span key={idx} className="warning-keyword">{keyword}</span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     <div className="comprehension-details">

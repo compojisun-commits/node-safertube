@@ -7,9 +7,63 @@ import SaveWizard from "./SaveWizard";
 const HISTORY_KEY = "tubering_search_history";
 const MAX_HISTORY = 10;
 
-export default function VideoInput({ onAnalysisStart, onProgressUpdate, onBack }) {
+// URL 타입 감지 함수
+const detectUrlType = (url) => {
+  if (!url || !url.trim()) return null;
+  
+  const trimmedUrl = url.trim().toLowerCase();
+  
+  // YouTube 패턴 감지
+  if (trimmedUrl.includes('youtube.com') || trimmedUrl.includes('youtu.be')) {
+    return 'youtube';
+  }
+  
+  // 일반 URL 감지 (http/https로 시작)
+  if (trimmedUrl.startsWith('http://') || trimmedUrl.startsWith('https://')) {
+    return 'generic';
+  }
+  
+  // www로 시작하는 경우도 일반 URL로 처리
+  if (trimmedUrl.startsWith('www.')) {
+    return 'generic';
+  }
+  
+  return null;
+};
+
+// 아이콘 컴포넌트들
+const YoutubeIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="#FF0000">
+    <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+  </svg>
+);
+
+const GlobeIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10"/>
+    <line x1="2" y1="12" x2="22" y2="12"/>
+    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+  </svg>
+);
+
+const PlusIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="12" y1="5" x2="12" y2="19"/>
+    <line x1="5" y1="12" x2="19" y2="12"/>
+  </svg>
+);
+
+const XIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"/>
+    <line x1="6" y1="6" x2="18" y2="18"/>
+  </svg>
+);
+
+export default function VideoInput({ onAnalysisStart, onProgressUpdate, onBack, autoAnalyzeRequest = null }) {
   const { user } = useAuth();
-  const [url, setUrl] = useState("");
+  // 멀티 링크 상태 (배열로 관리)
+  const [links, setLinks] = useState([{ id: Date.now(), url: '' }]);
   const [loading, setLoading] = useState(false);
   const [gradeLevel, setGradeLevel] = useState("elementary-5-6");
   const [progress, setProgress] = useState({
@@ -20,13 +74,33 @@ export default function VideoInput({ onAnalysisStart, onProgressUpdate, onBack }
   });
   const [hasStartedAnalysis, setHasStartedAnalysis] = useState(false);
   const [showSaveWizard, setShowSaveWizard] = useState(false);
-  const [videoTitle, setVideoTitle] = useState("");
+  const [linksToSave, setLinksToSave] = useState([]); // 일괄 저장할 링크들
   const [searchHistory, setSearchHistory] = useState([]);
+  const [autoAnalyzePending, setAutoAnalyzePending] = useState(false);
 
   // 검색 기록 로드
   useEffect(() => {
     loadSearchHistory();
   }, []);
+
+  // 찜보따리 등에서 넘어온 자동 분석 요청 처리
+  useEffect(() => {
+    if (autoAnalyzeRequest && autoAnalyzeRequest.videoUrl) {
+      setLinks([{ id: Date.now(), url: autoAnalyzeRequest.videoUrl }]);
+      if (autoAnalyzeRequest.gradeLevel) {
+        setGradeLevel(autoAnalyzeRequest.gradeLevel);
+      }
+      setAutoAnalyzePending(true);
+    }
+  }, [autoAnalyzeRequest]);
+
+  // 링크 세팅 후 자동 분석 실행
+  useEffect(() => {
+    if (autoAnalyzePending && links.length > 0 && links[0].url.trim() && !loading) {
+      handleAnalyze();
+      setAutoAnalyzePending(false);
+    }
+  }, [autoAnalyzePending, links, loading]);
 
   const loadSearchHistory = () => {
     try {
@@ -87,6 +161,57 @@ export default function VideoInput({ onAnalysisStart, onProgressUpdate, onBack }
     localStorage.removeItem(HISTORY_KEY);
     setSearchHistory([]);
   };
+
+  // 링크 추가
+  const addLink = () => {
+    setLinks([...links, { id: Date.now(), url: '' }]);
+  };
+
+  // 링크 삭제
+  const removeLink = (id) => {
+    if (links.length === 1) {
+      // 마지막 하나는 삭제하지 않고 비우기만
+      setLinks([{ id: Date.now(), url: '' }]);
+    } else {
+      setLinks(links.filter(link => link.id !== id));
+    }
+  };
+
+  // 링크 URL 업데이트
+  const updateLinkUrl = (id, newUrl) => {
+    setLinks(links.map(link => 
+      link.id === id ? { ...link, url: newUrl } : link
+    ));
+  };
+
+  // 모든 링크의 타입 분석
+  const analyzeLinks = () => {
+    const filledLinks = links.filter(link => link.url.trim());
+    const types = filledLinks.map(link => detectUrlType(link.url));
+    
+    const hasYoutube = types.includes('youtube');
+    const hasGeneric = types.includes('generic');
+    const hasAny = filledLinks.length > 0;
+    
+    // Case A: 아무것도 입력 안 됨
+    if (!hasAny) {
+      return { case: 'A', hasYoutube: false, hasGeneric: false };
+    }
+    
+    // Case C: 일반 링크가 하나라도 섞여 있을 때
+    if (hasGeneric) {
+      return { case: 'C', hasYoutube, hasGeneric: true };
+    }
+    
+    // Case B: 오직 유튜브 링크만 있을 때
+    if (hasYoutube && !hasGeneric) {
+      return { case: 'B', hasYoutube: true, hasGeneric: false };
+    }
+    
+    return { case: 'A', hasYoutube: false, hasGeneric: false };
+  };
+
+  const linkAnalysis = analyzeLinks();
 
   // 검색 기록 클릭 시 바로 분석 시작
   const handleHistoryClick = async (item) => {
@@ -228,9 +353,89 @@ export default function VideoInput({ onAnalysisStart, onProgressUpdate, onBack }
     return "";
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  // 일괄 찜보따리 담기 (일반 링크 포함)
+  const handleBulkSave = async () => {
+    // 로그인 확인
+    if (!user) {
+      await Swal.fire({
+        title: "로그인 필요",
+        text: "찜보따리 기능은 로그인 후 사용 가능합니다",
+        icon: "info",
+        confirmButtonColor: "#dc3232",
+      });
+      return;
+    }
+
+    // 유효한 링크들만 필터링
+    const validLinks = links.filter(link => {
+      const type = detectUrlType(link.url);
+      return type !== null;
+    });
+
+    if (validLinks.length === 0) {
+      await Swal.fire({
+        title: "유효한 URL 없음",
+        text: "저장할 수 있는 유효한 URL을 입력해주세요",
+        icon: "warning",
+        confirmButtonColor: "#dc3232",
+      });
+      return;
+    }
+
+    // 링크 정보 수집 (제목 가져오기)
+    const linksWithInfo = await Promise.all(
+      validLinks.map(async (link) => {
+        const type = detectUrlType(link.url);
+        let title = "";
+        let thumbnail = "";
+        
+        if (type === 'youtube') {
+          const videoId = extractVideoId(link.url);
+          title = await fetchVideoTitle(link.url);
+          thumbnail = videoId ? `https://img.youtube.com/vi/${videoId}/mqdefault.jpg` : "";
+        } else {
+          // 일반 URL의 경우 도메인 추출
+          try {
+            const urlObj = new URL(link.url.startsWith('http') ? link.url : `https://${link.url}`);
+            title = urlObj.hostname;
+            thumbnail = `https://www.google.com/s2/favicons?domain=${urlObj.hostname}&sz=128`;
+          } catch {
+            title = link.url;
+          }
+        }
+        
+        return {
+          url: link.url,
+          title,
+          thumbnail,
+          type
+        };
+      })
+    );
+
+    setLinksToSave(linksWithInfo);
+    setShowSaveWizard(true);
+  };
+
+  // 유튜브 영상 분석하기 (기존 handleSubmit 대체)
+  const handleAnalyze = async () => {
+    // 유튜브 링크만 필터링
+    const youtubeLinks = links.filter(link => detectUrlType(link.url) === 'youtube');
+    
+    if (youtubeLinks.length === 0) {
+      await Swal.fire({
+        title: "YouTube URL 필요",
+        text: "분석할 YouTube URL을 입력해주세요",
+        icon: "warning",
+        confirmButtonColor: "#dc3232",
+      });
+      return;
+    }
+
+    // 첫 번째 유튜브 링크로 분석 시작 (기존 로직 유지)
+    const url = youtubeLinks[0].url;
     const videoId = extractVideoId(url);
+    
     if (!videoId) {
       alert("유효한 YouTube URL을 입력해주세요");
       return;
@@ -334,7 +539,9 @@ export default function VideoInput({ onAnalysisStart, onProgressUpdate, onBack }
         videoId: videoId,
         videoUrl: `https://www.youtube.com/watch?v=${videoId}`,
       });
-      setUrl("");
+      
+      // 입력창 초기화
+      setLinks([{ id: Date.now(), url: '' }]);
     } catch (error) {
       console.error("영상 분석 실패:", error);
       await Swal.fire({
@@ -355,49 +562,21 @@ export default function VideoInput({ onAnalysisStart, onProgressUpdate, onBack }
     }
   };
 
-  const handleDirectAdd = async () => {
-    // 로그인 확인
-    if (!user) {
-      await Swal.fire({
-        title: "로그인 필요",
-        text: "찜보따리 기능은 로그인 후 사용 가능합니다",
-        icon: "info",
-        confirmButtonColor: "#dc3232",
-      });
-      return;
-    }
-
-    // URL 유효성 검사
-    const videoId = extractVideoId(url);
-    if (!videoId) {
-      await Swal.fire({
-        title: "잘못된 URL",
-        text: "유효한 YouTube URL을 입력해주세요",
-        icon: "warning",
-        confirmButtonColor: "#dc3232",
-      });
-      return;
-    }
-
-    // YouTube 제목 가져오기
-    const title = await fetchVideoTitle(url);
-    setVideoTitle(title);
-
-    // SaveWizard 모달 열기
-    setShowSaveWizard(true);
-  };
-
   const handleSaveWizardSuccess = async () => {
     setShowSaveWizard(false);
+    const count = linksToSave.length;
     await Swal.fire({
       title: "저장 완료!",
-      text: "찜보따리에 링크가 추가되었습니다",
+      text: count > 1 
+        ? `${count}개의 링크가 찜보따리에 추가되었습니다` 
+        : "찜보따리에 링크가 추가되었습니다",
       icon: "success",
       confirmButtonColor: "#3b82f6",
       timer: 2000,
     });
-    setUrl("");
-    setVideoTitle("");
+    // 입력창 초기화
+    setLinks([{ id: Date.now(), url: '' }]);
+    setLinksToSave([]);
   };
 
   return (
@@ -419,43 +598,119 @@ export default function VideoInput({ onAnalysisStart, onProgressUpdate, onBack }
 
       {/* 검색 컨테이너 */}
       <div className="search-container">
-        <form onSubmit={handleSubmit}>
-          {/* 검색 박스 */}
-          <div className="search-box">
-            <div className="search-icon">
-              <svg focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"></path>
-              </svg>
-            </div>
-            <input
-              type="text"
-              className="search-input"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="YouTube URL을 입력하세요"
-              disabled={loading}
-            />
+        <div className="multi-link-form">
+          {/* 멀티 링크 입력 영역 */}
+          <div className="multi-link-inputs">
+            {links.map((link, index) => {
+              const urlType = detectUrlType(link.url);
+              return (
+                <div key={link.id} className={`link-input-row ${urlType ? `type-${urlType}` : ''}`}>
+                  {/* URL 타입 아이콘 */}
+                  <div className={`link-type-icon ${urlType || 'empty'}`}>
+                    {urlType === 'youtube' ? (
+                      <YoutubeIcon />
+                    ) : urlType === 'generic' ? (
+                      <GlobeIcon />
+                    ) : (
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M8 12h8M12 8v8"/>
+                      </svg>
+                    )}
+                  </div>
+                  
+                  {/* URL 입력창 */}
+                  <input
+                    type="text"
+                    className="link-input"
+                    value={link.url}
+                    onChange={(e) => updateLinkUrl(link.id, e.target.value)}
+                    placeholder={index === 0 ? "YouTube 또는 웹사이트 URL을 입력하세요" : "추가 URL 입력"}
+                    disabled={loading}
+                  />
+                  
+                  {/* 삭제 버튼 */}
+                  <button
+                    type="button"
+                    className="link-remove-btn"
+                    onClick={() => removeLink(link.id)}
+                    disabled={loading}
+                    title="삭제"
+                  >
+                    <XIcon />
+                  </button>
+                </div>
+              );
+            })}
           </div>
 
-          {/* 버튼들 */}
-          <div className="buttons-container">
+          {/* 링크 추가 버튼 */}
+          <button
+            type="button"
+            className="add-link-btn"
+            onClick={addLink}
+            disabled={loading}
+          >
+            <PlusIcon />
+            <span>링크 추가하기</span>
+          </button>
+
+          {/* 액션 버튼들 */}
+          {linkAnalysis.case === 'A' && (
+            // Case A: 입력 없음 - 비활성화 버튼
             <button
               type="button"
-              className="btn-jjim"
-              onClick={handleDirectAdd}
-              disabled={!url}
+              className="smart-btn disabled"
+              disabled={true}
             >
-              찜보따리 넣기
+              URL을 입력하세요
             </button>
-            <button
-              type="submit"
-              className="btn-analyze"
-              disabled={loading || !url}
-            >
-              {loading ? "분석중..." : "영상 분석하기"}
-            </button>
-          </div>
-        </form>
+          )}
+
+          {linkAnalysis.case === 'B' && (
+            // Case B: 유튜브만 - 두 버튼 모두 표시
+            <div className="dual-buttons-container">
+              <button
+                type="button"
+                className="btn-jjim-new"
+                onClick={handleBulkSave}
+                disabled={loading}
+              >
+                🎁 찜보따리 넣기
+              </button>
+              <button
+                type="button"
+                className="btn-analyze-new"
+                onClick={handleAnalyze}
+                disabled={loading}
+              >
+                {loading ? "분석중..." : "🚀 영상 분석하기"}
+              </button>
+            </div>
+          )}
+
+          {linkAnalysis.case === 'C' && (
+            // Case C: 일반 링크 포함 - 일괄 저장 버튼만
+            <>
+              <button
+                type="button"
+                className="smart-btn secondary"
+                onClick={handleBulkSave}
+                disabled={loading}
+              >
+                {loading ? "처리중..." : "🎁 일괄 찜보따리에 담기"}
+              </button>
+              <div className="bulk-save-notice">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="12" y1="16" x2="12" y2="12"/>
+                  <line x1="12" y1="8" x2="12.01" y2="8"/>
+                </svg>
+                <span>일반 링크는 분석 없이 바로 저장됩니다</span>
+              </div>
+            </>
+          )}
+        </div>
 
         {/* 진행 상황 표시 */}
         {loading && progress.totalChunks > 0 && progress.message && (
@@ -559,18 +814,21 @@ export default function VideoInput({ onAnalysisStart, onProgressUpdate, onBack }
         )}
       </div>
 
-      {/* SaveWizard 모달 */}
+      {/* SaveWizard 모달 - 멀티 링크 지원 */}
       {showSaveWizard && (
         <SaveWizard
-          videoData={{
-            url: url,
-            title: videoTitle,
+          videoData={linksToSave.length === 1 ? {
+            url: linksToSave[0].url,
+            title: linksToSave[0].title,
+            thumbnail: linksToSave[0].thumbnail,
+            type: linksToSave[0].type,
             tags: []
-          }}
+          } : null}
+          multiLinks={linksToSave.length > 1 ? linksToSave : null}
           user={user}
           onClose={() => {
             setShowSaveWizard(false);
-            setVideoTitle("");
+            setLinksToSave([]);
           }}
           onSuccess={handleSaveWizardSuccess}
         />

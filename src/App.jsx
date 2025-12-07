@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { AuthProvider } from "./context/AuthContext";
+import { useState, useEffect } from "react";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 import VideoInput from "./components/VideoInput";
 import AnalysisResult from "./components/AnalysisResult";
 import VideoRecommendationDirect from "./components/VideoRecommendationDirect";
@@ -11,8 +11,10 @@ import Header from "./components/Header";
 import Footer from "./components/Footer";
 import Terms from "./components/Terms";
 import Privacy from "./components/Privacy";
+import SettingsModal from "./components/SettingsModal";
 
-function App() {
+function AppContent() {
+  const { user } = useAuth();
   const [mode, setMode] = useState("analyze");
   const [currentRequestId, setCurrentRequestId] = useState(null);
   const [currentResult, setCurrentResult] = useState(null);
@@ -22,6 +24,19 @@ function App() {
     totalChunks: 0,
     completedChunks: 0,
   });
+  const [showSettings, setShowSettings] = useState(false);
+
+  // URL에 auto=1 또는 /jjim 경로로 진입 시 찜보따리 화면으로 전환해 자동분류 모달이 뜨도록 함
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const auto = params.get("auto") || params.get("autoClassify");
+    const path = window.location.pathname;
+    if (auto === "1" || path.includes("/jjim")) {
+      setMode("jjim");
+      setCurrentRequestId(null);
+      setCurrentResult(null);
+    }
+  }, []);
 
   const handleAnalysisStart = (requestId, result = null) => {
     setCurrentRequestId(requestId);
@@ -57,10 +72,19 @@ function App() {
     setCurrentResult(null);
   };
 
+  const handleSettingsClick = () => {
+    if (user) {
+      setShowSettings(true);
+    }
+  };
+
   return (
-    <AuthProvider>
-      <div className="app">
-        <Header mode={mode} onModeChange={handleModeSelect} />
+    <div className="app">
+      <Header 
+        mode={mode} 
+        onModeChange={handleModeSelect} 
+        onSettingsClick={handleSettingsClick}
+      />
 
         {mode === "analyze" && !currentRequestId && (
           <VideoInput
@@ -124,7 +148,19 @@ function App() {
         )}
 
         <Footer onNavigate={handleFooterNavigate} />
-      </div>
+
+        {/* 설정 모달 */}
+        {showSettings && (
+          <SettingsModal onClose={() => setShowSettings(false)} />
+        )}
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
     </AuthProvider>
   );
 }

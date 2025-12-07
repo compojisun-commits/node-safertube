@@ -46,6 +46,11 @@ export async function addToJjim({ user, videoUrl, videoId, analysis, title, fold
     tags,
     isManualAdd: false,
     createdAt: Timestamp.now(),
+    metadata: {
+      grade: "",
+      semester: "",
+      subject: "",
+    },
   };
 
   // 메인 문서 ID
@@ -192,29 +197,44 @@ export async function removeFromJjim({ user, videoId }) {
  * 링크를 직접 추가 (분석 없이)
  * @param {object} params
  * @param {object} params.user - firebase user
- * @param {string} params.videoUrl - YouTube URL
- * @param {string} params.title - 영상 제목
+ * @param {string} params.videoUrl - URL (YouTube 또는 일반 URL)
+ * @param {string} params.title - 제목
  * @param {string} [params.memo] - 메모
  * @param {string} [params.folderId] - 폴더 ID
  * @param {Array<string>} [params.tags] - 태그 배열
+ * @param {string} [params.linkType] - 링크 타입 ('youtube' | 'generic')
+ * @param {string} [params.thumbnail] - 썸네일 URL
  */
-export async function addLinkDirectly({ user, videoUrl, title, memo = "", folderId = null, tags = [] }) {
+export async function addLinkDirectly({ user, videoUrl, title, memo = "", folderId = null, tags = [], linkType = "youtube", thumbnail = "" }) {
   if (!user) throw new Error("로그인이 필요합니다");
   if (!videoUrl || !title) throw new Error("URL과 제목은 필수입니다");
 
-  // YouTube URL에서 videoId 추출
-  const patterns = [
-    /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/,
-    /youtube\.com\/embed\/([^&\n?#]+)/,
-    /youtube\.com\/v\/([^&\n?#]+)/,
-  ];
-
+  // YouTube URL에서 videoId 추출 (YouTube 타입인 경우만)
   let videoId = null;
-  for (const pattern of patterns) {
-    const match = videoUrl.match(pattern);
-    if (match) {
-      videoId = match[1];
-      break;
+  if (linkType === 'youtube') {
+    const patterns = [
+      /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/,
+      /youtube\.com\/embed\/([^&\n?#]+)/,
+      /youtube\.com\/v\/([^&\n?#]+)/,
+    ];
+
+    for (const pattern of patterns) {
+      const match = videoUrl.match(pattern);
+      if (match) {
+        videoId = match[1];
+        break;
+      }
+    }
+  }
+
+  // 일반 URL인 경우 썸네일이 없으면 파비콘 사용
+  let finalThumbnail = thumbnail;
+  if (!finalThumbnail && linkType === 'generic') {
+    try {
+      const urlObj = new URL(videoUrl.startsWith('http') ? videoUrl : `https://${videoUrl}`);
+      finalThumbnail = `https://www.google.com/s2/favicons?domain=${urlObj.hostname}&sz=128`;
+    } catch {
+      finalThumbnail = '';
     }
   }
 
@@ -227,9 +247,16 @@ export async function addLinkDirectly({ user, videoUrl, title, memo = "", folder
     memo,
     folderId,
     tags,
+    linkType, // 링크 타입 추가
+    thumbnail: finalThumbnail, // 썸네일 URL 추가
     isManualAdd: true, // 직접 추가된 영상 표시
     analysis: null,
     createdAt: Timestamp.now(),
+    metadata: {
+      grade: "",
+      semester: "",
+      subject: "",
+    },
   };
 
   const mainDocId = user.uid;
