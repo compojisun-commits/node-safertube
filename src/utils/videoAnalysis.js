@@ -130,7 +130,7 @@ ${transcript
     "abstractConcepts": ["추상적 개념1", "추상적 개념2"],
     "comprehensionNotes": "이해도 관련 종합 설명 (1-2문장)"
   },
-  "warnings": [{"startTime": "MM:SS", "endTime": "MM:SS", "description": "문제 내용 설명", "severity": "high/medium/low", "category": "sexuality/violence/profanity/fear/drug/imitation"}],
+  "warnings": [{"startTime": "MM:SS", "endTime": "MM:SS", "description": "문제 내용 설명", "severity": "high/medium/low", "category": "sexuality/violence/profanity/fear/drug/imitation", "quote": "실제 문제가 된 대사"}],
   "flow": [{"timestamp": "MM:SS", "description": "해당 구간 설명"}]
 }
 
@@ -420,7 +420,7 @@ ${transcriptHint}
 
 /**
  * 긴 영상 분석 (10분 초과)
- * 🆕 자막 기반 타임라인 + 청크별 경고 분석 분리
+ * 🆕 최적화: 15분 청크 + 간소화된 프롬프트 + 카테고리별 정확한 시간 표시
  */
 export async function analyzeLongVideo(
   videoUrl,
@@ -430,7 +430,8 @@ export async function analyzeLongVideo(
   onProgress
 ) {
   try {
-    const CHUNK_DURATION = 600; // 10분 (600초)
+    // 🆕 청크 크기 15분으로 확대 (API 호출 횟수 33% 감소)
+    const CHUNK_DURATION = 900; // 15분 (900초)
     const numChunks = Math.ceil(videoDuration / CHUNK_DURATION);
 
     // 자막 추출
@@ -498,63 +499,51 @@ export async function analyzeLongVideo(
                   },
                 },
                 {
-                  text: `# Role
-당신은 긴 교육 영상의 대본을 구간별로 나누어 처리하는 '부분 편집자(Segment Editor)'입니다.
-지금 당신이 보고 있는 텍스트는 전체 영상의 **중간 부분(Chunk)**입니다.
+                  text: `# 영상 유해 콘텐츠 감지 (${startMin}:00~${endMin}:00 구간)
 
-**중요: 모든 응답은 반드시 한국어로 작성하세요!**
+**학년**: ${selectedFilter.name} | **청크**: ${i + 1}/${numChunks}
 
-# Context Variables
-- **Current Chunk**: ${startMin}:00 ~ ${endMin}:00
-- **Is First Chunk**: ${i === 0 ? 'true' : 'false'}
-- **학년 필터**: ${selectedFilter.name}
-
-# Critical Rules (반드시 지킬 것)
-
-1. **'앞부분 무시' 원칙 (Start Buffer Zone)**:
-   - Is First Chunk가 false라면, 텍스트의 **시작 후 30초 이내**는 이전 청크에서 이어지는 내용일 확률이 99%다.
-   - 따라서, **${startMin}:00 ~ ${startMin}:30 사이에는 flow를 생성하지 마라.**
-   - 문장이 중간에 잘려 있거나, "그래서", "때문에" 같은 접속사로 시작한다면 **절대 flow로 잡지 마라.**
-   - 명확하게 **새로운 주제로 전환되는 지점**이 나타날 때까지 기다렸다가 flow를 생성해라.
-
-2. **타임스탬프 기준**:
-   - 출력하는 timestamp는 반드시 **${startMin}:00 이상, ${endMin}:00 미만**이어야 한다.
-   - 자막에 있는 실제 시간만 사용해라. (추정 금지)
-
-**응답 형식 (JSON):**
-{
-  "warnings": [{"startTime": "MM:SS", "endTime": "MM:SS", "description": "문제 내용 설명", "severity": "high/medium"}],
-  "flow": [{"timestamp": "MM:SS", "description": "구간 설명"}]
-}
-
-**분석 기준:**
-- warnings: 부적절한 내용 감지 (욕설, 폭력, 선정성 등)
-- flow: 확실한 주제 전환(Topic Transition)이 일어나는 지점만 3~4개 선별. 없으면 빈 배열.
-
-자막(해당 구간 샘플):
+## 자막 데이터
 ${transcript
   .filter((t) => t.start >= startTime && t.start < endTime)
-  .slice(0, 60)
-  .map((t) => `[${Math.round(t.start)}s] ${t.text}`)
+  .slice(0, 80)
+  .map((t) => `[${formatTimestamp(t.start)}] ${t.text}`)
   .join("\n")}
 
-**타임스탬프 규칙 (중요, 추측 금지):**
-- 모든 시간은 해당 청크 구간 [${startMin}:00, ${endMin}:00] 안에서만 표기
-- 형식: HH:MM:SS 또는 MM:SS
-- startTime/endTime/flow.timestamp 모두 실제 자막/화면 기준 시간만 사용 (임의 추측 금지)
-- 한 구간에서 startTime <= endTime 이어야 함
+## 분석 지시
+1. **유해 콘텐츠 감지**: 욕설, 폭력, 선정성, 공포, 약물, 모방위험
+2. **정확한 시간 필수**: 자막의 실제 시간만 사용 (추측 금지!)
+3. **카테고리 명시**: 각 경고에 category 필드 필수 포함
 
+## 응답 형식 (JSON)
+{
+  "warnings": [
+    {
+      "startTime": "MM:SS",
+      "endTime": "MM:SS",
+      "description": "구체적인 문제 내용",
+      "severity": "high/medium/low",
+      "category": "profanity/violence/sexuality/fear/drug/imitation",
+      "quote": "실제 문제가 된 대사나 장면 설명"
+    }
+  ],
+  "flow": [{"timestamp": "MM:SS", "description": "주제 전환 설명"}]
+}
 
-**매우 중요 - 경고 구간 규칙:**
-1. **모든 부적절한 내용 감지** (개수 제한 없음)
-2. **비슷한 분위기/맥락이 지속되면 긴 구간으로 통합**
-   - ❌ 나쁜 예: ${startMin}:15 공포, ${startMin}:32 공포, ${startMin}:47 공포 (잘게 쪼개짐)
-   - ✅ 좋은 예: ${startMin}:15-${endMin}:50 (구간 안내 들어있는 구체적인 내용들)
-   - 시간 간격보다 **맥락의 연속성**이 중요
-3. **심각도 분류 기준:**
-   - **high**: 폭력적 장면, 선정적 내용, 약물, 심한 욕설, 강한 공포
-   - **medium**: 일반 욕설, 위협적 표현, 중간 수준 공포, 갈등 장면
-4. **일관성:** 항상 같은 기준으로 분석`,
+## 카테고리 기준
+- **profanity**: 욕설, 비속어, 부적절한 언어
+- **violence**: 폭력, 싸움, 위협, 신체 위해
+- **sexuality**: 선정적 내용, 부적절한 신체 노출
+- **fear**: 공포, 무서운 장면, 혐오스러운 내용
+- **drug**: 음주, 흡연, 약물 관련
+- **imitation**: 따라하면 위험한 행동, 범죄 행위
+
+## 심각도 기준
+- **high**: 즉시 시청 중단 권장 (심한 욕설, 폭력, 선정성)
+- **medium**: 보호자 확인 필요 (경미한 부적절 표현)
+- **low**: 참고 사항 (약간의 긴장감, 가벼운 갈등)
+
+**중요**: 시간은 반드시 ${startMin}:00~${endMin}:00 범위 내로!`,
                 },
               ],
             },
@@ -655,6 +644,17 @@ ${transcript
     };
 
     allWarnings.sort(sortWarningsByTime);
+
+    // 🆕 카테고리별 경고 통계 생성
+    const categoryStats = {
+      profanity: allWarnings.filter(w => w.category === 'profanity').length,
+      violence: allWarnings.filter(w => w.category === 'violence').length,
+      sexuality: allWarnings.filter(w => w.category === 'sexuality').length,
+      fear: allWarnings.filter(w => w.category === 'fear').length,
+      drug: allWarnings.filter(w => w.category === 'drug').length,
+      imitation: allWarnings.filter(w => w.category === 'imitation').length,
+    };
+    console.log("[카테고리 통계]", categoryStats);
 
     // 🆕 타임라인: 자막 기반 타임라인 우선 사용 (가장 정확함!)
     let finalFlow = [];

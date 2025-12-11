@@ -847,7 +847,7 @@ export default function AnalysisResult({ requestId, directResult, progress, onRe
           </div>
         )}
 
-        {/* 위험 구간 */}
+        {/* 위험 구간 - 카테고리별 아이콘과 정확한 시간 표시 */}
         {analysis.warnings && analysis.warnings.length > 0 && (
           <div className="mb-6">
             <div className="flex items-center gap-2 mb-3">
@@ -860,67 +860,110 @@ export default function AnalysisResult({ requestId, directResult, progress, onRe
                 주의 구간 <span className="text-red-600 font-bold">{analysis.warnings.length}개</span>
               </h3>
             </div>
+            
+            {/* 🆕 카테고리별 요약 통계 */}
+            <div className="flex flex-wrap gap-2 mb-4">
+              {(() => {
+                const categoryIcons = {
+                  profanity: { icon: "🗣️", label: "언어", color: "bg-orange-100 text-orange-700" },
+                  violence: { icon: "⚔️", label: "폭력", color: "bg-red-100 text-red-700" },
+                  sexuality: { icon: "🔞", label: "선정성", color: "bg-pink-100 text-pink-700" },
+                  fear: { icon: "👻", label: "공포", color: "bg-purple-100 text-purple-700" },
+                  drug: { icon: "💊", label: "약물", color: "bg-green-100 text-green-700" },
+                  imitation: { icon: "⚠️", label: "모방위험", color: "bg-amber-100 text-amber-700" },
+                };
+                const counts = {};
+                analysis.warnings.forEach(w => {
+                  const cat = w.category || 'other';
+                  counts[cat] = (counts[cat] || 0) + 1;
+                });
+                return Object.entries(counts).map(([cat, count]) => {
+                  const info = categoryIcons[cat] || { icon: "❓", label: cat, color: "bg-gray-100 text-gray-700" };
+                  return (
+                    <span key={cat} className={`px-2 py-1 rounded-full text-xs font-medium ${info.color}`}>
+                      {info.icon} {info.label} {count}건
+                    </span>
+                  );
+                });
+              })()}
+            </div>
+            
             <p className="text-gray-500 text-sm mb-4">
-              해당 학년 기준으로 주의가 필요한 구간입니다.
+              💡 타임스탬프를 클릭하면 해당 시점으로 이동합니다.
             </p>
             <div className="space-y-3">
               {analysis.warnings.map((warning, idx) => {
+                // 카테고리별 스타일 정의
+                const categoryStyles = {
+                  profanity: { icon: "🗣️", label: "언어/욕설", borderColor: "border-orange-500" },
+                  violence: { icon: "⚔️", label: "폭력", borderColor: "border-red-600" },
+                  sexuality: { icon: "🔞", label: "선정성", borderColor: "border-pink-500" },
+                  fear: { icon: "👻", label: "공포", borderColor: "border-purple-500" },
+                  drug: { icon: "💊", label: "약물", borderColor: "border-green-600" },
+                  imitation: { icon: "⚠️", label: "모방위험", borderColor: "border-amber-500" },
+                };
+                const catStyle = categoryStyles[warning.category] || { icon: "❓", label: "기타", borderColor: "border-gray-400" };
+                
                 // severity에 따른 색상 선택
                 const severityColors = {
                   high: {
                     bg: "bg-red-50",
-                    border: "border-red-500",
                     text: "text-red-800",
-                    icon: "🔴",
                     label: "매우 부적절",
                     badgeBg: "bg-red-500",
                   },
                   medium: {
                     bg: "bg-yellow-50",
-                    border: "border-yellow-500",
                     text: "text-yellow-800",
-                    icon: "🟡",
                     label: "주의 필요",
                     badgeBg: "bg-yellow-500",
                   },
                   low: {
                     bg: "bg-blue-50",
-                    border: "border-blue-500",
                     text: "text-blue-800",
-                    icon: "🔵",
                     label: "약간 주의",
                     badgeBg: "bg-blue-500",
                   },
                 };
-                const colors =
-                  severityColors[warning.severity] || severityColors.medium;
+                const colors = severityColors[warning.severity] || severityColors.medium;
 
                 return (
                   <div
                     key={idx}
-                    className={`p-4 ${colors.bg} border-l-4 ${colors.border} rounded-lg shadow-sm hover:shadow-md transition-shadow`}
+                    className={`p-4 ${colors.bg} border-l-4 ${catStyle.borderColor} rounded-lg shadow-sm hover:shadow-md transition-shadow`}
                   >
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-lg">{colors.icon}</span>
+                    <div className="flex items-center flex-wrap gap-2 mb-2">
+                      {/* 카테고리 아이콘 */}
+                      <span className="text-xl" title={catStyle.label}>{catStyle.icon}</span>
+                      
+                      {/* 🆕 정확한 시간 표시 (분:초) */}
                       <button
                         onClick={() => seekToTime(warning.startTime || warning.timestamp)}
                         className={`text-base ${colors.text} font-bold flex items-center gap-1 hover:underline`}
+                        title="클릭하면 해당 시점으로 이동"
                       >
                         <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
                         </svg>
                         {warning.startTime && warning.endTime
-                          ? `${warning.startTime} - ${warning.endTime}`
-                          : warning.timestamp || `구간 ${idx + 1}`}
+                          ? `${warning.startTime} ~ ${warning.endTime}`
+                          : warning.startTime || warning.timestamp || `구간 ${idx + 1}`}
                       </button>
+                      
+                      {/* 카테고리 라벨 */}
+                      <span className="px-2 py-0.5 bg-gray-200 text-gray-700 rounded text-xs font-medium">
+                        {catStyle.label}
+                      </span>
+                      
+                      {/* 심각도 배지 */}
                       {warning.severity && (
-                        <span
-                          className={`px-2 py-1 ${colors.badgeBg} text-white rounded text-xs font-bold`}
-                        >
+                        <span className={`px-2 py-0.5 ${colors.badgeBg} text-white rounded text-xs font-bold`}>
                           {colors.label}
                         </span>
                       )}
                     </div>
+                    
+                    {/* 🆕 실제 문제가 된 대사/장면 인용 */}
                     {warning.quote && (
                       <div className="mb-2 p-3 bg-white/80 border-l-2 border-gray-400 rounded">
                         <p className="text-gray-900 text-sm font-medium leading-relaxed">
@@ -928,6 +971,7 @@ export default function AnalysisResult({ requestId, directResult, progress, onRe
                         </p>
                       </div>
                     )}
+                    
                     <p className="text-gray-700 text-sm leading-relaxed">
                       {warning.description}
                     </p>

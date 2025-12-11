@@ -1209,6 +1209,40 @@ export default function JjimList({ onBack }) {
     }
   };
 
+  // 🆕 칸반 보드에서 영상 추가 (Root에 저장)
+  const handleAddVideoToBoard = async ({ url, videoId, status }) => {
+    try {
+      // YouTube API로 제목 가져오기 (간단 버전)
+      let title = '제목 로딩 중...';
+      try {
+        const apiKey = import.meta.env.VITE_YOUTUBE_API_KEY;
+        const res = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${apiKey}`);
+        const data = await res.json();
+        if (data.items?.[0]?.snippet?.title) {
+          title = data.items[0].snippet.title;
+        }
+      } catch (e) {
+        console.warn('제목 가져오기 실패:', e);
+      }
+
+      // addLinkDirectly 사용 (jjim.js)
+      await addLinkDirectly({
+        user,
+        videoUrl: url,
+        title,
+        memo: '',
+        tags: [],
+        folderId: null, // 🆕 Root에 저장 (미분류)
+        status, // 🆕 칸반 상태
+      });
+
+      loadJjimData();
+    } catch (error) {
+      console.error('영상 추가 오류:', error);
+      throw error;
+    }
+  };
+
   // AI 자동 정리 적용
   const handleApplyAutoOrganize = async (moves) => {
     try {
@@ -1475,12 +1509,22 @@ export default function JjimList({ onBack }) {
                       </button>
                     </div>
         ) : viewMode === 'board' ? (
-          // 🆕 새로운 칸반 보드 v2.0
+          // 🆕 Global Kanban Board v22.0
           <KanbanBoard 
             videos={videos}
             folders={folders}
             onAnalyze={(video) => handleAnalyzeClick(video, { stopPropagation: () => {}, preventDefault: () => {} })}
             onOpenVideo={(video) => window.open(video.videoUrl, '_blank')}
+            onStatusChange={handleStatusChange}
+            onAddVideo={handleAddVideoToBoard}
+            onAiOrganize={(targets) => {
+              if (targets) {
+                setAutoOrganizeTargets(targets);
+              } else {
+                setAutoOrganizeTargets(null);
+              }
+              setAutoOrganizeOpen(true);
+            }}
           />
       ) : (
           // 리스트 & 그리드 뷰
