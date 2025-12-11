@@ -43,6 +43,45 @@ const IconExternalLink = () => (
   </svg>
 );
 
+const IconSearch = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+  </svg>
+);
+
+const IconGrip = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/>
+    <circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/>
+  </svg>
+);
+
+const IconLayers = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+    <polyline points="2 17 12 22 22 17"/>
+    <polyline points="2 12 12 17 22 12"/>
+  </svg>
+);
+
+const IconChevronDown = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polyline points="6 9 12 15 18 9"/>
+  </svg>
+);
+
+const IconChevronRight = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polyline points="9 18 15 12 9 6"/>
+  </svg>
+);
+
+const IconChevronLeft = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polyline points="15 18 9 12 15 6"/>
+  </svg>
+);
+
 // ==========================================
 // 안전 등급 뱃지
 // ==========================================
@@ -110,6 +149,11 @@ export default function KanbanBoard({
   const [addingToColumn, setAddingToColumn] = useState(null);
   const [newVideoUrl, setNewVideoUrl] = useState('');
   const inputRef = useRef(null);
+  
+  // 🆕 서랍 상태
+  const [isDrawerOpen, setIsDrawerOpen] = useState(true);
+  const [drawerSearch, setDrawerSearch] = useState('');
+  const [expandedFolders, setExpandedFolders] = useState(new Set());
 
   // localStorage에 컬럼 저장
   useEffect(() => {
@@ -149,9 +193,46 @@ export default function KanbanBoard({
     return videos.filter(v => !v.folderId).length;
   }, [videos]);
 
-  // 드래그 시작
-  const handleDragStart = (e, video) => {
-    setDraggedVideo(video);
+  // 🆕 서랍용: 검색 필터링된 영상
+  const filteredDrawerVideos = useMemo(() => {
+    if (!drawerSearch) return videos;
+    const q = drawerSearch.toLowerCase();
+    return videos.filter(v => 
+      v.title?.toLowerCase().includes(q) ||
+      v.memo?.toLowerCase().includes(q) ||
+      v.tags?.some(t => t.toLowerCase().includes(q))
+    );
+  }, [videos, drawerSearch]);
+
+  // 🆕 서랍용: 폴더별로 그룹화
+  const videosByFolder = useMemo(() => {
+    const groups = { '미분류': [] };
+    
+    filteredDrawerVideos.forEach(video => {
+      // 이미 보드에 있는 영상은 서랍에서 제외 (옵션)
+      // const hasStatus = video.status && video.status !== 'none';
+      // if (hasStatus) return;
+      
+      const folder = folders.find(f => f.id === video.folderId);
+      const folderName = folder?.name || '미분류';
+      if (!groups[folderName]) groups[folderName] = [];
+      groups[folderName].push(video);
+    });
+    
+    return groups;
+  }, [filteredDrawerVideos, folders]);
+
+  // 🆕 서랍 폴더 토글
+  const toggleDrawerFolder = (folderName) => {
+    const newSet = new Set(expandedFolders);
+    if (newSet.has(folderName)) newSet.delete(folderName);
+    else newSet.add(folderName);
+    setExpandedFolders(newSet);
+  };
+
+  // 드래그 시작 (보드 카드 또는 서랍에서)
+  const handleDragStart = (e, video, source = 'board') => {
+    setDraggedVideo({ ...video, _source: source });
     e.dataTransfer.effectAllowed = 'move';
   };
 
@@ -167,12 +248,34 @@ export default function KanbanBoard({
     setDragOverColumn(null);
   };
 
-  // 드롭 - status 변경
+  // 드롭 - status 변경 (보드 내 이동 또는 서랍에서 추가)
   const handleDrop = async (e, targetColumnId) => {
     e.preventDefault();
     setDragOverColumn(null);
     
     if (!draggedVideo) return;
+    
+    // 🆕 서랍에서 드래그한 경우 - 새로 보드에 추가
+    if (draggedVideo._source === 'drawer') {
+      // 이미 같은 status라면 스킵
+      if (draggedVideo.status === targetColumnId) {
+        setDraggedVideo(null);
+        return;
+      }
+      
+      // status 변경
+      if (onStatusChange) {
+        try {
+          await onStatusChange(draggedVideo.id, targetColumnId);
+        } catch (error) {
+          console.error('상태 변경 실패:', error);
+        }
+      }
+      setDraggedVideo(null);
+      return;
+    }
+    
+    // 보드 내 이동
     if (draggedVideo.status === targetColumnId) {
       setDraggedVideo(null);
       return;
@@ -291,21 +394,118 @@ export default function KanbanBoard({
           <span className="kanban-subtitle">폴더와 관계없이 모든 영상을 한눈에</span>
         </div>
         
-        {/* 미분류 알림 + AI 정리 버튼 */}
-        {unorganizedCount > 0 && (
+        <div className="kanban-header-actions">
+          {/* 미분류 알림 + AI 정리 버튼 */}
+          {unorganizedCount > 0 && (
+            <button 
+              className="kanban-ai-organize-btn"
+              onClick={() => onAiOrganize?.()}
+            >
+              <IconWand />
+              <span>🗂️ 미분류 {unorganizedCount}개</span>
+              <span className="kanban-ai-hint">AI 정리</span>
+            </button>
+          )}
+          
+          {/* 🆕 서랍 토글 버튼 */}
           <button 
-            className="kanban-ai-organize-btn"
-            onClick={() => onAiOrganize?.()}
+            onClick={() => setIsDrawerOpen(!isDrawerOpen)}
+            className={`kanban-drawer-toggle ${isDrawerOpen ? 'active' : ''}`}
           >
-            <IconWand />
-            <span>🗂️ 미분류 {unorganizedCount}개</span>
-            <span className="kanban-ai-hint">AI 정리</span>
+            {isDrawerOpen ? <IconChevronLeft /> : <IconChevronRight />}
+            {isDrawerOpen ? '서랍 닫기' : '서랍 열기'}
           </button>
-        )}
+        </div>
       </div>
 
-      {/* 칸반 컬럼들 */}
-      <div className="kanban-global-columns">
+      <div className="kanban-main-area">
+        {/* 🆕 자료 서랍 (찜보따리에서 가져오기) */}
+        <aside className={`kanban-drawer ${isDrawerOpen ? 'open' : ''}`}>
+          <div className="kanban-drawer-header">
+            <h3><IconLayers /> 찜보따리에서 가져오기</h3>
+            <div className="kanban-drawer-search">
+              <IconSearch />
+              <input 
+                type="text"
+                placeholder="영상 검색..."
+                value={drawerSearch}
+                onChange={(e) => setDrawerSearch(e.target.value)}
+              />
+            </div>
+          </div>
+          
+          <div className="kanban-drawer-content">
+            {Object.entries(videosByFolder).map(([folderName, folderVideos]) => {
+              if (folderVideos.length === 0) return null;
+              const isOpen = expandedFolders.has(folderName);
+              
+              return (
+                <div key={folderName} className="kanban-drawer-folder">
+                  <button 
+                    className="kanban-drawer-folder-header"
+                    onClick={() => toggleDrawerFolder(folderName)}
+                  >
+                    {isOpen ? <IconChevronDown /> : <IconChevronRight />}
+                    <IconFolder />
+                    <span className="kanban-drawer-folder-name">{folderName}</span>
+                    <span className="kanban-drawer-folder-count">{folderVideos.length}</span>
+                  </button>
+                  
+                  {isOpen && (
+                    <div className="kanban-drawer-files">
+                      {folderVideos.map(video => (
+                        <div 
+                          key={video.id}
+                          className={`kanban-drawer-file ${video.status ? 'on-board' : ''}`}
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, video, 'drawer')}
+                        >
+                          <div className="kanban-drawer-file-thumb">
+                            {video.videoId ? (
+                              <img 
+                                src={`https://img.youtube.com/vi/${video.videoId}/mqdefault.jpg`} 
+                                alt=""
+                              />
+                            ) : (
+                              <IconYoutube />
+                            )}
+                          </div>
+                          <div className="kanban-drawer-file-info">
+                            <h4>{video.title || '제목 없음'}</h4>
+                            <div className="kanban-drawer-file-meta">
+                              <SafetyBadge score={video.safetyScore} />
+                              {video.status && (
+                                <span className="kanban-drawer-status-badge">
+                                  보드에 있음
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="kanban-drawer-file-grip">
+                            <IconGrip />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            
+            {Object.values(videosByFolder).flat().length === 0 && (
+              <div className="kanban-drawer-empty">
+                <p>검색 결과가 없습니다</p>
+              </div>
+            )}
+          </div>
+          
+          <div className="kanban-drawer-footer">
+            <p>💡 영상을 드래그해서 보드에 추가하세요</p>
+          </div>
+        </aside>
+
+        {/* 칸반 컬럼들 */}
+        <div className="kanban-global-columns">
         {columns.map(column => {
           const columnVideos = videosByStatus[column.id] || [];
           const isDropTarget = dragOverColumn === column.id;
@@ -350,7 +550,7 @@ export default function KanbanBoard({
                         key={video.id}
                         className={`kanban-card-v2 ${draggedVideo?.id === video.id ? 'dragging' : ''}`}
                         draggable
-                        onDragStart={(e) => handleDragStart(e, video)}
+                        onDragStart={(e) => handleDragStart(e, video, 'board')}
                       >
                         {/* 썸네일 */}
                         <div className="kanban-card-thumb-v2">
@@ -462,9 +662,12 @@ export default function KanbanBoard({
         })}
       </div>
 
+        </div>
+      </div>
+
       {/* 하단 안내 */}
       <div className="kanban-global-footer">
-        <p>💡 카드를 드래그하여 상태를 변경하세요. 미분류 영상은 <strong>🪄 AI 정리</strong>로 폴더에 배치할 수 있습니다.</p>
+        <p>💡 서랍에서 영상을 드래그하거나, 카드를 이동하여 상태를 변경하세요. 미분류 영상은 <strong>🪄 AI 정리</strong>로 폴더에 배치할 수 있습니다.</p>
       </div>
     </div>
   );

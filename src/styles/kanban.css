@@ -1071,6 +1071,97 @@
   background: #f1f5f9;
 }
 
+/* --- 메인 영역 (서랍 + 컬럼) --- */
+.kanban-main-area {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.kanban-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Global Kanban 서랍 토글 버튼 */
+.kanban-global-header .kanban-drawer-toggle {
+  padding: 10px 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.kanban-global-header .kanban-drawer-toggle:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.kanban-global-header .kanban-drawer-toggle.active {
+  background: #f5f3ff;
+  border-color: #8b5cf6;
+  color: #7c3aed;
+}
+
+/* Global Kanban 서랍 */
+.kanban-main-area .kanban-drawer {
+  background: white;
+  border-right: 1px solid #e2e8f0;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.04);
+}
+
+.kanban-main-area .kanban-drawer.open {
+  width: 360px;
+}
+
+/* 서랍 하단 안내 */
+.kanban-drawer-footer {
+  padding: 16px;
+  background: linear-gradient(135deg, #f0f9ff 0%, #f5f3ff 100%);
+  border-top: 1px solid #e2e8f0;
+}
+
+.kanban-drawer-footer p {
+  font-size: 12px;
+  color: #64748b;
+  text-align: center;
+  margin: 0;
+}
+
+/* 서랍 안에서 '보드에 있음' 상태 표시 */
+.kanban-drawer-status-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: #8b5cf6;
+  background: #f5f3ff;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.kanban-drawer-file.on-board {
+  border-color: #e9d5ff;
+  background: #faf5ff;
+}
+
+.kanban-drawer-file.on-board:hover {
+  border-color: #c084fc;
+}
+
+/* 서랍 검색 결과 없음 */
+.kanban-drawer-empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: #94a3b8;
+}
+
+.kanban-drawer-empty p {
+  font-size: 13px;
+  margin: 0;
+}
+
 /* --- 하단 안내 --- */
 .kanban-global-footer {
   padding: 12px 24px;
