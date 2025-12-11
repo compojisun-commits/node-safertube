@@ -279,6 +279,8 @@ ${transcript
           temperature: 0.1, // 일관성을 위해 낮은 값
           maxOutputTokens: 8192, // 긴 영상의 모든 경고 포함 위해 증가
           responseMimeType: "application/json",
+          // 🆕 Thinking 비활성화로 속도 향상
+          thinkingConfig: { thinkingBudget: 0 },
         },
       }),
     });
@@ -340,6 +342,8 @@ ${sampled.map(t => `[${formatTimestamp(t.start)}] ${t.text.slice(0, 60)}`).join(
   
   const prompt = `이 YouTube 영상을 처음부터 끝까지 시청하고, **주제가 바뀌는 정확한 시점**을 찾아주세요.
 
+**⚠️ 중요: 모든 응답은 반드시 한국어로 작성하세요!**
+
 # 영상 정보
 - 전체 길이: ${totalMinutes}분 (${formatTimestamp(videoDuration)})
 ${transcriptHint}
@@ -350,6 +354,7 @@ ${transcriptHint}
 3. **개수**: 6~10개 정도의 주요 전환점만 선택
 4. **균등 분포**: 영상 전체에 고르게 분포되게 선택
 5. **명확한 전환점만**: "자, 다음은~", "두 번째로~" 등 명확한 전환 신호가 있는 곳
+6. **한국어 필수**: description은 반드시 한국어로 작성!
 
 # 출력 형식 (JSON 배열만!)
 [
@@ -358,7 +363,7 @@ ${transcriptHint}
   {"timestamp": "5:30", "description": "두 번째 주제로 전환"}
 ]
 
-**반드시 JSON 배열만 출력하세요!**`;
+**반드시 JSON 배열만 출력하세요! description은 한국어로!**`;
 
   try {
     const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
@@ -377,6 +382,8 @@ ${transcriptHint}
           temperature: 0.2,
           maxOutputTokens: 2048,
           responseMimeType: "application/json",
+          // 🆕 Thinking 비활성화로 속도 향상
+          thinkingConfig: { thinkingBudget: 0 },
         },
       }),
     });
@@ -501,6 +508,8 @@ export async function analyzeLongVideo(
                 {
                   text: `# 영상 유해 콘텐츠 감지 (${startMin}:00~${endMin}:00 구간)
 
+**⚠️ 중요: 모든 응답(description, quote)은 반드시 한국어로 작성하세요!**
+
 **학년**: ${selectedFilter.name} | **청크**: ${i + 1}/${numChunks}
 
 ## 자막 데이터
@@ -514,6 +523,7 @@ ${transcript
 1. **유해 콘텐츠 감지**: 욕설, 폭력, 선정성, 공포, 약물, 모방위험
 2. **정확한 시간 필수**: 자막의 실제 시간만 사용 (추측 금지!)
 3. **카테고리 명시**: 각 경고에 category 필드 필수 포함
+4. **한국어 필수**: description, quote는 반드시 한국어로!
 
 ## 응답 형식 (JSON)
 {
@@ -521,13 +531,13 @@ ${transcript
     {
       "startTime": "MM:SS",
       "endTime": "MM:SS",
-      "description": "구체적인 문제 내용",
+      "description": "구체적인 문제 내용 (한국어)",
       "severity": "high/medium/low",
       "category": "profanity/violence/sexuality/fear/drug/imitation",
-      "quote": "실제 문제가 된 대사나 장면 설명"
+      "quote": "실제 문제가 된 대사나 장면 설명 (한국어)"
     }
   ],
-  "flow": [{"timestamp": "MM:SS", "description": "주제 전환 설명"}]
+  "flow": [{"timestamp": "MM:SS", "description": "주제 전환 설명 (한국어)"}]
 }
 
 ## 카테고리 기준
@@ -543,7 +553,7 @@ ${transcript
 - **medium**: 보호자 확인 필요 (경미한 부적절 표현)
 - **low**: 참고 사항 (약간의 긴장감, 가벼운 갈등)
 
-**중요**: 시간은 반드시 ${startMin}:00~${endMin}:00 범위 내로!`,
+**중요**: 시간은 반드시 ${startMin}:00~${endMin}:00 범위 내로! 한국어 필수!`,
                 },
               ],
             },
@@ -552,6 +562,8 @@ ${transcript
             temperature: 0.3, // 일관성을 위해 낮은 값
             maxOutputTokens: 8192, // 모든 경고 포함 위해 증가
             responseMimeType: "application/json",
+            // 🆕 Thinking 비활성화로 속도 향상
+            thinkingConfig: { thinkingBudget: 0 },
           },
         }),
       })
@@ -807,6 +819,8 @@ ${allWarnings
             temperature: 0.1, // 일관성을 위해 낮은 값
             maxOutputTokens: 8192, // 점수 계산 설명을 위해 증가
             responseMimeType: "application/json",
+            // 🆕 Thinking 비활성화로 속도 향상
+            thinkingConfig: { thinkingBudget: 0 },
           },
         }),
       }

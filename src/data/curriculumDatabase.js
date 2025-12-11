@@ -1,7 +1,7 @@
 /**
  * 초등학교 교육과정 연간 지도 계획 데이터베이스
  * AI 자동 분류를 위한 계층 구조
- *
+ * 
  * ID 규칙:
  * - 학년: g1, g2, g3, g4, g5, g6
  * - 학기: g1-s1 (1학년 1학기), g1-s2 (1학년 2학기)
@@ -75,17 +75,17 @@ export const getChildFolders = (parentId) => {
 
 export const findFoldersByKeywords = (keywords) => {
   const results = [];
-
+  
   CurriculumDatabase.hierarchy.forEach((folder) => {
     if (folder.metadata?.keywords) {
       const matchCount = keywords.filter((kw) =>
         folder.metadata.keywords.some(
           (fkw) =>
-            fkw.toLowerCase().includes(kw.toLowerCase()) ||
+          fkw.toLowerCase().includes(kw.toLowerCase()) || 
             kw.toLowerCase().includes(fkw.toLowerCase()),
         ),
       ).length;
-
+      
       if (matchCount > 0) {
         results.push({
           folder,
@@ -97,26 +97,26 @@ export const findFoldersByKeywords = (keywords) => {
       }
     }
   });
-
+  
   return results.sort((a, b) => b.matchCount - a.matchCount);
 };
 
 export const findFoldersByStandard = (text) => {
   const results = [];
-
+  
   CurriculumDatabase.hierarchy.forEach((folder) => {
     if (folder.metadata?.achievementStandards) {
       const matched = folder.metadata.achievementStandards.some(
         (std) =>
           text.toLowerCase().includes(std.toLowerCase()) || std.toLowerCase().includes(text.toLowerCase()),
       );
-
+      
       if (matched) {
         results.push(folder);
       }
     }
   });
-
+  
   return results;
 };
 
@@ -124,7 +124,7 @@ export const getFolderPath = (folderId) => {
   const path = [];
   let currentId = folderId;
   let safety = 0;
-
+  
   while (currentId && safety < 10) {
     const folder = getFolderById(currentId);
     if (folder) {
@@ -135,7 +135,7 @@ export const getFolderPath = (folderId) => {
     }
     safety++;
   }
-
+  
   return path.join(' > ');
 };
 
