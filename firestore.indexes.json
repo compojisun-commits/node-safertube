@@ -9,36 +9,15 @@
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "semester",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "subject",
-          "order": "ASCENDING"
-        },
-        {
           "fieldPath": "createdAt",
           "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "sharedVideos",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "grade",
-          "order": "ASCENDING"
         },
         {
-          "fieldPath": "subject",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdAt",
+          "fieldPath": "__name__",
           "order": "DESCENDING"
         }
-      ]
+      ],
+      "density": "SPARSE_ALL"
     },
     {
       "collectionGroup": "sharedVideos",
@@ -55,26 +34,13 @@
         {
           "fieldPath": "createdAt",
           "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "sharedVideos",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "subject",
-          "order": "ASCENDING"
         },
         {
-          "fieldPath": "semester",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdAt",
+          "fieldPath": "__name__",
           "order": "DESCENDING"
         }
-      ]
+      ],
+      "density": "SPARSE_ALL"
     },
     {
       "collectionGroup": "sharedVideos",
@@ -85,15 +51,9 @@
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "sharedVideos",
-      "queryScope": "COLLECTION",
-      "fields": [
+          "fieldPath": "semester",
+          "order": "ASCENDING"
+        },
         {
           "fieldPath": "subject",
           "order": "ASCENDING"
@@ -101,8 +61,36 @@
         {
           "fieldPath": "createdAt",
           "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "DESCENDING"
         }
-      ]
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "sharedVideos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "grade",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "subject",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
     },
     {
       "collectionGroup": "sharedVideos",
@@ -115,8 +103,55 @@
         {
           "fieldPath": "createdAt",
           "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "DESCENDING"
         }
-      ]
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "sharedVideos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "subject",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "sharedVideos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "subject",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "semester",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
     }
   ],
   "fieldOverrides": []

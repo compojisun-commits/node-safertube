@@ -18,6 +18,59 @@ export default function VideoRecommendation({ onBack }) {
   const [materials, setMaterials] = useState([]);
   const [customMaterial, setCustomMaterial] = useState("");
 
+  // 랜덤 키워드 생성
+  const handleRandomKeyword = async () => {
+    try {
+      // Firestore에서 학년-과목 조합으로 문서 찾기
+      const docName = `${gradeLevel}-${subject}`;
+      const keywordDocRef = doc(db, "recommendKeywords", docName);
+      const keywordDoc = await getDoc(keywordDocRef);
+
+      if (!keywordDoc.exists()) {
+        await Swal.fire({
+          title: '키워드 없음',
+          text: `${gradeLevel} ${subject}에 대한 추천 키워드가 아직 없습니다.`,
+          icon: 'info',
+          confirmButtonColor: '#4285f4'
+        });
+        return;
+      }
+
+      const data = keywordDoc.data();
+      const keywords = data.keywords || [];
+
+      if (keywords.length === 0) {
+        await Swal.fire({
+          title: '키워드 없음',
+          text: '저장된 키워드가 없습니다.',
+          icon: 'info',
+          confirmButtonColor: '#4285f4'
+        });
+        return;
+      }
+
+      // 랜덤으로 하나 선택
+      const randomKeyword = keywords[Math.floor(Math.random() * keywords.length)];
+      setIntention(randomKeyword);
+
+      await Swal.fire({
+        title: '키워드 생성!',
+        text: `"${randomKeyword}" 키워드를 선택했습니다.`,
+        icon: 'success',
+        confirmButtonColor: '#4285f4',
+        timer: 1500
+      });
+    } catch (error) {
+      console.error('랜덤 키워드 생성 오류:', error);
+      await Swal.fire({
+        title: '오류',
+        text: '키워드를 가져오는 중 오류가 발생했습니다.',
+        icon: 'error',
+        confirmButtonColor: '#4285f4'
+      });
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -263,11 +316,9 @@ export default function VideoRecommendation({ onBack }) {
           <div className="flex flex-wrap gap-1.5 sm:gap-2">
             {[
               { short: "미술", full: "미술" },
-              { short: "실과", full: "실과" },
               { short: "체육", full: "체육" },
-              { short: "음악", full: "음악" },
-              { short: "창체", full: "창의적 체험활동" },
-              { short: "미정", full: "미정" },
+              { short: "안전교육", full: "안전교육" },
+              { short: "짜투리영상", full: "짜투리영상" },
             ].map((subj) => (
               <button
                 key={subj.full}
@@ -276,38 +327,37 @@ export default function VideoRecommendation({ onBack }) {
                 title={subj.full}
                 className={`relative px-3 sm:px-4 py-1.5 sm:py-2 text-sm sm:text-base font-semibold rounded-lg border transition-all group ${
                   subject === subj.full
-                    ? subj.full === "미정"
-                      ? "text-white bg-purple-600 border-purple-600"
-                      : "text-white bg-blue-600 border-blue-600"
+                    ? "text-white bg-blue-600 border-blue-600"
                     : "text-gray-700 bg-white border-gray-300 hover:bg-blue-50 hover:border-blue-400"
                 }`}
               >
                 {subj.short}
-                {subj.full === "미정" && (
-                  <span className="ml-1 text-xs">✨</span>
-                )}
                 <span className="hidden sm:block absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-                  {subj.full === "미정" ? "재미있고 의미있는 영상 추천" : subj.full}
+                  {subj.full}
                 </span>
               </button>
             ))}
           </div>
-          {subject === "미정" && (
-            <p className="text-xs sm:text-sm text-purple-600 mt-2 font-medium">
-              ✨ 해당 학년에 적합한 재미있고 교육적인 영상을 추천해드립니다
-            </p>
-          )}
         </div>
 
-        {/* 3. 수업 의도 (선택) */}
+        {/* 3. 수업 의도 및 준비물 (선택) */}
         <div>
-          <label className="block text-base sm:text-lg font-semibold text-gray-700 mb-2">
-            3. 수업 의도 (선택)
-          </label>
+          <div className="flex justify-between items-center mb-2">
+            <label className="block text-base sm:text-lg font-semibold text-gray-700">
+              3. 수업 의도 및 준비물 (선택)
+            </label>
+            <button
+              type="button"
+              onClick={handleRandomKeyword}
+              className="px-3 py-1.5 text-xs sm:text-sm font-medium bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
+            >
+              🎲 랜덤 생성
+            </button>
+          </div>
           <textarea
             value={intention}
             onChange={(e) => setIntention(e.target.value)}
-            placeholder="예: 학생들이 민주주의의 중요성을 이해하고, 자신의 권리를 알 수 있도록..."
+            placeholder="크리스마스 트리 만들기"
             rows={3}
             className="w-full px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />

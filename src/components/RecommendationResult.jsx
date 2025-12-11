@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, addDoc, collection, Timestamp, getDoc, setDoc, arrayUnion } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { useAuth } from '../context/AuthContext';
 import Swal from 'sweetalert2';
+import { addToJjim } from '../utils/jjim';
+import { addLikeSubject, removeLikeSubject, isLikedSubject } from '../utils/likeSubject';
 
 export default function RecommendationResult({ requestId, onReset, onBack }) {
   const { user, loginWithGoogle } = useAuth();
@@ -10,6 +12,9 @@ export default function RecommendationResult({ requestId, onReset, onBack }) {
   const [loading, setLoading] = useState(true);
   const [expandedVideos, setExpandedVideos] = useState({});
   const [emailNotificationEnabled, setEmailNotificationEnabled] = useState(false);
+  const [sortBy, setSortBy] = useState('duration'); // 'duration', 'views', 'likes'
+  const [likedVideos, setLikedVideos] = useState({}); // videoId: boolean
+  const [jjimedVideos, setJjimedVideos] = useState({}); // videoId: boolean
 
   useEffect(() => {
     if (!requestId) return;
@@ -40,6 +45,274 @@ export default function RecommendationResult({ requestId, onReset, onBack }) {
       ...prev,
       [videoId]: !prev[videoId]
     }));
+  };
+
+  // 키워드 자동 저장 함수 (좋아요/찜 2개 이상 시)
+  const saveKeywordIfNeeded = async () => {
+    if (!result || !result.intention || !result.gradeLevel || !result.subject) return;
+
+    // 좋아요 + 찜 개수 확인
+    const likedCount = Object.values(likedVideos).filter(Boolean).length;
+    const jjimedCount = Object.values(jjimedVideos).filter(Boolean).length;
+    const totalCount = likedCount + jjimedCount;
+
+    if (totalCount >= 2) {
+      try {
+        const docName = `${result.gradeLevel}-${result.subject}`;
+        const keywordDocRef = doc(db, "recommendKeywords", docName);
+        const keywordDoc = await getDoc(keywordDocRef);
+
+        const keyword = result.intention.trim();
+
+        if (!keywordDoc.exists()) {
+          // 문서가 없으면 새로 생성
+          await setDoc(keywordDocRef, {
+            gradeLevel: result.gradeLevel,
+            subject: result.subject,
+            keywords: [keyword],
+            createdAt: Timestamp.now(),
+            updatedAt: Timestamp.now()
+          });
+          console.log(`✅ 키워드 저장: "${keyword}" (새 문서 생성)`);
+        } else {
+          // 이미 있으면 중복 체크 후 추가
+          const data = keywordDoc.data();
+          const keywords = data.keywords || [];
+
+          if (!keywords.includes(keyword)) {
+            await updateDoc(keywordDocRef, {
+              keywords: arrayUnion(keyword),
+              updatedAt: Timestamp.now()
+            });
+            console.log(`✅ 키워드 저장: "${keyword}" (기존 문서에 추가)`);
+          } else {
+            console.log(`ℹ️ 키워드 이미 존재: "${keyword}"`);
+          }
+        }
+      } catch (error) {
+        console.error('키워드 저장 오류:', error);
+      }
+    }
+  };
+
+  // 찜하기 핸들러
+  const handleJjim = async (video) => {
+    if (!user) {
+      const result = await Swal.fire({
+        title: '로그인이 필요합니다',
+        text: '찜하기 기능을 사용하려면 로그인이 필요합니다.',
+        icon: 'info',
+        showCancelButton: true,
+        confirmButtonColor: '#4285f4',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: '로그인',
+        cancelButtonText: '취소'
+      });
+      if (result.isConfirmed) {
+        await loginWithGoogle();
+      }
+      return;
+    }
+
+    try {
+      await addToJjim({
+        user,
+        videoUrl: video.videoUrl,
+        videoId: video.videoId,
+        title: video.title,
+        analysis: {
+          safetyScore: video.safetyScore,
+          summary: video.summary,
+          warnings: video.warnings || [],
+        },
+      });
+
+      setJjimedVideos(prev => {
+        const newState = { ...prev, [video.videoId]: true };
+        // 상태 업데이트 후 키워드 저장 체크
+        setTimeout(() => saveKeywordIfNeeded(), 100);
+        return newState;
+      });
+
+      await Swal.fire({
+        title: '찜 완료!',
+        text: '내 찜보따리에 추가되었습니다.',
+        icon: 'success',
+        confirmButtonColor: '#4285f4',
+        timer: 1500
+      });
+    } catch (error) {
+      console.error('찜하기 오류:', error);
+      await Swal.fire({
+        title: '오류',
+        text: error.message || '찜하기 중 오류가 발생했습니다.',
+        icon: 'error',
+        confirmButtonColor: '#4285f4'
+      });
+    }
+  };
+
+  // 좋아요 핸들러
+  const handleLike = async (video) => {
+    if (!user) {
+      const result = await Swal.fire({
+        title: '로그인이 필요합니다',
+        text: '좋아요 기능을 사용하려면 로그인이 필요합니다.',
+        icon: 'info',
+        showCancelButton: true,
+        confirmButtonColor: '#4285f4',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: '로그인',
+        cancelButtonText: '취소'
+      });
+      if (result.isConfirmed) {
+        await loginWithGoogle();
+      }
+      return;
+    }
+
+    try {
+      const isLiked = likedVideos[video.videoId];
+      const subject = result.subject;
+
+      if (isLiked) {
+        // 좋아요 취소
+        await removeLikeSubject({ user, subject, videoId: video.videoId });
+        setLikedVideos(prev => ({ ...prev, [video.videoId]: false }));
+        await Swal.fire({
+          title: '좋아요 취소',
+          text: '좋아요가 취소되었습니다.',
+          icon: 'info',
+          confirmButtonColor: '#6c757d',
+          timer: 1000
+        });
+      } else {
+        // 좋아요 추가
+        await addLikeSubject({
+          user,
+          subject,
+          videoId: video.videoId,
+          videoUrl: video.videoUrl,
+          title: video.title,
+          summary: video.summary || '',
+          duration: video.duration || 0,
+          safetyScore: video.safetyScore || 0,
+        });
+        setLikedVideos(prev => {
+          const newState = { ...prev, [video.videoId]: true };
+          // 상태 업데이트 후 키워드 저장 체크
+          setTimeout(() => saveKeywordIfNeeded(), 100);
+          return newState;
+        });
+        await Swal.fire({
+          title: '좋아요!',
+          text: `${subject} 좋아요 목록에 추가되었습니다.`,
+          icon: 'success',
+          confirmButtonColor: '#4285f4',
+          timer: 1500
+        });
+      }
+    } catch (error) {
+      console.error('좋아요 오류:', error);
+      await Swal.fire({
+        title: '오류',
+        text: error.message || '좋아요 처리 중 오류가 발생했습니다.',
+        icon: 'error',
+        confirmButtonColor: '#4285f4'
+      });
+    }
+  };
+
+  // 새로고침 핸들러 (4개 더 추가, 로그인 시 2회 제한)
+  const handleRefresh = async () => {
+    if (!result) return;
+
+    // 비로그인 사용자는 사용 불가
+    if (!user) {
+      await Swal.fire({
+        title: '로그인이 필요합니다',
+        text: '새로고침 기능은 로그인 후 사용 가능합니다.',
+        icon: 'info',
+        showCancelButton: true,
+        confirmButtonColor: '#4285f4',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: '로그인',
+        cancelButtonText: '취소'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          loginWithGoogle();
+        }
+      });
+      return;
+    }
+
+    // 새로고침 사용 횟수 체크 (requestId별로 관리)
+    const refreshKey = `refresh_count_${requestId}`;
+    const refreshCount = parseInt(localStorage.getItem(refreshKey) || '0');
+
+    if (refreshCount >= 2) {
+      await Swal.fire({
+        title: '새로고침 한도 초과',
+        text: '이 추천 결과는 이미 2번 새로고침했습니다.',
+        icon: 'warning',
+        confirmButtonColor: '#4285f4'
+      });
+      return;
+    }
+
+    const confirmResult = await Swal.fire({
+      title: '새로고침',
+      html: `같은 조건으로 4개의 영상을 더 추가할까요?<br/><small>남은 횟수: ${2 - refreshCount}/2</small>`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#4285f4',
+      cancelButtonColor: '#6c757d',
+      confirmButtonText: '추가',
+      cancelButtonText: '취소'
+    });
+
+    if (!confirmResult.isConfirmed) return;
+
+    try {
+      setLoading(true);
+
+      // 같은 조건으로 새 요청 생성 (maxResults: 4)
+      const docRef = await addDoc(collection(db, "recommendationRequests"), {
+        gradeLevel: result.gradeLevel,
+        subject: result.subject,
+        intention: result.intention || null,
+        objective: result.objective || `${result.subject} 수업을 위한 적합한 영상 추천`,
+        preferredDuration: result.preferredDuration || null,
+        materials: result.materials || [],
+        maxResults: 4, // 4개만 검색
+        userId: user?.uid || null,
+        status: "pending",
+        createdAt: Timestamp.now(),
+      });
+
+      // 새로고침 횟수 증가
+      localStorage.setItem(refreshKey, (refreshCount + 1).toString());
+
+      await Swal.fire({
+        title: '새로고침 시작!',
+        text: '같은 조건으로 4개 영상을 추가로 검색합니다.',
+        icon: 'success',
+        confirmButtonColor: '#4285f4',
+        timer: 1500
+      });
+
+      // 새 요청 ID로 리다이렉트
+      window.location.href = `?requestId=${docRef.id}`;
+    } catch (error) {
+      console.error('새로고침 오류:', error);
+      await Swal.fire({
+        title: '오류',
+        text: '새로고침 중 오류가 발생했습니다.',
+        icon: 'error',
+        confirmButtonColor: '#4285f4'
+      });
+      setLoading(false);
+    }
   };
 
   const handleEmailNotification = async () => {
@@ -234,6 +507,18 @@ export default function RecommendationResult({ requestId, onReset, onBack }) {
 
   const { recommendations } = result;
 
+  // 정렬 함수
+  const sortVideos = (videos) => {
+    const sorted = [...videos];
+    if (sortBy === 'views') {
+      return sorted.sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0));
+    } else if (sortBy === 'likes') {
+      return sorted.sort((a, b) => (b.likeCount || 0) - (a.likeCount || 0));
+    }
+    // 기본값: duration (이미 카테고리별로 분류되어 있음)
+    return sorted;
+  };
+
   // 영상 길이별로 그룹화
   const durationCategories = [
     { label: '5분 이내', maxDuration: 300, videos: [] },
@@ -254,6 +539,11 @@ export default function RecommendationResult({ requestId, onReset, onBack }) {
         break;
       }
     }
+  });
+
+  // 각 카테고리 내에서 정렬 적용
+  durationCategories.forEach(category => {
+    category.videos = sortVideos(category.videos);
   });
 
   // 비어있지 않은 카테고리만 필터링
@@ -283,6 +573,63 @@ export default function RecommendationResult({ requestId, onReset, onBack }) {
           <p style={{ margin: '8px 0' }}><strong>주제:</strong> {result.subject}</p>
           <p style={{ margin: '8px 0' }}><strong>목표:</strong> {result.objective}</p>
           <p style={{ margin: '8px 0' }}><strong>총 {recommendations.length}개 영상 발견</strong></p>
+        </div>
+
+        {/* 정렬 버튼 */}
+        <div style={{
+          display: 'flex',
+          gap: '10px',
+          marginBottom: '20px',
+          flexWrap: 'wrap'
+        }}>
+          <button
+            onClick={() => setSortBy('duration')}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: sortBy === 'duration' ? '#4285f4' : '#f1f3f4',
+              color: sortBy === 'duration' ? 'white' : '#333',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '600',
+              transition: 'all 0.2s'
+            }}
+          >
+            ⏱️ 시간순
+          </button>
+          <button
+            onClick={() => setSortBy('views')}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: sortBy === 'views' ? '#4285f4' : '#f1f3f4',
+              color: sortBy === 'views' ? 'white' : '#333',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '600',
+              transition: 'all 0.2s'
+            }}
+          >
+            👁️ 조회수순
+          </button>
+          <button
+            onClick={() => setSortBy('likes')}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: sortBy === 'likes' ? '#4285f4' : '#f1f3f4',
+              color: sortBy === 'likes' ? 'white' : '#333',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '600',
+              transition: 'all 0.2s'
+            }}
+          >
+            👍 좋아요순
+          </button>
         </div>
 
         {/* 영상 길이별 목록 */}
@@ -478,25 +825,70 @@ export default function RecommendationResult({ requestId, onReset, onBack }) {
                         </div>
                       )}
 
-                      {/* YouTube 링크 */}
-                      <a
-                        href={`https://www.youtube.com/watch?v=${video.videoId}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        style={{
-                          display: 'inline-block',
-                          padding: '10px 20px',
-                          backgroundColor: '#ff0000',
-                          color: 'white',
-                          textDecoration: 'none',
-                          borderRadius: '8px',
-                          fontSize: '14px',
-                          fontWeight: '600'
-                        }}
-                      >
-                        YouTube에서 보기
-                      </a>
+                      {/* 액션 버튼들 */}
+                      <div style={{ display: 'flex', gap: '10px', marginBottom: '15px', flexWrap: 'wrap' }}>
+                        {/* 찜하기 버튼 */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleJjim(video);
+                          }}
+                          style={{
+                            padding: '8px 16px',
+                            backgroundColor: jjimedVideos[video.videoId] ? '#ffc107' : '#f1f3f4',
+                            color: jjimedVideos[video.videoId] ? 'white' : '#333',
+                            border: 'none',
+                            borderRadius: '8px',
+                            fontSize: '14px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          ⭐ {jjimedVideos[video.videoId] ? '찜 완료' : '찜하기'}
+                        </button>
+
+                        {/* 좋아요 버튼 */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleLike(video);
+                          }}
+                          style={{
+                            padding: '8px 16px',
+                            backgroundColor: likedVideos[video.videoId] ? '#e91e63' : '#f1f3f4',
+                            color: likedVideos[video.videoId] ? 'white' : '#333',
+                            border: 'none',
+                            borderRadius: '8px',
+                            fontSize: '14px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          ❤️ {likedVideos[video.videoId] ? '좋아요 취소' : '좋아요'}
+                        </button>
+
+                        {/* YouTube 링크 */}
+                        <a
+                          href={`https://www.youtube.com/watch?v=${video.videoId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          style={{
+                            display: 'inline-block',
+                            padding: '8px 16px',
+                            backgroundColor: '#ff0000',
+                            color: 'white',
+                            textDecoration: 'none',
+                            borderRadius: '8px',
+                            fontSize: '14px',
+                            fontWeight: '600'
+                          }}
+                        >
+                          YouTube 보기
+                        </a>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -547,10 +939,41 @@ export default function RecommendationResult({ requestId, onReset, onBack }) {
           🏠
         </button>
 
-        {/* 새로운 추천받기 버튼 */}
+        {/* 새로고침 버튼 (같은 조건 5개) */}
+        <button
+          onClick={handleRefresh}
+          title="같은 조건으로 5개 다시 검색"
+          style={{
+            width: '60px',
+            height: '60px',
+            borderRadius: '50%',
+            backgroundColor: '#fbbc04',
+            color: 'white',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: '24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 20px rgba(251, 188, 4, 0.4)',
+            transition: 'all 0.3s ease'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'scale(1.1) rotate(180deg)';
+            e.currentTarget.style.boxShadow = '0 6px 30px rgba(251, 188, 4, 0.6)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1) rotate(0deg)';
+            e.currentTarget.style.boxShadow = '0 4px 20px rgba(251, 188, 4, 0.4)';
+          }}
+        >
+          🔄
+        </button>
+
+        {/* 처음부터 버튼 */}
         <button
           onClick={onReset}
-          title="새로운 추천받기"
+          title="처음부터 다시 시작"
           style={{
             width: '60px',
             height: '60px',
@@ -567,15 +990,15 @@ export default function RecommendationResult({ requestId, onReset, onBack }) {
             transition: 'all 0.3s ease'
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'scale(1.1) rotate(90deg)';
+            e.currentTarget.style.transform = 'scale(1.1)';
             e.currentTarget.style.boxShadow = '0 6px 30px rgba(52, 168, 83, 0.6)';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'scale(1) rotate(0deg)';
+            e.currentTarget.style.transform = 'scale(1)';
             e.currentTarget.style.boxShadow = '0 4px 20px rgba(52, 168, 83, 0.4)';
           }}
         >
-          🔄
+          ✨
         </button>
       </div>
     </>
