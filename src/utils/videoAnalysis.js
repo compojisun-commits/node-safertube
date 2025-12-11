@@ -420,7 +420,7 @@ ${transcriptHint}
 
 /**
  * 긴 영상 분석 (10분 초과)
- * 🚀 v2.0 최적화: 25분 청크 + 타임라인 통합 + API 호출 50% 감소
+ * 🆕 최적화: 15분 청크 + 간소화된 프롬프트 + 카테고리별 정확한 시간 표시
  */
 export async function analyzeLongVideo(
   videoUrl,
@@ -430,8 +430,8 @@ export async function analyzeLongVideo(
   onProgress
 ) {
   try {
-    // 🚀 청크 크기 25분으로 확대 (API 호출 횟수 대폭 감소)
-    const CHUNK_DURATION = 1500; // 25분 (1500초)
+    // 🆕 청크 크기 15분으로 확대 (API 호출 횟수 33% 감소)
+    const CHUNK_DURATION = 900; // 15분 (900초)
     const numChunks = Math.ceil(videoDuration / CHUNK_DURATION);
 
     // 자막 추출
@@ -443,10 +443,24 @@ export async function analyzeLongVideo(
       console.warn("Transcript fetch failed (long):", e?.message || e);
     }
 
-    // 🚀 타임라인 생성 API 제거 - 청크 분석에서 flow 추출로 대체
+    onProgress?.({
+      status: "timeline",
+      message: `긴 영상 감지: 타임라인 생성 중...`,
+      totalChunks: numChunks,
+      completedChunks: 0,
+    });
+
+    // 🆕 1단계: 영상 전체로 타임라인 생성 (청크 분할 X - 가장 정확!)
+    let transcriptFlow = [];
+    try {
+      transcriptFlow = await generateTimelineFromVideo(videoUrl, videoDuration, transcript);
+    } catch (e) {
+      console.error("[타임라인 생성 실패]", e);
+    }
+
     onProgress?.({
       status: "chunking",
-      message: `영상 분석 중... (${numChunks}개 구간)`,
+      message: `경고 구간 분석 중... (${numChunks}개 청크)`,
       totalChunks: numChunks,
       completedChunks: 0,
     });
@@ -485,23 +499,51 @@ export async function analyzeLongVideo(
                   },
                 },
                 {
-                  text: `영상 ${startMin}:00~${endMin}:00 구간 분석 (${selectedFilter.name}, ${i + 1}/${numChunks})
+                  text: `# 영상 유해 콘텐츠 감지 (${startMin}:00~${endMin}:00 구간)
 
-자막: ${transcript
+**학년**: ${selectedFilter.name} | **청크**: ${i + 1}/${numChunks}
+
+## 자막 데이터
+${transcript
   .filter((t) => t.start >= startTime && t.start < endTime)
-  .slice(0, 50)
+  .slice(0, 80)
   .map((t) => `[${formatTimestamp(t.start)}] ${t.text}`)
   .join("\n")}
 
-**JSON 응답:**
+## 분석 지시
+1. **유해 콘텐츠 감지**: 욕설, 폭력, 선정성, 공포, 약물, 모방위험
+2. **정확한 시간 필수**: 자막의 실제 시간만 사용 (추측 금지!)
+3. **카테고리 명시**: 각 경고에 category 필드 필수 포함
+
+## 응답 형식 (JSON)
 {
-  "warnings": [{"startTime": "MM:SS", "endTime": "MM:SS", "description": "문제내용", "severity": "high/medium/low", "category": "profanity/violence/sexuality/fear/drug/imitation", "quote": "실제 대사"}],
-  "flow": [{"timestamp": "MM:SS", "description": "주제 전환"}]
+  "warnings": [
+    {
+      "startTime": "MM:SS",
+      "endTime": "MM:SS",
+      "description": "구체적인 문제 내용",
+      "severity": "high/medium/low",
+      "category": "profanity/violence/sexuality/fear/drug/imitation",
+      "quote": "실제 문제가 된 대사나 장면 설명"
+    }
+  ],
+  "flow": [{"timestamp": "MM:SS", "description": "주제 전환 설명"}]
 }
 
-카테고리: profanity(욕설), violence(폭력), sexuality(선정성), fear(공포), drug(약물), imitation(모방위험)
-심각도: high(심각), medium(보통), low(경미)
-시간 범위: ${startMin}:00~${endMin}:00만 사용!`,
+## 카테고리 기준
+- **profanity**: 욕설, 비속어, 부적절한 언어
+- **violence**: 폭력, 싸움, 위협, 신체 위해
+- **sexuality**: 선정적 내용, 부적절한 신체 노출
+- **fear**: 공포, 무서운 장면, 혐오스러운 내용
+- **drug**: 음주, 흡연, 약물 관련
+- **imitation**: 따라하면 위험한 행동, 범죄 행위
+
+## 심각도 기준
+- **high**: 즉시 시청 중단 권장 (심한 욕설, 폭력, 선정성)
+- **medium**: 보호자 확인 필요 (경미한 부적절 표현)
+- **low**: 참고 사항 (약간의 긴장감, 가벼운 갈등)
+
+**중요**: 시간은 반드시 ${startMin}:00~${endMin}:00 범위 내로!`,
                 },
               ],
             },
@@ -614,35 +656,34 @@ export async function analyzeLongVideo(
     };
     console.log("[카테고리 통계]", categoryStats);
 
-    // 🚀 타임라인: 청크 분석 결과에서 flow 수집 (별도 API 호출 제거!)
-    const allFlow = [];
-    chunkResults
-      .filter((r) => r)
-      .sort((a, b) => a.chunkIndex - b.chunkIndex)
-      .forEach((chunk) => {
-        allFlow.push(...(chunk.flow || []));
-      });
-    
-    allFlow.sort((a, b) => parseTimestamp(a.timestamp) - parseTimestamp(b.timestamp));
-    let finalFlow = filterNearbyChapters(allFlow, 60);
-    
-    if (finalFlow.length > 8) {
-      const step = Math.ceil(finalFlow.length / 8);
-      finalFlow = finalFlow.filter((_, idx) => idx % step === 0).slice(0, 8);
+    // 🆕 타임라인: 자막 기반 타임라인 우선 사용 (가장 정확함!)
+    let finalFlow = [];
+    if (transcriptFlow.length > 0) {
+      // 자막 기반 타임라인이 있으면 그대로 사용 (이미 정확한 시간)
+      finalFlow = transcriptFlow;
+      console.log("[타임라인] 자막 기반 타임라인 사용:", finalFlow.length, "개");
+    } else {
+      // 자막이 없으면 청크 분석 결과에서 flow 수집 (폴백)
+      const allFlow = [];
+      chunkResults
+        .filter((r) => r)
+        .sort((a, b) => a.chunkIndex - b.chunkIndex)
+        .forEach((chunk) => {
+          allFlow.push(...(chunk.flow || []));
+        });
+      
+      allFlow.sort((a, b) => parseTimestamp(a.timestamp) - parseTimestamp(b.timestamp));
+      finalFlow = filterNearbyChapters(allFlow, 60);
+      
+      if (finalFlow.length > 8) {
+        const step = Math.ceil(finalFlow.length / 8);
+        finalFlow = finalFlow.filter((_, idx) => idx % step === 0).slice(0, 8);
+      }
+      console.log("[타임라인] 청크 기반 타임라인 사용 (폴백):", finalFlow.length, "개");
     }
-    console.log("[타임라인] 청크 기반 타임라인:", finalFlow.length, "개");
 
-    // 🚀 전체 요약 생성 (간소화된 프롬프트)
-    onProgress?.({ status: "summarizing", message: "요약 생성 중..." });
-
-    // 경고 구간 총 시간 계산
-    let totalWarningSeconds = 0;
-    allWarnings.forEach(w => {
-      const start = parseTimestamp(w.startTime || "0:00");
-      const end = parseTimestamp(w.endTime || w.startTime || "0:00");
-      totalWarningSeconds += Math.max(1, end - start);
-    });
-    const warningRatio = Math.round((totalWarningSeconds / videoDuration) * 100);
+    // 전체 요약 생성
+    onProgress?.({ status: "summarizing", message: "전체 요약 생성 중..." });
 
     const summaryResponse = await fetch(
       `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`,
@@ -654,42 +695,117 @@ export async function analyzeLongVideo(
             {
               parts: [
                 {
-                  text: `영상 분석 결과 요약 (${Math.floor(videoDuration / 60)}분, ${selectedFilter.name} 기준)
+                  text: `다음은 YouTube 영상(${Math.floor(
+                    videoDuration / 60
+                  )}분)을 분석한 타임라인과 경고 목록입니다. "${
+                    selectedFilter.name
+                  }" 학생 기준으로 요약하고 안전 점수를 매겨주세요.
 
-타임라인: ${finalFlow.map(f => `${f.timestamp}: ${f.description}`).join(" | ")}
+**중요: 모든 응답은 반드시 한국어로 작성하세요!**
 
-경고 ${allWarnings.length}개 (영상의 ${warningRatio}%):
-${allWarnings.slice(0, 15).map(w => `[${w.severity}/${w.category}] ${w.startTime}: ${w.description}`).join("\n")}
+**영상 타임라인:**
+${finalFlow.map((f) => `${f.timestamp}: ${f.description}`).join("\n")}
 
-**JSON 응답:**
+**감지된 경고 구간 (총 ${allWarnings.length}개):**
+${allWarnings
+  .slice(0, 20)
+  .map(
+    (w, i) =>
+      `${i + 1}. [${w.severity}] ${w.startTime}-${w.endTime}: ${w.description}`
+  )
+  .join("\n")}${
+                    allWarnings.length > 20
+                      ? `\n... 외 ${allWarnings.length - 20}개`
+                      : ""
+                  }
+
+**응답 형식 (JSON):**
 {
-  "summary": "영상 내용 3문장 요약",
-  "safetyScore": 0-100,
-  "safetyDescription": "안전도 한줄 설명",
+  "summary": "영상의 주제와 내용을 3-5문장으로 구체적으로 요약 (반드시 작성)",
+  "safetyScore": (숫자 0-100),
+  "safetyDescription": "안전도 설명(2-3문장)",
   "categoryRatings": {
-    "sexuality": {"ratingLevel": 0-3, "level": "safe/caution/warning/danger", "score": 0-100},
-    "violence": {"ratingLevel": 0-3, "level": "safe/caution/warning/danger", "score": 0-100},
-    "profanity": {"ratingLevel": 0-3, "level": "safe/caution/warning/danger", "score": 0-100},
-    "fear": {"ratingLevel": 0-3, "level": "safe/caution/warning/danger", "score": 0-100},
-    "drug": {"ratingLevel": 0-3, "level": "safe/caution/warning/danger", "score": 0-100},
-    "imitation": {"ratingLevel": 0-3, "level": "safe/caution/warning/danger", "score": 0-100}
+    "sexuality": {"ratingLevel": 0-3, "level": "safe/caution/warning/danger", "score": 0-100, "description": "선정성 관련 설명"},
+    "violence": {"ratingLevel": 0-3, "level": "safe/caution/warning/danger", "score": 0-100, "description": "폭력성 관련 설명"},
+    "profanity": {"ratingLevel": 0-3, "level": "safe/caution/warning/danger", "score": 0-100, "description": "언어/욕설 관련 설명"},
+    "fear": {"ratingLevel": 0-3, "level": "safe/caution/warning/danger", "score": 0-100, "description": "공포 관련 설명"},
+    "drug": {"ratingLevel": 0-3, "level": "safe/caution/warning/danger", "score": 0-100, "description": "약물 관련 설명"},
+    "imitation": {"ratingLevel": 0-3, "level": "safe/caution/warning/danger", "score": 0-100, "description": "모방위험 관련 설명"}
+  },
+  "ratingResult": {
+    "finalRating": "전체관람가/12세이상관람가/15세이상관람가/청소년관람불가",
+    "schoolSafetyScore": 0-100,
+    "isClassroomSafe": true/false,
+    "warningKeywords": ["문제단어1", "문제단어2"]
   },
   "comprehensionAnalysis": {
-    "recommendedAge": "초등 저학년/초등 고학년/중학생/고등학생",
+    "recommendedAge": "초등 저학년/초등 고학년/중학생/고등학생 이상",
+    "vocabularyLevel": "쉬움/보통/어려움",
+    "topicComplexity": "단순/보통/복잡",
     "overallDifficulty": "쉬움/보통/어려움",
-    "difficultWords": ["단어1", "단어2"]
+    "lexicalDensity": "Low/Medium/High",
+    "sentenceComplexity": "Simple/Complex",
+    "abstractConceptLevel": 1-5,
+    "difficultWords": ["어려운단어1", "어려운단어2"],
+    "priorKnowledge": ["필요한 사전지식"],
+    "abstractConcepts": ["추상적 개념"],
+    "comprehensionNotes": "이해도 관련 종합 설명"
   }
 }
 
-점수 기준: 경고비율 50%↑=0-20점, 30-50%=20-40점, 10-30%=40-70점, 5-10%=70-85점, 5%↓=85-100점
-ratingLevel: 0=전체, 1=12세, 2=15세, 3=청불`,
+**🎬 영상등급위원회(KMRB) 6대 고려사항 (ratingLevel 0~3):**
+1. **선정성**: 0=전체, 1=12세, 2=15세, 3=청불 (성적 내용 수위)
+2. **폭력성**: 0=전체, 1=12세, 2=15세, 3=청불 (폭력 묘사 수위)
+3. **언어**: 0=전체, 1=12세, 2=15세, 3=청불 (욕설/비속어 수위)
+4. **공포**: 0=전체, 1=12세, 2=15세, 3=청불 (공포 분위기 수위)
+5. **약물**: 0=전체, 1=12세, 2=15세, 3=청불 (음주/흡연/약물 수위)
+6. **모방위험**: 0=전체, 1=12세, 2=15세, 3=청불 (위험행동 모방 가능성)
+
+**📌 등급 변환:** ratingLevel 0→safe, 1→caution, 2→warning, 3→danger
+
+**카테고리 등급 기준:**
+- safe (90-100점): 해당 학년에 적합
+- caution (70-89점): 주의 권장
+- warning (40-69점): 보호자 동반 권장
+- danger (0-39점): 시청 부적합
+
+**안전 점수 채점 가이드라인:**
+
+점수 계산 시 다음을 **반드시** 고려:
+
+1. **구간 길이 가중치**: 긴 구간일수록 더 심각
+   - 예: "0:00-10:00" (10분) high 구간 = 매우 위험
+   - 예: "0:30-0:31" (1초) medium 구간 = 경미
+
+2. **영상 대비 경고 비율**:
+   - 전체 경고 구간 시간을 합산하여 영상 길이(${Math.floor(
+     videoDuration / 60
+   )}분) 대비 비율 계산
+   - 50% 이상: 매우 부적절 (0-20점)
+   - 30-50%: 부적절 (20-40점)
+   - 10-30%: 주의 필요 (40-70점)
+   - 5-10%: 일부 주의 (70-85점)
+   - 5% 미만: 대체로 안전 (85-100점)
+
+3. **학년별 엄격도** ("${selectedFilter.name}" 기준):
+   - 초등 저학년: 가장 엄격하게 (추가 감점)
+   - 초등 고학년: 엄격하게
+   - 중학생: 보통
+   - 고등학생: 관대하게 (완화)
+
+4. **심각도 가중치**:
+   - high: 매우 큰 감점
+   - medium: 중간 감점
+   - low: 작은 감점
+
+**중요**: 구간이 적어도 각 구간이 길고 심각하면 낮은 점수를 줄 것!`,
                 },
               ],
             },
           ],
           generationConfig: {
-            temperature: 0.1,
-            maxOutputTokens: 2048, // 🚀 응답 크기 축소
+            temperature: 0.1, // 일관성을 위해 낮은 값
+            maxOutputTokens: 8192, // 점수 계산 설명을 위해 증가
             responseMimeType: "application/json",
           },
         }),
