@@ -660,8 +660,6 @@ export default function KanbanBoard({
             </div>
           );
         })}
-      </div>
-
         </div>
       </div>
 
