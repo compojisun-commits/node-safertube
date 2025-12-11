@@ -420,7 +420,7 @@ ${transcriptHint}
 
 /**
  * 긴 영상 분석 (10분 초과)
- * 🆕 최적화: 15분 청크 + 간소화된 프롬프트 + 카테고리별 정확한 시간 표시
+ * 🆕 최적화: 20분 청크 + 카테고리별 정확한 시간 표시
  */
 export async function analyzeLongVideo(
   videoUrl,
@@ -430,8 +430,8 @@ export async function analyzeLongVideo(
   onProgress
 ) {
   try {
-    // 🆕 청크 크기 15분으로 확대 (API 호출 횟수 33% 감소)
-    const CHUNK_DURATION = 900; // 15분 (900초)
+    // 🆕 청크 크기 20분으로 확대 (정확도 유지 + 속도 향상)
+    const CHUNK_DURATION = 1200; // 20분 (1200초)
     const numChunks = Math.ceil(videoDuration / CHUNK_DURATION);
 
     // 자막 추출
