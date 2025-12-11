@@ -1370,7 +1370,7 @@ exports.recommendVideos = onDocumentCreated(
       const selectedFilter =
         gradeFilters[gradeLevel] || gradeFilters["elementary-1-2"];
 
-      // Gemini로 최적의 검색어 생성
+      // Gemini로 최적의 검색어 생성 (학년 정보 포함)
       const searchKeywords = await generateSearchKeywords(
         subject,
         intention,
@@ -1380,7 +1380,8 @@ exports.recommendVideos = onDocumentCreated(
         availableTools,
         teacherInvolvement,
         duration,
-        studentLevel
+        studentLevel,
+        gradeLevel
       );
       console.log("Gemini 생성 검색어:", searchKeywords);
 
@@ -1540,7 +1541,8 @@ async function generateSearchKeywords(
   availableTools = null,
   teacherInvolvement = null,
   duration = null,
-  studentLevel = null
+  studentLevel = null,
+  gradeLevel = null
 ) {
   try {
     let prompt;
@@ -1597,18 +1599,64 @@ async function generateSearchKeywords(
 
 검색어만 출력:`;
     } else {
+      // 학년별 검색어 스타일 가이드 생성
+      const getGradeSearchGuide = (grade) => {
+        if (!grade) return { level: "초등학생", style: "기본 개념 중심", suffix: "" };
+
+        if (grade.includes("1학년") || grade.includes("2학년")) {
+          return {
+            level: "초등 저학년(1-2학년)",
+            style: "쉬운 표현, 기초 개념, 따라하기 쉬운 활동",
+            suffix: "쉬운, 기초, 따라하기",
+            avoid: "복잡한 용어, 전문적인 기법"
+          };
+        } else if (grade.includes("3학년") || grade.includes("4학년")) {
+          return {
+            level: "초등 중학년(3-4학년)",
+            style: "개념 이해 중심, 단계별 설명, 활동 위주",
+            suffix: "알기, 배우기, 익히기",
+            avoid: "너무 어려운 전문 용어"
+          };
+        } else if (grade.includes("5학년") || grade.includes("6학년")) {
+          return {
+            level: "초등 고학년(5-6학년)",
+            style: "개념 + 활용, 창의적 응용, 심화 내용 가능",
+            suffix: "활용하기, 응용하기, 개념알기",
+            avoid: "유치하거나 너무 쉬운 내용"
+          };
+        } else if (grade.includes("중학")) {
+          return {
+            level: "중학생",
+            style: "심화 개념, 전문적 기법, 프로젝트 기반",
+            suffix: "기법, 원리, 심화",
+            avoid: "초등학교 수준의 단순한 활동"
+          };
+        } else if (grade.includes("고등")) {
+          return {
+            level: "고등학생",
+            style: "전문적 내용, 고급 기법, 이론 연계",
+            suffix: "이론, 심화, 전문",
+            avoid: "초중등 수준의 기초 내용"
+          };
+        }
+        return { level: "초등학생", style: "기본 개념 중심", suffix: "", avoid: "" };
+      };
+
+      const gradeGuide = getGradeSearchGuide(gradeLevel);
+
       // 일반 수업 영상 검색 프롬프트
       // "미정" - 재미있고 의미있는 영상 추천
       if (subject === "미정") {
-        prompt = `초등학생/중학생에게 적합한 재미있고 교육적인 YouTube 영상을 찾기 위한 검색어 3-5개 생성 (쉼표 구분, 한국어):
+        prompt = `${gradeGuide.level}에게 적합한 재미있고 교육적인 YouTube 영상을 찾기 위한 검색어 3-5개 생성 (쉼표 구분, 한국어):
 
+**대상:** ${gradeGuide.level}
 **목표:** 학생들이 즐겁게 보면서 배울 수 있는 영상
 ${intention && intention.trim() ? `**수업 의도:** ${intention}` : ""}
 
 **조건:**
 - 재미있고 흥미로운 내용
 - 교육적 가치가 있는 내용
-- 학생 발달 단계에 적합
+- ${gradeGuide.level} 발달 단계에 적합
 - 긍정적인 메시지 전달
 - 창의성, 사고력, 감성 발달에 도움
 
@@ -1622,33 +1670,51 @@ ${intention && intention.trim() ? `**수업 의도:** ${intention}` : ""}
 검색어만 출력:`;
       } else if (intention && intention.trim()) {
         // 수업 의도가 있으면 과목과 연계하여 구체적인 검색어 생성
-        prompt = `${subject} 수업을 위한 YouTube 검색어 3-5개 생성 (쉼표 구분, 한국어):
+        prompt = `${gradeGuide.level} ${subject} 수업을 위한 YouTube 검색어 3-5개 생성 (쉼표 구분, 한국어):
 
+**대상 학년:** ${gradeLevel || "초등학생"}
 **과목:** ${subject}
 **수업 의도 및 준비물:** ${intention}
 ${objective ? `**목표:** ${objective}` : ""}
 
+**핵심: 학년 수준에 맞는 검색어 생성**
+- 대상: ${gradeGuide.level}
+- 적합한 스타일: ${gradeGuide.style}
+- 권장 검색어 패턴: "핵심키워드 + ${gradeGuide.suffix || "배우기, 알기, 활용"}"
+${gradeGuide.avoid ? `- 피해야 할 것: ${gradeGuide.avoid}` : ""}
+
 **검색어 생성 규칙:**
-1. 과목(${subject})과 수업 의도를 반드시 연계하여 검색어를 만드세요
-2. 수업 의도에서 핵심 키워드를 추출하고, 그것을 ${subject} 활동으로 연결하세요
-3. 구체적이고 실행 가능한 활동 중심으로 검색어를 생성하세요
+1. 수업 의도에서 핵심 키워드만 추출하세요 (예: "색상환 이용한 디자인하기" → "색상환")
+2. 핵심 키워드에 학년 수준에 맞는 접미어를 붙이세요
+3. 절대 수업 의도 전체를 그대로 검색어로 사용하지 마세요
+4. YouTube에서 실제로 검색되는 짧고 명확한 검색어를 만드세요
 
-**예시:**
-- 수업 의도: "색상환" → 검색어: "색상환 그리기", "색상환 활용 그림", "색상환 만들기"
-- 수업 의도: "크리스마스 트리 만들기" → 검색어: "크리스마스 트리 만들기", "크리스마스 트리 미술", "트리 꾸미기"
-- 수업 의도: "줄넘기" → 검색어: "줄넘기 기초", "줄넘기 연속뛰기", "줄넘기 수업"
+**좋은 검색어 예시 (${gradeGuide.level} 기준):**
+- 수업 의도: "색상환 이용한 디자인하기"
+  → 좋음: "색상환의 개념알기", "색상환 활용하기", "색상환 그리기"
+  → 나쁨: "색상환 이용한 디자인하기" (너무 구체적, 검색 결과 없음)
+- 수업 의도: "크리스마스 트리 만들기"
+  → 좋음: "크리스마스 트리 만들기", "트리 꾸미기 미술"
+- 수업 의도: "줄넘기 수업"
+  → 좋음: "줄넘기 기초", "줄넘기 배우기"
 
-검색어만 출력 (쉼표로 구분):`;
+검색어만 출력 (쉼표로 구분, 각 검색어는 2-5단어):`;
       } else {
         // 수업 의도가 없을 때는 과목에 맞는 일반적인 검색어
-        prompt = `${subject} 수업을 위한 YouTube 검색어 3-5개 생성 (쉼표 구분, 한국어):
+        prompt = `${gradeGuide.level} ${subject} 수업을 위한 YouTube 검색어 3-5개 생성 (쉼표 구분, 한국어):
 
+**대상 학년:** ${gradeLevel || "초등학생"}
 **과목:** ${subject}
 ${objective ? `**목표:** ${objective}` : ""}
 
+**학년 수준 고려사항:**
+- 대상: ${gradeGuide.level}
+- 적합한 스타일: ${gradeGuide.style}
+${gradeGuide.avoid ? `- 피해야 할 것: ${gradeGuide.avoid}` : ""}
+
 **조건:**
 - ${subject} 수업에 활용할 수 있는 영상
-- 초등학생/중학생이 보기 적합한 내용
+- ${gradeGuide.level}이 보기 적합한 내용
 - 교육적이고 실용적인 내용
 
 검색어만 출력 (쉼표로 구분):`;
