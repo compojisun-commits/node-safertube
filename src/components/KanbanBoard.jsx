@@ -686,7 +686,41 @@ export default function KanbanBoard({
     }
   }, []);
 
-  // 🆕 섹션 삭제
+  // 🆕 섹션 더보기 메뉴 상태
+  const [columnMenuOpen, setColumnMenuOpen] = useState(null);
+
+  // 🆕 외부 클릭 시 메뉴 닫기
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (columnMenuOpen && !e.target.closest('.kanban-column-menu-wrapper')) {
+        setColumnMenuOpen(null);
+      }
+    };
+    
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [columnMenuOpen]);
+
+  // 영상을 status별로 그룹화
+  const videosByStatus = useMemo(() => {
+    const groups = {};
+    columns.forEach(col => {
+      groups[col.id] = [];
+    });
+    
+    videos.forEach(video => {
+      const status = video.status || columns[0]?.id || 'inbox';
+      if (groups[status]) {
+        groups[status].push(video);
+      } else if (groups[columns[0]?.id]) {
+        groups[columns[0].id].push(video);
+      }
+    });
+    
+    return groups;
+  }, [videos, columns]);
+
+  // 🆕 섹션 삭제 (videosByStatus 정의 후에 위치해야 함)
   const handleDeleteColumn = useCallback(async (columnId) => {
     const column = columns.find(c => c.id === columnId);
     if (!column) return;
@@ -736,40 +770,6 @@ export default function KanbanBoard({
       });
     }
   }, [columns, videosByStatus, currentBoardId, onUpdateVideoStatus]);
-
-  // 🆕 섹션 더보기 메뉴 상태
-  const [columnMenuOpen, setColumnMenuOpen] = useState(null);
-
-  // 🆕 외부 클릭 시 메뉴 닫기
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (columnMenuOpen && !e.target.closest('.kanban-column-menu-wrapper')) {
-        setColumnMenuOpen(null);
-      }
-    };
-    
-    document.addEventListener('click', handleClickOutside);
-    return () => document.removeEventListener('click', handleClickOutside);
-  }, [columnMenuOpen]);
-
-  // 영상을 status별로 그룹화
-  const videosByStatus = useMemo(() => {
-    const groups = {};
-    columns.forEach(col => {
-      groups[col.id] = [];
-    });
-    
-    videos.forEach(video => {
-      const status = video.status || columns[0]?.id || 'inbox';
-      if (groups[status]) {
-        groups[status].push(video);
-      } else if (groups[columns[0]?.id]) {
-        groups[columns[0].id].push(video);
-      }
-    });
-    
-    return groups;
-  }, [videos, columns]);
 
   // 미분류 영상 수
   const unorganizedCount = useMemo(() => {
