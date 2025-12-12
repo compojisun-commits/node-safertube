@@ -621,21 +621,20 @@ export default function JjimList({ onBack }) {
     }
   }, [user]);
 
-  // URL 파라미터로 자동 분류 모달 열기 (예: /jjim?auto=1)
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const auto = params.get('auto') || params.get('autoClassify');
-    if (auto === '1') {
-      setAutoOrganizeTargets(null); // 루트 미분류 영상 기준
-      setAutoOrganizeOpen(true);
-      
-      // 🆕 URL 파라미터 제거 (다시 열리는 것 방지)
-      const url = new URL(window.location.href);
-      url.searchParams.delete('auto');
-      url.searchParams.delete('autoClassify');
-      window.history.replaceState({}, '', url.pathname);
-    }
-  }, []);
+  // URL 파라미터로 자동 분류 모달 열기 (예: /jjim?auto=1) - 🆕 비활성화됨
+  // 사용자가 직접 AI 정리 버튼을 클릭해야만 모달이 열림
+  // useEffect(() => {
+  //   const params = new URLSearchParams(window.location.search);
+  //   const auto = params.get('auto') || params.get('autoClassify');
+  //   if (auto === '1') {
+  //     setAutoOrganizeTargets(null);
+  //     setAutoOrganizeOpen(true);
+  //     const url = new URL(window.location.href);
+  //     url.searchParams.delete('auto');
+  //     url.searchParams.delete('autoClassify');
+  //     window.history.replaceState({}, '', url.pathname);
+  //   }
+  // }, []);
 
   const handleNotLoggedIn = async () => {
     const result = await Swal.fire({
