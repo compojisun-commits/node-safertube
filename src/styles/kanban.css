@@ -748,14 +748,6 @@
 }
 
 /* --- 컬럼 영역 --- */
-.kanban-global-columns {
-  display: flex;
-  gap: 16px;
-  padding: 20px;
-  overflow-x: auto;
-  flex: 1;
-}
-
 /* 스크롤바 숨김 (필요시만 표시) */
 .kanban-global-columns::-webkit-scrollbar {
   height: 6px;
@@ -770,7 +762,7 @@
   border-radius: 3px;
 }
 
-/* 🆕 컬럼 자동 너비 조절 - Material Design */
+/* 🆕 컬럼 자동 너비 조절 - Notion/Trello 스타일 */
 .kanban-global-column {
   flex: 1 1 0;
   min-width: 220px;
@@ -780,13 +772,40 @@
   box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.1));
   display: flex;
   flex-direction: column;
-  transition: all 300ms cubic-bezier(0.34, 1.56, 0.64, 1); /* 스프링 효과 */
-  animation: scaleIn 0.3s ease-out;
+  /* 🆕 부드러운 레이아웃 전환 (섹션 이동 시) */
+  transition: 
+    transform 280ms cubic-bezier(0.2, 0, 0, 1),
+    box-shadow 200ms ease,
+    opacity 200ms ease;
+  animation: columnAppear 0.25s ease-out;
   position: relative;
+  will-change: transform;
+}
+
+@keyframes columnAppear {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .kanban-global-column:hover {
   box-shadow: var(--shadow-md, 0 4px 6px rgba(0, 0, 0, 0.1));
+}
+
+/* 🆕 컬럼 컨테이너에 레이아웃 애니메이션 */
+.kanban-global-columns {
+  display: flex;
+  gap: 16px;
+  flex: 1;
+  overflow-x: auto;
+  padding: 20px;
+  /* 섹션 순서 변경 시 부드러운 전환 */
+  transition: all 200ms ease;
 }
 
 /* 5개 이하일 때 스크롤 없이 화면에 맞춤 */
@@ -800,36 +819,55 @@
   min-width: 260px;
 }
 
+/* 🆕 카드 드롭 타겟 (영상 드래그 시) */
 .kanban-global-column.drop-target {
-  box-shadow: 0 0 0 3px var(--primary-500, #8b5cf6), var(--shadow-lg);
-  transform: scale(1.02);
+  box-shadow: 0 0 0 2px var(--primary-400, #a78bfa), var(--shadow-md);
 }
 
-/* 🆕 섹션 드래그 스타일 - Material Motion */
+/* 🆕 섹션 드래그 스타일 - Notion/Trello 스타일 */
 .kanban-global-column.column-dragging {
-  opacity: 0.7;
-  transform: scale(0.95) rotate(2deg);
+  opacity: 0.6;
+  transform: scale(0.98);
   box-shadow: var(--shadow-2xl, 0 25px 50px rgba(0, 0, 0, 0.25));
-  z-index: 100;
-  transition: all 150ms ease-out;
+  z-index: 1000;
+  pointer-events: none;
 }
 
+/* 섹션 드롭 타겟 - 왼쪽에만 보라색 바 표시 */
 .kanban-global-column.column-drop-target {
-  background: linear-gradient(135deg, var(--primary-50, #f5f3ff) 0%, white 100%);
-  box-shadow: inset 0 0 0 3px var(--primary-400, #a78bfa);
-  transform: scale(1.01);
+  position: relative;
 }
 
 .kanban-global-column.column-drop-target::before {
   content: '';
   position: absolute;
-  left: -4px;
-  top: 10%;
-  bottom: 10%;
+  left: -6px;
+  top: 0;
+  bottom: 0;
   width: 4px;
-  background: linear-gradient(180deg, var(--primary-400, #a78bfa), var(--primary-600, #7c3aed));
+  background: var(--primary-500, #8b5cf6);
   border-radius: 4px;
-  animation: pulse 1s ease-in-out infinite;
+  animation: dropIndicator 0.3s ease-out forwards;
+}
+
+@keyframes dropIndicator {
+  from { 
+    opacity: 0; 
+    transform: scaleY(0.5);
+  }
+  to { 
+    opacity: 1; 
+    transform: scaleY(1);
+  }
+}
+
+/* 드래그 종료 후 모든 효과 즉시 제거 */
+.kanban-global-column:not(.column-drop-target):not(.drop-target):not(.column-dragging) {
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.1));
+}
+
+.kanban-global-column:not(.column-drop-target)::before {
+  display: none;
 }
 
 /* 헤더 드래그 커서 & 인터랙션 */
@@ -838,23 +876,118 @@
   position: relative;
   user-select: none;
   transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 12px;
 }
 
 .kanban-column-header-v2:hover {
-  filter: brightness(0.98);
+  filter: brightness(0.97);
 }
 
 .kanban-column-header-v2:active {
   cursor: grabbing;
-  transform: scale(0.99);
+}
+
+/* 🆕 컬럼 액션 버튼 그룹 */
+.kanban-column-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+
+.kanban-global-column:hover .kanban-column-actions {
+  opacity: 1;
+}
+
+/* 🆕 더보기 메뉴 래퍼 */
+.kanban-column-menu-wrapper {
+  position: relative;
+}
+
+/* 🆕 더보기 버튼 (Notion 스타일) */
+.kanban-column-more-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm, 6px);
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.kanban-column-more-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+}
+
+/* 🆕 드롭다운 메뉴 (Notion/Trello 스타일) */
+.kanban-column-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 160px;
+  background: white;
+  border-radius: var(--radius-md, 10px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15), 0 0 1px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  overflow: hidden;
+  animation: menuSlideIn 0.15s ease-out;
+}
+
+@keyframes menuSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.kanban-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  background: none;
+  border: none;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--gray-700, #374151);
+  cursor: pointer;
+  transition: background 100ms ease;
+  text-align: left;
+}
+
+.kanban-dropdown-item:hover {
+  background: var(--gray-100, #f3f4f6);
+}
+
+.kanban-dropdown-item.danger {
+  color: #dc2626;
+}
+
+.kanban-dropdown-item.danger:hover {
+  background: #fef2f2;
+}
+
+.kanban-dropdown-item svg {
+  flex-shrink: 0;
 }
 
 /* 컬럼 헤더 v2 */
+/* 헤더 추가 스타일 */
 .kanban-column-header-v2 {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 16px;
   border-radius: 16px 16px 0 0;
   border-bottom: 1px solid rgba(0, 0, 0, 0.05);
   gap: 10px;

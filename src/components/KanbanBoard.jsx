@@ -88,9 +88,24 @@ const IconEdit = () => (
   </svg>
 );
 
+// 🆕 더보기 아이콘 (Notion/Trello 스타일)
+const IconMoreHorizontal = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+    <circle cx="5" cy="12" r="2"/>
+    <circle cx="12" cy="12" r="2"/>
+    <circle cx="19" cy="12" r="2"/>
+  </svg>
+);
+
 const IconTrash = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+  </svg>
+);
+
+const IconPencil = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
   </svg>
 );
 
@@ -538,20 +553,6 @@ export default function KanbanBoard({
     setEditingColumn(null);
   }, [currentBoardId]);
 
-  // 🆕 컬럼 삭제
-  const handleDeleteColumn = useCallback((columnId) => {
-    if (columns.length <= 1) {
-      Swal.fire({ title: '마지막 섹션은 삭제할 수 없습니다', icon: 'warning', confirmButtonColor: '#3b82f6' });
-      return;
-    }
-
-    setBoards(prev => prev.map(board => {
-      if (board.id !== currentBoardId) return board;
-      return { ...board, columns: board.columns.filter(c => c.id !== columnId) };
-    }));
-    setEditingColumn(null);
-  }, [columns.length, currentBoardId]);
-
   // 🆕 새 섹션 추가
   const handleAddColumn = useCallback(() => {
     setEditingColumn({ title: '', color: COLUMN_COLORS[columns.length % COLUMN_COLORS.length] });
@@ -654,18 +655,102 @@ export default function KanbanBoard({
     setDragOverColumnId(null);
   }, [draggedColumn, currentBoardId]);
 
-  // 🆕 섹션 드래그 종료
-  const handleColumnDragEnd = useCallback(() => {
+  // 🆕 섹션 드래그 종료 - 모든 상태 완전 초기화
+  const handleColumnDragEnd = useCallback((e) => {
+    // 드래그 관련 모든 상태 즉시 초기화
     setDraggedColumn(null);
     setDragOverColumnId(null);
+    setDragOverColumn(null);
+    
+    // 포커스 해제 (보라색 테두리 제거)
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+    
+    // 모든 drop-target 클래스 강제 제거
+    document.querySelectorAll('.column-drop-target, .drop-target').forEach(el => {
+      el.classList.remove('column-drop-target', 'drop-target');
+    });
   }, []);
 
   // 🆕 섹션 드래그 Leave (보라색 선 제거)
   const handleColumnDragLeave = useCallback((e) => {
-    // 자식 요소로 이동하는 경우 무시
-    if (e.currentTarget.contains(e.relatedTarget)) return;
-    setDragOverColumnId(null);
+    e.preventDefault();
+    // relatedTarget이 현재 요소 밖으로 나갈 때만 상태 초기화
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
+    
+    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+      setDragOverColumnId(null);
+    }
   }, []);
+
+  // 🆕 섹션 삭제
+  const handleDeleteColumn = useCallback(async (columnId) => {
+    const column = columns.find(c => c.id === columnId);
+    if (!column) return;
+    
+    // 해당 섹션에 영상이 있는지 확인
+    const columnVideos = videosByStatus[columnId] || [];
+    
+    const result = await Swal.fire({
+      title: '섹션 삭제',
+      html: columnVideos.length > 0 
+        ? `<p><strong>"${column.title}"</strong> 섹션을 삭제하시겠습니까?</p><p style="color: #ef4444; font-size: 13px; margin-top: 8px;">⚠️ 이 섹션에 있는 ${columnVideos.length}개의 영상은 첫 번째 섹션으로 이동됩니다.</p>`
+        : `<p><strong>"${column.title}"</strong> 섹션을 삭제하시겠습니까?</p>`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: '삭제',
+      cancelButtonText: '취소',
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#6b7280',
+    });
+
+    if (result.isConfirmed) {
+      // 영상들을 첫 번째 섹션으로 이동
+      if (columnVideos.length > 0 && columns.length > 1) {
+        const firstColumnId = columns.find(c => c.id !== columnId)?.id;
+        if (firstColumnId) {
+          for (const video of columnVideos) {
+            await onUpdateVideoStatus?.(video.id, firstColumnId);
+          }
+        }
+      }
+      
+      // 섹션 삭제
+      setBoards(prev => prev.map(board => {
+        if (board.id !== currentBoardId) return board;
+        return { 
+          ...board, 
+          columns: board.columns.filter(c => c.id !== columnId) 
+        };
+      }));
+
+      Swal.fire({
+        icon: 'success',
+        title: '삭제 완료',
+        text: '섹션이 삭제되었습니다.',
+        timer: 1500,
+        showConfirmButton: false
+      });
+    }
+  }, [columns, videosByStatus, currentBoardId, onUpdateVideoStatus]);
+
+  // 🆕 섹션 더보기 메뉴 상태
+  const [columnMenuOpen, setColumnMenuOpen] = useState(null);
+
+  // 🆕 외부 클릭 시 메뉴 닫기
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (columnMenuOpen && !e.target.closest('.kanban-column-menu-wrapper')) {
+        setColumnMenuOpen(null);
+      }
+    };
+    
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [columnMenuOpen]);
 
   // 영상을 status별로 그룹화
   const videosByStatus = useMemo(() => {
@@ -1082,8 +1167,9 @@ export default function KanbanBoard({
                     </span>
                   </div>
                   
-                  {/* 🆕 헤더에 + 버튼 (편집 모드가 아닐 때만) */}
-                  {!isEditMode && (
+                  {/* 헤더 액션 버튼들 */}
+                  <div className="kanban-column-actions">
+                    {/* + 버튼 */}
                     <button 
                       className="kanban-header-add-btn"
                       onClick={(e) => {
@@ -1094,13 +1180,50 @@ export default function KanbanBoard({
                     >
                       <IconPlus />
                     </button>
-                  )}
-                  
-                  {isEditMode && (
-                    <button className="kanban-column-edit-btn">
-                      <IconEdit />
-                    </button>
-                  )}
+                    
+                    {/* 🆕 더보기 메뉴 (Notion/Trello 스타일) */}
+                    <div className="kanban-column-menu-wrapper">
+                      <button 
+                        className="kanban-column-more-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setColumnMenuOpen(columnMenuOpen === column.id ? null : column.id);
+                        }}
+                        title="더보기"
+                      >
+                        <IconMoreHorizontal />
+                      </button>
+                      
+                      {columnMenuOpen === column.id && (
+                        <div className="kanban-column-dropdown-menu">
+                          <button 
+                            className="kanban-dropdown-item"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setColumnMenuOpen(null);
+                              handleStartInlineEdit(column);
+                            }}
+                          >
+                            <IconPencil />
+                            <span>이름 변경</span>
+                          </button>
+                          {columns.length > 1 && (
+                            <button 
+                              className="kanban-dropdown-item danger"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setColumnMenuOpen(null);
+                                handleDeleteColumn(column.id);
+                              }}
+                            >
+                              <IconTrash />
+                              <span>섹션 삭제</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 {/* 카드 리스트 */}
