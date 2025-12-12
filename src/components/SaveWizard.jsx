@@ -86,6 +86,7 @@ export default function SaveWizard({ videoData, multiLinks, user, onClose, onSuc
   
   // 멀티 모드용 상태 - 각 링크별 폴더 지정
   const [linkFolders, setLinkFolders] = useState({});
+  const [linkTitles, setLinkTitles] = useState({}); // 🆕 각 링크별 제목 편집
   const [expandedLinkIndex, setExpandedLinkIndex] = useState(null);
   
   // 드롭다운 내 폴더 네비게이션 상태
@@ -111,14 +112,17 @@ export default function SaveWizard({ videoData, multiLinks, user, onClose, onSuc
     }
   }, [videoData?.title]);
 
-  // 멀티 링크 초기화 - 모든 링크를 최상위(null)로 설정
+  // 멀티 링크 초기화 - 폴더와 제목 초기화
   useEffect(() => {
     if (isMultiMode && multiLinks) {
       const initialFolders = {};
-      multiLinks.forEach((_, idx) => {
+      const initialTitles = {};
+      multiLinks.forEach((link, idx) => {
         initialFolders[idx] = null; // null = 최상위
+        initialTitles[idx] = link.title || link.url; // 🆕 크롤링된 제목 또는 URL
       });
       setLinkFolders(initialFolders);
+      setLinkTitles(initialTitles);
     }
   }, [isMultiMode, multiLinks]);
 
@@ -332,15 +336,16 @@ export default function SaveWizard({ videoData, multiLinks, user, onClose, onSuc
     setSaving(true);
     try {
       if (isMultiMode) {
-        // 멀티 링크 - 각각 지정된 폴더에 저장
+        // 멀티 링크 - 각각 지정된 폴더에 저장 (🆕 수정된 제목 사용)
         for (let i = 0; i < linksToSave.length; i++) {
           const link = linksToSave[i];
-          const folderId = linkFolders[i] || null;
+          const folderId = linkFolders[i] ?? null; // null도 유효한 값으로 처리
+          const customTitle = linkTitles[i] || link.title || link.url; // 🆕 수정된 제목 우선 사용
           
           await addLinkDirectly({
             user,
             videoUrl: link.url,
-            title: link.title || link.url,
+            title: customTitle.trim(),
             memo: '',
             folderId,
             tags: [],
@@ -489,12 +494,21 @@ export default function SaveWizard({ videoData, multiLinks, user, onClose, onSuc
             <div className="sw-links-list">
               {linksToSave.map((link, idx) => (
                 <div key={idx} className="sw-link-item">
-                  {/* 링크 정보 */}
+                  {/* 링크 정보 - 🆕 제목 편집 가능 */}
                   <div className="sw-link-info">
                     <div className={`sw-link-icon ${link.type}`}>
                       {link.type === 'youtube' ? <IconYoutube /> : <IconGlobe />}
                     </div>
-                    <span className="sw-link-title">{link.title || link.url}</span>
+                    <input
+                      type="text"
+                      className="sw-link-title-input"
+                      value={linkTitles[idx] || ''}
+                      onChange={(e) => setLinkTitles(prev => ({
+                        ...prev,
+                        [idx]: e.target.value
+                      }))}
+                      placeholder="제목을 입력하세요"
+                    />
                   </div>
                   
                   {/* 폴더 선택 드롭다운 */}

@@ -1783,6 +1783,37 @@ body {
   white-space: nowrap;
 }
 
+/* 🆕 제목 편집 가능한 input */
+.sw-link-title-input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  outline: none;
+  transition: all 200ms ease;
+}
+
+.sw-link-title-input:hover {
+  border-color: #d1d5db;
+  background: #f3f4f6;
+}
+
+.sw-link-title-input:focus {
+  background: white;
+  border-color: var(--primary-500, #8b5cf6);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+}
+
+.sw-link-title-input::placeholder {
+  color: #9ca3af;
+  font-weight: 400;
+}
+
 /* 폴더 선택 드롭다운 */
 .sw-folder-select-wrapper {
   position: relative;
