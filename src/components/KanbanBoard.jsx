@@ -421,6 +421,11 @@ export default function KanbanBoard({
   // 🆕 편집 모달 상태
   const [editingColumn, setEditingColumn] = useState(null);
   const [isEditMode, setIsEditMode] = useState(false);
+  
+  // 🆕 인라인 섹션명 편집 상태
+  const [inlineEditingColumnId, setInlineEditingColumnId] = useState(null);
+  const [inlineEditValue, setInlineEditValue] = useState('');
+  const inlineInputRef = useRef(null);
 
   // 저장
   useEffect(() => {
@@ -547,6 +552,51 @@ export default function KanbanBoard({
   const handleAddColumn = useCallback(() => {
     setEditingColumn({ title: '', color: COLUMN_COLORS[columns.length % COLUMN_COLORS.length] });
   }, [columns.length]);
+
+  // 🆕 인라인 섹션명 편집 시작 (더블클릭)
+  const handleStartInlineEdit = useCallback((column) => {
+    setInlineEditingColumnId(column.id);
+    setInlineEditValue(column.title);
+    setTimeout(() => inlineInputRef.current?.focus(), 50);
+  }, []);
+
+  // 🆕 인라인 섹션명 편집 저장
+  const handleSaveInlineEdit = useCallback(() => {
+    if (!inlineEditValue.trim()) {
+      setInlineEditingColumnId(null);
+      return;
+    }
+    
+    setBoards(prev => prev.map(board => {
+      if (board.id !== currentBoardId) return board;
+      return {
+        ...board,
+        columns: board.columns.map(col => 
+          col.id === inlineEditingColumnId 
+            ? { ...col, title: inlineEditValue.trim() }
+            : col
+        )
+      };
+    }));
+    setInlineEditingColumnId(null);
+  }, [inlineEditValue, inlineEditingColumnId, currentBoardId]);
+
+  // 🆕 빠른 섹션 추가 (직접)
+  const handleQuickAddColumn = useCallback(() => {
+    const newColumn = {
+      id: `col_${Date.now()}`,
+      title: `📌 새 섹션`,
+      color: COLUMN_COLORS[columns.length % COLUMN_COLORS.length]
+    };
+    
+    setBoards(prev => prev.map(board => {
+      if (board.id !== currentBoardId) return board;
+      return { ...board, columns: [...board.columns, newColumn] };
+    }));
+    
+    // 바로 이름 편집 모드로 진입
+    setTimeout(() => handleStartInlineEdit(newColumn), 100);
+  }, [columns.length, currentBoardId, handleStartInlineEdit]);
 
   // 영상을 status별로 그룹화
   const videosByStatus = useMemo(() => {
@@ -913,9 +963,33 @@ export default function KanbanBoard({
                   onClick={() => isEditMode && setEditingColumn(column)}
                 >
                   <div className="kanban-column-title-area">
-                    <span className="kanban-column-title-v2">
-                      {column.title}
-                    </span>
+                    {/* 🆕 인라인 편집 모드 */}
+                    {inlineEditingColumnId === column.id ? (
+                      <input
+                        ref={inlineInputRef}
+                        type="text"
+                        className="kanban-inline-edit-input"
+                        value={inlineEditValue}
+                        onChange={(e) => setInlineEditValue(e.target.value)}
+                        onBlur={handleSaveInlineEdit}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSaveInlineEdit();
+                          if (e.key === 'Escape') setInlineEditingColumnId(null);
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    ) : (
+                      <span 
+                        className="kanban-column-title-v2"
+                        onDoubleClick={(e) => {
+                          e.stopPropagation();
+                          handleStartInlineEdit(column);
+                        }}
+                        title="더블클릭하여 이름 수정"
+                      >
+                        {column.title}
+                      </span>
+                    )}
                     <span className="kanban-column-count-v2">
                       {columnVideos.length}
                     </span>
@@ -1067,18 +1141,16 @@ export default function KanbanBoard({
             );
           })}
 
-          {/* 🆕 편집 모드에서 섹션 추가 버튼 */}
-          {isEditMode && (
-            <div className="kanban-add-column-area">
-              <button 
-                className="kanban-add-column-btn"
-                onClick={handleAddColumn}
-              >
-                <IconPlus />
-                <span>새 섹션 추가</span>
-              </button>
-            </div>
-          )}
+          {/* 🆕 항상 보이는 섹션 추가 버튼 */}
+          <div className="kanban-add-column-area">
+            <button 
+              className="kanban-add-column-btn-compact"
+              onClick={handleQuickAddColumn}
+              title="새 섹션 추가"
+            >
+              <IconPlus />
+            </button>
+          </div>
         </div>
       </div>
 

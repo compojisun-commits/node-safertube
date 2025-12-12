@@ -821,6 +821,57 @@
   height: 16px;
 }
 
+/* 🆕 인라인 섹션명 편집 */
+.kanban-inline-edit-input {
+  flex: 1;
+  padding: 6px 10px;
+  font-size: 15px;
+  font-weight: 700;
+  background: white;
+  border: 2px solid #8b5cf6;
+  border-radius: 8px;
+  outline: none;
+  min-width: 100px;
+}
+
+.kanban-column-title-v2 {
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+
+.kanban-column-title-v2:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+/* 🆕 컴팩트 섹션 추가 버튼 (항상 표시) */
+.kanban-add-column-btn-compact {
+  width: 48px;
+  height: 100%;
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.5);
+  border: 2px dashed #e2e8f0;
+  border-radius: 16px;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.kanban-add-column-btn-compact:hover {
+  background: #f5f3ff;
+  border-color: #c4b5fd;
+  color: #7c3aed;
+}
+
+.kanban-add-column-btn-compact svg {
+  width: 24px;
+  height: 24px;
+}
+
 /* 카드 리스트 v2 */
 .kanban-column-cards-v2 {
   flex: 1;
