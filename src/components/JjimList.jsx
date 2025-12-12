@@ -718,6 +718,93 @@ export default function JjimList({ onBack }) {
     setSelectedIds(new Set());
   };
 
+  // 🆕 전체 선택
+  const handleSelectAll = () => {
+    const allIds = new Set();
+    // 현재 폴더의 하위 폴더들
+    currentItems.folders.forEach(f => allIds.add(f.id));
+    // 현재 폴더의 영상들
+    currentItems.videos.forEach(v => allIds.add(v.id));
+    setSelectedIds(allIds);
+  };
+
+  // 🆕 폴더 자동생성
+  const handleAutoGenerateFolders = async () => {
+    // folderGenerator 모듈 가져오기
+    const { generateFolderStructure } = await import('../utils/folderGenerator');
+    
+    const { value: formValues } = await Swal.fire({
+      title: '📁 폴더 자동 생성',
+      html: `
+        <div style="text-align: left; margin-bottom: 16px;">
+          <p style="font-size: 14px; color: #64748b; margin-bottom: 16px;">
+            학년과 과목을 선택하면 교육과정에 맞는 폴더를 자동으로 만들어 드립니다.
+          </p>
+          <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px;">학년</label>
+          <select id="grade-select" class="swal2-select" style="width: 100%; margin-bottom: 12px;">
+            <option value="">학년 선택</option>
+            <option value="1">1학년</option>
+            <option value="2">2학년</option>
+            <option value="3">3학년</option>
+            <option value="4">4학년</option>
+            <option value="5">5학년</option>
+            <option value="6">6학년</option>
+          </select>
+          <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px;">과목</label>
+          <select id="subject-select" class="swal2-select" style="width: 100%;">
+            <option value="">전체 과목</option>
+            <option value="kor">국어</option>
+            <option value="math">수학</option>
+            <option value="social">사회</option>
+            <option value="science">과학</option>
+            <option value="eng">영어</option>
+            <option value="int">통합교과</option>
+          </select>
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonText: '폴더 생성',
+      cancelButtonText: '취소',
+      confirmButtonColor: '#8b5cf6',
+      preConfirm: () => {
+        const grade = document.getElementById('grade-select').value;
+        const subject = document.getElementById('subject-select').value;
+        if (!grade) {
+          Swal.showValidationMessage('학년을 선택해주세요');
+          return false;
+        }
+        return { grade: parseInt(grade), subject: subject || null };
+      }
+    });
+
+    if (formValues) {
+      try {
+        setLoading(true);
+        const result = await generateFolderStructure(user, formValues.grade, formValues.subject ? [formValues.subject] : null);
+        
+        // 폴더 목록 새로고침
+        await loadData();
+        
+        Swal.fire({
+          icon: 'success',
+          title: '폴더 생성 완료!',
+          html: `<p>${result.created}개의 폴더가 생성되었습니다.</p>`,
+          confirmButtonColor: '#8b5cf6'
+        });
+      } catch (error) {
+        console.error('폴더 생성 오류:', error);
+        Swal.fire({
+          icon: 'error',
+          title: '오류 발생',
+          text: error.message,
+          confirmButtonColor: '#ef4444'
+        });
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
   // 새 폴더 만들기
   const handleCreateFolder = async () => {
     const { value: folderName } = await Swal.fire({
@@ -991,10 +1078,15 @@ export default function JjimList({ onBack }) {
       {/* 헤더 */}
       <div className="jjim-header">
         <h1 className="jjim-title">내 찜보따리</h1>
-        <button onClick={handleCreateFolder} className="jjim-new-btn">
-          <IconPlus /> 새 폴더
-            </button>
+        <div className="jjim-header-actions">
+          <button onClick={handleAutoGenerateFolders} className="jjim-auto-folder-btn">
+            <IconWand /> 폴더 자동생성
+          </button>
+          <button onClick={handleCreateFolder} className="jjim-new-btn">
+            <IconPlus /> 새 폴더
+          </button>
         </div>
+      </div>
 
       {/* 툴바 */}
       <div className="jjim-toolbar">
@@ -1003,7 +1095,10 @@ export default function JjimList({ onBack }) {
           <div className="jjim-selection-bar">
             <button onClick={handleClearSelection} className="jjim-clear-btn">
               <IconX />
-          </button>
+            </button>
+            <button onClick={handleSelectAll} className="jjim-select-all-btn">
+              ✓ 전체 선택
+            </button>
             <span className="jjim-selection-count">{selectedIds.size}개 선택됨</span>
             <div className="jjim-selection-actions">
               <button onClick={handleClassifySelected} className="jjim-action-btn primary">

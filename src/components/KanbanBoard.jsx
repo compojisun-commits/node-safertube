@@ -660,6 +660,13 @@ export default function KanbanBoard({
     setDragOverColumnId(null);
   }, []);
 
+  // 🆕 섹션 드래그 Leave (보라색 선 제거)
+  const handleColumnDragLeave = useCallback((e) => {
+    // 자식 요소로 이동하는 경우 무시
+    if (e.currentTarget.contains(e.relatedTarget)) return;
+    setDragOverColumnId(null);
+  }, []);
+
   // 영상을 status별로 그룹화
   const videosByStatus = useMemo(() => {
     const groups = {};
@@ -1021,7 +1028,10 @@ export default function KanbanBoard({
                   handleDragOver(e, column.id);
                   handleColumnDragOver(e, column.id);
                 }}
-                onDragLeave={handleDragLeave}
+                onDragLeave={(e) => {
+                  handleDragLeave(e);
+                  handleColumnDragLeave(e);
+                }}
                 onDrop={(e) => {
                   if (draggedColumn) {
                     handleColumnDrop(e, column.id);
