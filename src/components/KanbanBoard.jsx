@@ -798,6 +798,101 @@ export default function KanbanBoard({
     }
   }, [columns, videosByStatus, currentBoardId, onUpdateVideoStatus]);
 
+  // 🆕 섹션 색상 변경
+  const handleChangeColumnColor = useCallback(async (columnId) => {
+    const column = columns.find(c => c.id === columnId);
+    if (!column) return;
+
+    const { value: color } = await Swal.fire({
+      title: '섹션 색상 변경',
+      html: `
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; padding: 16px;">
+          ${COLUMN_COLORS.map(c => `
+            <button 
+              class="swal2-color-btn" 
+              data-color="${c}" 
+              style="width: 36px; height: 36px; border-radius: 8px; background: ${c}; border: 2px solid ${c === column.color ? '#000' : 'transparent'}; cursor: pointer;"
+            ></button>
+          `).join('')}
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonText: '변경',
+      cancelButtonText: '취소',
+      confirmButtonColor: '#8b5cf6',
+      didOpen: () => {
+        document.querySelectorAll('.swal2-color-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            document.querySelectorAll('.swal2-color-btn').forEach(b => b.style.border = '2px solid transparent');
+            btn.style.border = '2px solid #000';
+            Swal.getInput()?.setAttribute('value', btn.dataset.color);
+          });
+        });
+      },
+      preConfirm: () => {
+        const selected = document.querySelector('.swal2-color-btn[style*="border: 2px solid rgb(0, 0, 0)"]');
+        return selected?.dataset.color || column.color;
+      }
+    });
+
+    if (color) {
+      setBoards(prev => prev.map(board => {
+        if (board.id !== currentBoardId) return board;
+        return {
+          ...board,
+          columns: board.columns.map(c => 
+            c.id === columnId ? { ...c, color } : c
+          )
+        };
+      }));
+      setColumnMenuOpen(null);
+    }
+  }, [columns, currentBoardId]);
+
+  // 🆕 섹션 전체 비우기
+  const handleClearColumn = useCallback(async (columnId) => {
+    const column = columns.find(c => c.id === columnId);
+    if (!column) return;
+
+    const columnVideos = videosByStatus[columnId] || [];
+    if (columnVideos.length === 0) {
+      Swal.fire({
+        icon: 'info',
+        title: '비울 영상이 없습니다',
+        timer: 1500,
+        showConfirmButton: false
+      });
+      return;
+    }
+
+    const result = await Swal.fire({
+      title: '섹션 비우기',
+      html: `<p>"<strong>${column.title}</strong>" 섹션의 ${columnVideos.length}개 영상을 모두 첫 번째 섹션으로 이동하시겠습니까?</p>`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: '비우기',
+      cancelButtonText: '취소',
+      confirmButtonColor: '#f59e0b',
+    });
+
+    if (result.isConfirmed) {
+      const firstColumnId = columns.find(c => c.id !== columnId)?.id;
+      if (firstColumnId) {
+        for (const video of columnVideos) {
+          await onUpdateVideoStatus?.(video.id, firstColumnId);
+        }
+      }
+      setColumnMenuOpen(null);
+      Swal.fire({
+        icon: 'success',
+        title: '완료',
+        text: `${columnVideos.length}개 영상이 이동되었습니다.`,
+        timer: 1500,
+        showConfirmButton: false
+      });
+    }
+  }, [columns, videosByStatus, onUpdateVideoStatus]);
+
   // 미분류 영상 수
   const unorganizedCount = useMemo(() => {
     return videos.filter(v => !v.folderId).length;
@@ -990,16 +1085,6 @@ export default function KanbanBoard({
               <span className="kanban-ai-hint">AI 정리</span>
             </button>
           )}
-          
-          {/* 🆕 편집 모드 토글 */}
-          <button 
-            onClick={() => setIsEditMode(!isEditMode)}
-            className={`kanban-edit-mode-btn ${isEditMode ? 'active' : ''}`}
-            title="보드 편집"
-          >
-            <IconSettings />
-            {isEditMode ? '편집 완료' : '보드 편집'}
-          </button>
 
           {/* 서랍 토글 버튼 */}
           <button 
@@ -1012,8 +1097,8 @@ export default function KanbanBoard({
         </div>
       </div>
 
-      {/* 🆕 편집 모드 툴바 */}
-      {isEditMode && (
+      {/* Notion 스타일: 편집 모드 툴바 삭제됨 - 더블클릭으로 직접 수정 */}
+      {false && (
         <div className="kanban-edit-toolbar">
           <div className="kanban-edit-toolbar-info">
             <IconEdit /> 섹션을 클릭하여 이름과 색상을 변경하세요
@@ -1194,62 +1279,70 @@ export default function KanbanBoard({
                     </span>
                   </div>
                   
-                  {/* 헤더 액션 버튼들 */}
-                  <div className="kanban-column-actions">
-                    {/* + 버튼 */}
+                  {/* 🆕 Notion 스타일: 호버 시에만 보이는 ... 메뉴 */}
+                  <div className="kanban-column-menu-wrapper">
                     <button 
-                      className="kanban-header-add-btn"
+                      className="kanban-column-more-btn"
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleAddClick(column.id);
+                        setColumnMenuOpen(columnMenuOpen === column.id ? null : column.id);
                       }}
-                      title="영상 추가"
+                      title="더보기"
                     >
-                      <IconPlus />
+                      <IconMoreHorizontal />
                     </button>
                     
-                    {/* 🆕 더보기 메뉴 (Notion/Trello 스타일) */}
-                    <div className="kanban-column-menu-wrapper">
-                      <button 
-                        className="kanban-column-more-btn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setColumnMenuOpen(columnMenuOpen === column.id ? null : column.id);
-                        }}
-                        title="더보기"
-                      >
-                        <IconMoreHorizontal />
-                      </button>
-                      
-                      {columnMenuOpen === column.id && (
-                        <div className="kanban-column-dropdown-menu">
+                    {columnMenuOpen === column.id && (
+                      <div className="kanban-column-dropdown-menu">
+                        {/* 색상 변경 */}
+                        <button 
+                          className="kanban-dropdown-item"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleChangeColumnColor(column.id);
+                          }}
+                        >
+                          <span style={{ 
+                            width: 14, 
+                            height: 14, 
+                            borderRadius: '50%', 
+                            background: column.color,
+                            border: '1px solid rgba(0,0,0,0.1)'
+                          }}></span>
+                          <span>색상 변경</span>
+                        </button>
+                        
+                        {/* 전체 비우기 */}
+                        <button 
+                          className="kanban-dropdown-item"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleClearColumn(column.id);
+                          }}
+                        >
+                          <IconX />
+                          <span>전체 비우기</span>
+                        </button>
+                        
+                        {/* 구분선 */}
+                        <div className="kanban-dropdown-divider"></div>
+                        
+                        {/* 섹션 삭제 */}
+                        {columns.length > 1 && (
                           <button 
-                            className="kanban-dropdown-item"
+                            className="kanban-dropdown-item danger"
                             onClick={(e) => {
                               e.stopPropagation();
                               setColumnMenuOpen(null);
-                              handleStartInlineEdit(column);
+                              handleDeleteColumn(column.id);
                             }}
                           >
-                            <IconPencil />
-                            <span>이름 변경</span>
+                            <IconTrash />
+                            <span>섹션 삭제</span>
                           </button>
-                          {columns.length > 1 && (
-                            <button 
-                              className="kanban-dropdown-item danger"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setColumnMenuOpen(null);
-                                handleDeleteColumn(column.id);
-                              }}
-                            >
-                              <IconTrash />
-                              <span>섹션 삭제</span>
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
 

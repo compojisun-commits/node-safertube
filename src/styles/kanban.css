@@ -890,22 +890,16 @@
   cursor: grabbing;
 }
 
-/* 🆕 컬럼 액션 버튼 그룹 */
-.kanban-column-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+/* 🆕 Notion 스타일: 더보기 메뉴 래퍼 (호버 시만 표시) */
+.kanban-column-menu-wrapper {
+  position: relative;
   opacity: 0;
   transition: opacity 200ms ease;
 }
 
-.kanban-global-column:hover .kanban-column-actions {
+.kanban-column-header-v2:hover .kanban-column-menu-wrapper,
+.kanban-column-menu-wrapper:focus-within {
   opacity: 1;
-}
-
-/* 🆕 더보기 메뉴 래퍼 */
-.kanban-column-menu-wrapper {
-  position: relative;
 }
 
 /* 🆕 더보기 버튼 (Notion 스타일) */
@@ -979,6 +973,13 @@
 
 .kanban-dropdown-item.danger:hover {
   background: #fef2f2;
+}
+
+/* 🆕 드롭다운 구분선 */
+.kanban-dropdown-divider {
+  height: 1px;
+  background: #e5e7eb;
+  margin: 6px 0;
 }
 
 .kanban-dropdown-item svg {
