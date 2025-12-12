@@ -1225,6 +1225,7 @@ export default function JjimList({ onBack }) {
               }
               setShowAutoOrganize(true);
             }}
+            onRefresh={loadJjimData}
           />
       ) : (
           // 리스트 & 그리드 뷰

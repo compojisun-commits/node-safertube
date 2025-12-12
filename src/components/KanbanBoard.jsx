@@ -386,6 +386,7 @@ export default function KanbanBoard({
   onStatusChange,
   onAddVideo,
   onAiOrganize,
+  onRefresh, // 🆕 데이터 새로고침 콜백
 }) {
   // 🆕 onStatusChange를 onUpdateVideoStatus로 alias (호환성 유지)
   const onUpdateVideoStatus = onStatusChange || ((videoId, newStatus) => {
@@ -436,6 +437,13 @@ export default function KanbanBoard({
   const [isDrawerOpen, setIsDrawerOpen] = useState(true);
   const [drawerSearch, setDrawerSearch] = useState('');
   const [expandedFolders, setExpandedFolders] = useState(new Set());
+
+  // 🆕 서랍이 열릴 때 데이터 새로고침 (동기화 보장)
+  useEffect(() => {
+    if (isDrawerOpen && onRefresh) {
+      onRefresh();
+    }
+  }, [isDrawerOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 🆕 편집 모달 상태
   const [editingColumn, setEditingColumn] = useState(null);
@@ -1023,12 +1031,22 @@ export default function KanbanBoard({
     );
   }, [videos, drawerSearch]);
 
-  // 서랍용: 폴더별로 그룹화
+  // 서랍용: 폴더별로 그룹화 (🆕 삭제된 폴더 필터링 포함)
   const videosByFolder = useMemo(() => {
     const groups = { '미분류': [] };
     
+    // 🆕 유효한 폴더만 필터링 (null, undefined, deleted 제외)
+    const validFolders = folders.filter(f => f && f.id && !f.deleted);
+    const validFolderIds = new Set(validFolders.map(f => f.id));
+    
     filteredDrawerVideos.forEach(video => {
-      const folder = folders.find(f => f.id === video.folderId);
+      // 🆕 영상의 폴더가 삭제되었으면 미분류로 처리
+      if (video.folderId && !validFolderIds.has(video.folderId)) {
+        groups['미분류'].push(video);
+        return;
+      }
+      
+      const folder = validFolders.find(f => f.id === video.folderId);
       const folderName = folder?.name || '미분류';
       if (!groups[folderName]) groups[folderName] = [];
       groups[folderName].push(video);
