@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import Swal from 'sweetalert2';
 
 // ==========================================
@@ -82,6 +82,42 @@ const IconChevronLeft = () => (
   </svg>
 );
 
+const IconEdit = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+  </svg>
+);
+
+const IconTrash = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+  </svg>
+);
+
+const IconSettings = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v10M4.22 4.22l4.24 4.24m7.08 7.08l4.24 4.24M1 12h6m6 0h10M4.22 19.78l4.24-4.24m7.08-7.08l4.24-4.24"/>
+  </svg>
+);
+
+const IconCheck = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polyline points="20 6 9 17 4 12"/>
+  </svg>
+);
+
+const IconCalendar = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+  </svg>
+);
+
+const IconGrid = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+  </svg>
+);
+
 // ==========================================
 // 안전 등급 뱃지
 // ==========================================
@@ -112,62 +148,407 @@ const SafetyBadge = ({ score }) => {
 };
 
 // ==========================================
-// 기본 컬럼 정의 (status 기반)
+// 🆕 보드 템플릿 정의
 // ==========================================
-const DEFAULT_COLUMNS = [
-  { id: 'inbox', title: '📥 찜한 영상', color: '#FEF2F2' },
-  { id: 'reviewing', title: '👀 검토 중', color: '#F5F3FF' },
-  { id: 'ready', title: '✅ 수업 준비 완료', color: '#F0FDF4' },
+const BOARD_TEMPLATES = {
+  default: {
+    id: 'default',
+    name: '📋 수업 준비',
+    icon: '📋',
+    columns: [
+      { id: 'inbox', title: '📥 찜한 영상', color: '#FEF2F2' },
+      { id: 'reviewing', title: '👀 검토 중', color: '#F5F3FF' },
+      { id: 'ready', title: '✅ 수업 준비 완료', color: '#F0FDF4' },
+    ]
+  },
+  weekly: {
+    id: 'weekly',
+    name: '📅 요일별 계획',
+    icon: '📅',
+    columns: [
+      { id: 'mon', title: '🔴 월요일', color: '#FEF2F2' },
+      { id: 'tue', title: '🟠 화요일', color: '#FFF7ED' },
+      { id: 'wed', title: '🟡 수요일', color: '#FEFCE8' },
+      { id: 'thu', title: '🟢 목요일', color: '#F0FDF4' },
+      { id: 'fri', title: '🔵 금요일', color: '#EFF6FF' },
+    ]
+  },
+  progress: {
+    id: 'progress',
+    name: '📊 진행 상태',
+    icon: '📊',
+    columns: [
+      { id: 'todo', title: '📝 할 일', color: '#F8FAFC' },
+      { id: 'inprogress', title: '🚧 진행 중', color: '#FEF3C7' },
+      { id: 'review', title: '🔍 검토', color: '#E0E7FF' },
+      { id: 'done', title: '✅ 완료', color: '#DCFCE7' },
+    ]
+  },
+};
+
+// 컬럼 색상 팔레트
+const COLUMN_COLORS = [
+  '#FEF2F2', '#FFF7ED', '#FEFCE8', '#F0FDF4', '#ECFDF5',
+  '#F0FDFA', '#F0F9FF', '#EFF6FF', '#EEF2FF', '#F5F3FF',
+  '#FAF5FF', '#FDF4FF', '#FDF2F8', '#FFF1F2', '#F8FAFC',
 ];
 
 // ==========================================
-// 🆕 Global Kanban Board (v22.0)
-// - 폴더 무시, 전체 영상을 status로 분류
-// - 드래그로 status 변경
-// - 미분류 뱃지 + AI 정리 유도
+// 🆕 컬럼 편집 모달
+// ==========================================
+const ColumnEditModal = ({ column, onSave, onDelete, onClose, canDelete }) => {
+  const [title, setTitle] = useState(column?.title || '');
+  const [selectedColor, setSelectedColor] = useState(column?.color || COLUMN_COLORS[0]);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, []);
+
+  const handleSave = () => {
+    if (!title.trim()) {
+      Swal.fire({ title: '이름을 입력해주세요', icon: 'warning', confirmButtonColor: '#3b82f6' });
+      return;
+    }
+    onSave({ ...column, title: title.trim(), color: selectedColor });
+  };
+
+  return (
+    <div className="kanban-modal-overlay" onClick={onClose}>
+      <div className="kanban-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="kanban-modal-header">
+          <h3>{column?.id ? '섹션 수정' : '새 섹션 추가'}</h3>
+          <button onClick={onClose} className="kanban-modal-close"><IconX /></button>
+        </div>
+        
+        <div className="kanban-modal-content">
+          <div className="kanban-modal-field">
+            <label>섹션 이름</label>
+            <input
+              ref={inputRef}
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="예: 🔴 월요일"
+              onKeyDown={(e) => e.key === 'Enter' && handleSave()}
+            />
+            <small>이모지를 포함하면 더 보기 좋아요! 😊</small>
+          </div>
+
+          <div className="kanban-modal-field">
+            <label>배경 색상</label>
+            <div className="kanban-color-palette">
+              {COLUMN_COLORS.map((color) => (
+                <button
+                  key={color}
+                  className={`kanban-color-btn ${selectedColor === color ? 'selected' : ''}`}
+                  style={{ backgroundColor: color }}
+                  onClick={() => setSelectedColor(color)}
+                >
+                  {selectedColor === color && <IconCheck />}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="kanban-modal-footer">
+          {canDelete && column?.id && (
+            <button 
+              className="kanban-modal-btn delete"
+              onClick={() => {
+                Swal.fire({
+                  title: '섹션을 삭제할까요?',
+                  text: '이 섹션의 영상들은 첫 번째 섹션으로 이동합니다.',
+                  icon: 'warning',
+                  showCancelButton: true,
+                  confirmButtonColor: '#ef4444',
+                  cancelButtonColor: '#64748b',
+                  confirmButtonText: '삭제',
+                  cancelButtonText: '취소',
+                }).then((result) => {
+                  if (result.isConfirmed) onDelete(column.id);
+                });
+              }}
+            >
+              <IconTrash /> 삭제
+            </button>
+          )}
+          <div className="kanban-modal-btn-group">
+            <button className="kanban-modal-btn cancel" onClick={onClose}>취소</button>
+            <button className="kanban-modal-btn save" onClick={handleSave}>저장</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ==========================================
+// 🆕 보드 선택 드롭다운
+// ==========================================
+const BoardSelector = ({ boards, currentBoardId, onSelect, onCreateNew }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const currentBoard = boards.find(b => b.id === currentBoardId);
+
+  return (
+    <div className="kanban-board-selector" ref={dropdownRef}>
+      <button 
+        className="kanban-board-selector-btn"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <span className="kanban-board-icon">{currentBoard?.icon || '📋'}</span>
+        <span className="kanban-board-name">{currentBoard?.name || '보드 선택'}</span>
+        <IconChevronDown />
+      </button>
+
+      {isOpen && (
+        <div className="kanban-board-dropdown">
+          <div className="kanban-board-dropdown-header">
+            <span>보드 선택</span>
+          </div>
+          
+          <div className="kanban-board-dropdown-list">
+            {boards.map((board) => (
+              <button
+                key={board.id}
+                className={`kanban-board-option ${board.id === currentBoardId ? 'active' : ''}`}
+                onClick={() => {
+                  onSelect(board.id);
+                  setIsOpen(false);
+                }}
+              >
+                <span className="kanban-board-option-icon">{board.icon}</span>
+                <span className="kanban-board-option-name">{board.name}</span>
+                <span className="kanban-board-option-cols">{board.columns.length}개 섹션</span>
+                {board.id === currentBoardId && <IconCheck />}
+              </button>
+            ))}
+          </div>
+
+          <div className="kanban-board-dropdown-footer">
+            <button 
+              className="kanban-board-create-btn"
+              onClick={() => {
+                onCreateNew();
+                setIsOpen(false);
+              }}
+            >
+              <IconPlus />
+              새 보드 만들기
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ==========================================
+// 🆕 Global Kanban Board (v23.0)
+// - 다중 보드 지원
+// - 섹션 편집/추가/삭제
+// - 요일별 보드 기본 제공
 // ==========================================
 export default function KanbanBoard({ 
   videos = [], 
   folders = [], 
   onAnalyze, 
   onOpenVideo,
-  onStatusChange,  // 상태 변경 콜백
-  onAddVideo,      // 영상 추가 콜백
-  onAiOrganize,    // AI 정리 콜백
+  onStatusChange,
+  onAddVideo,
+  onAiOrganize,
 }) {
-  const [columns, setColumns] = useState(() => {
+  // 🆕 다중 보드 상태
+  const [boards, setBoards] = useState(() => {
     try {
-      const saved = localStorage.getItem('kanban_columns_v2');
-      return saved ? JSON.parse(saved) : DEFAULT_COLUMNS;
+      const saved = localStorage.getItem('kanban_boards_v23');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // 기본 템플릿이 없으면 추가
+        const hasDefault = parsed.some(b => b.id === 'default');
+        const hasWeekly = parsed.some(b => b.id === 'weekly');
+        if (!hasDefault) parsed.unshift(BOARD_TEMPLATES.default);
+        if (!hasWeekly) parsed.splice(1, 0, BOARD_TEMPLATES.weekly);
+        return parsed;
+      }
+      return [BOARD_TEMPLATES.default, BOARD_TEMPLATES.weekly, BOARD_TEMPLATES.progress];
     } catch {
-      return DEFAULT_COLUMNS;
+      return [BOARD_TEMPLATES.default, BOARD_TEMPLATES.weekly, BOARD_TEMPLATES.progress];
     }
   });
-  
+
+  const [currentBoardId, setCurrentBoardId] = useState(() => {
+    try {
+      return localStorage.getItem('kanban_current_board') || 'default';
+    } catch {
+      return 'default';
+    }
+  });
+
+  // 현재 보드
+  const currentBoard = useMemo(() => 
+    boards.find(b => b.id === currentBoardId) || boards[0],
+    [boards, currentBoardId]
+  );
+
+  const columns = currentBoard?.columns || [];
+
   const [draggedVideo, setDraggedVideo] = useState(null);
   const [dragOverColumn, setDragOverColumn] = useState(null);
   const [addingToColumn, setAddingToColumn] = useState(null);
   const [newVideoUrl, setNewVideoUrl] = useState('');
   const inputRef = useRef(null);
   
-  // 🆕 서랍 상태
+  // 서랍 상태
   const [isDrawerOpen, setIsDrawerOpen] = useState(true);
   const [drawerSearch, setDrawerSearch] = useState('');
   const [expandedFolders, setExpandedFolders] = useState(new Set());
 
-  // localStorage에 컬럼 저장
-  useEffect(() => {
-    localStorage.setItem('kanban_columns_v2', JSON.stringify(columns));
-  }, [columns]);
+  // 🆕 편집 모달 상태
+  const [editingColumn, setEditingColumn] = useState(null);
+  const [isEditMode, setIsEditMode] = useState(false);
 
-  // 입력창 포커스
+  // 저장
+  useEffect(() => {
+    localStorage.setItem('kanban_boards_v23', JSON.stringify(boards));
+  }, [boards]);
+
+  useEffect(() => {
+    localStorage.setItem('kanban_current_board', currentBoardId);
+  }, [currentBoardId]);
+
   useEffect(() => {
     if (addingToColumn && inputRef.current) {
       inputRef.current.focus();
     }
   }, [addingToColumn]);
 
-  // 🆕 영상을 status별로 그룹화 (폴더 무시!)
+  // 🆕 보드 전환
+  const handleSelectBoard = useCallback((boardId) => {
+    setCurrentBoardId(boardId);
+  }, []);
+
+  // 🆕 새 보드 생성
+  const handleCreateBoard = useCallback(async () => {
+    const { value: formValues } = await Swal.fire({
+      title: '새 보드 만들기',
+      html: `
+        <div style="text-align: left;">
+          <label style="display: block; margin-bottom: 4px; font-weight: 500;">보드 이름</label>
+          <input id="board-name" class="swal2-input" placeholder="예: 프로젝트 관리" style="margin: 0 0 12px 0;">
+          
+          <label style="display: block; margin-bottom: 4px; font-weight: 500;">아이콘 (이모지)</label>
+          <input id="board-icon" class="swal2-input" placeholder="예: 📚" style="margin: 0;" value="📋">
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonText: '만들기',
+      cancelButtonText: '취소',
+      confirmButtonColor: '#3b82f6',
+      preConfirm: () => {
+        const name = document.getElementById('board-name').value;
+        const icon = document.getElementById('board-icon').value;
+        if (!name?.trim()) {
+          Swal.showValidationMessage('보드 이름을 입력해주세요');
+          return false;
+        }
+        return { name: name.trim(), icon: icon.trim() || '📋' };
+      }
+    });
+
+    if (formValues) {
+      const newBoard = {
+        id: `board_${Date.now()}`,
+        name: `${formValues.icon} ${formValues.name}`,
+        icon: formValues.icon,
+        columns: [
+          { id: `col_${Date.now()}_1`, title: '📥 대기', color: '#F8FAFC' },
+          { id: `col_${Date.now()}_2`, title: '🚧 진행 중', color: '#FEF3C7' },
+          { id: `col_${Date.now()}_3`, title: '✅ 완료', color: '#DCFCE7' },
+        ]
+      };
+      setBoards(prev => [...prev, newBoard]);
+      setCurrentBoardId(newBoard.id);
+    }
+  }, []);
+
+  // 🆕 보드 삭제
+  const handleDeleteBoard = useCallback(async () => {
+    if (boards.length <= 1) {
+      Swal.fire({ title: '마지막 보드는 삭제할 수 없습니다', icon: 'warning', confirmButtonColor: '#3b82f6' });
+      return;
+    }
+
+    const result = await Swal.fire({
+      title: '보드를 삭제할까요?',
+      text: `"${currentBoard.name}" 보드가 삭제됩니다.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: '삭제',
+      cancelButtonText: '취소',
+    });
+
+    if (result.isConfirmed) {
+      setBoards(prev => prev.filter(b => b.id !== currentBoardId));
+      setCurrentBoardId(boards[0].id === currentBoardId ? boards[1]?.id : boards[0].id);
+    }
+  }, [boards, currentBoard, currentBoardId]);
+
+  // 🆕 컬럼 업데이트
+  const handleUpdateColumn = useCallback((updatedColumn) => {
+    setBoards(prev => prev.map(board => {
+      if (board.id !== currentBoardId) return board;
+      
+      const existingIndex = board.columns.findIndex(c => c.id === updatedColumn.id);
+      if (existingIndex >= 0) {
+        // 기존 컬럼 수정
+        const newColumns = [...board.columns];
+        newColumns[existingIndex] = updatedColumn;
+        return { ...board, columns: newColumns };
+      } else {
+        // 새 컬럼 추가
+        return { ...board, columns: [...board.columns, { ...updatedColumn, id: `col_${Date.now()}` }] };
+      }
+    }));
+    setEditingColumn(null);
+  }, [currentBoardId]);
+
+  // 🆕 컬럼 삭제
+  const handleDeleteColumn = useCallback((columnId) => {
+    if (columns.length <= 1) {
+      Swal.fire({ title: '마지막 섹션은 삭제할 수 없습니다', icon: 'warning', confirmButtonColor: '#3b82f6' });
+      return;
+    }
+
+    setBoards(prev => prev.map(board => {
+      if (board.id !== currentBoardId) return board;
+      return { ...board, columns: board.columns.filter(c => c.id !== columnId) };
+    }));
+    setEditingColumn(null);
+  }, [columns.length, currentBoardId]);
+
+  // 🆕 새 섹션 추가
+  const handleAddColumn = useCallback(() => {
+    setEditingColumn({ title: '', color: COLUMN_COLORS[columns.length % COLUMN_COLORS.length] });
+  }, [columns.length]);
+
+  // 영상을 status별로 그룹화
   const videosByStatus = useMemo(() => {
     const groups = {};
     columns.forEach(col => {
@@ -175,25 +556,23 @@ export default function KanbanBoard({
     });
     
     videos.forEach(video => {
-      // status가 없으면 기본값 'inbox'
-      const status = video.status || 'inbox';
+      const status = video.status || columns[0]?.id || 'inbox';
       if (groups[status]) {
         groups[status].push(video);
-      } else {
-        // 알 수 없는 status면 inbox로
-        groups['inbox'].push(video);
+      } else if (groups[columns[0]?.id]) {
+        groups[columns[0].id].push(video);
       }
     });
     
     return groups;
   }, [videos, columns]);
 
-  // 미분류 영상 수 (folderId가 없는 영상)
+  // 미분류 영상 수
   const unorganizedCount = useMemo(() => {
     return videos.filter(v => !v.folderId).length;
   }, [videos]);
 
-  // 🆕 서랍용: 검색 필터링된 영상
+  // 서랍용: 검색 필터링된 영상
   const filteredDrawerVideos = useMemo(() => {
     if (!drawerSearch) return videos;
     const q = drawerSearch.toLowerCase();
@@ -204,15 +583,11 @@ export default function KanbanBoard({
     );
   }, [videos, drawerSearch]);
 
-  // 🆕 서랍용: 폴더별로 그룹화
+  // 서랍용: 폴더별로 그룹화
   const videosByFolder = useMemo(() => {
     const groups = { '미분류': [] };
     
     filteredDrawerVideos.forEach(video => {
-      // 이미 보드에 있는 영상은 서랍에서 제외 (옵션)
-      // const hasStatus = video.status && video.status !== 'none';
-      // if (hasStatus) return;
-      
       const folder = folders.find(f => f.id === video.folderId);
       const folderName = folder?.name || '미분류';
       if (!groups[folderName]) groups[folderName] = [];
@@ -222,7 +597,7 @@ export default function KanbanBoard({
     return groups;
   }, [filteredDrawerVideos, folders]);
 
-  // 🆕 서랍 폴더 토글
+  // 서랍 폴더 토글
   const toggleDrawerFolder = (folderName) => {
     const newSet = new Set(expandedFolders);
     if (newSet.has(folderName)) newSet.delete(folderName);
@@ -230,40 +605,34 @@ export default function KanbanBoard({
     setExpandedFolders(newSet);
   };
 
-  // 드래그 시작 (보드 카드 또는 서랍에서)
+  // 드래그 핸들러들
   const handleDragStart = (e, video, source = 'board') => {
     setDraggedVideo({ ...video, _source: source });
     e.dataTransfer.effectAllowed = 'move';
   };
 
-  // 드래그 오버
   const handleDragOver = (e, columnId) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     setDragOverColumn(columnId);
   };
 
-  // 드래그 떠남
   const handleDragLeave = () => {
     setDragOverColumn(null);
   };
 
-  // 드롭 - status 변경 (보드 내 이동 또는 서랍에서 추가)
   const handleDrop = async (e, targetColumnId) => {
     e.preventDefault();
     setDragOverColumn(null);
     
     if (!draggedVideo) return;
     
-    // 🆕 서랍에서 드래그한 경우 - 새로 보드에 추가
     if (draggedVideo._source === 'drawer') {
-      // 이미 같은 status라면 스킵
       if (draggedVideo.status === targetColumnId) {
         setDraggedVideo(null);
         return;
       }
       
-      // status 변경
       if (onStatusChange) {
         try {
           await onStatusChange(draggedVideo.id, targetColumnId);
@@ -275,13 +644,11 @@ export default function KanbanBoard({
       return;
     }
     
-    // 보드 내 이동
     if (draggedVideo.status === targetColumnId) {
       setDraggedVideo(null);
       return;
     }
 
-    // 상태 변경 콜백 호출
     if (onStatusChange) {
       try {
         await onStatusChange(draggedVideo.id, targetColumnId);
@@ -298,26 +665,24 @@ export default function KanbanBoard({
     setDraggedVideo(null);
   };
 
-  // 🆕 + 버튼 클릭 - URL 입력 모드
+  // + 버튼 클릭
   const handleAddClick = (columnId) => {
     setAddingToColumn(columnId);
     setNewVideoUrl('');
   };
 
-  // URL 입력 취소
   const handleCancelAdd = () => {
     setAddingToColumn(null);
     setNewVideoUrl('');
   };
 
-  // 🆕 영상 추가 (Root에 저장 + status 설정)
+  // 영상 추가
   const handleSubmitAdd = async () => {
     if (!newVideoUrl.trim()) {
       handleCancelAdd();
       return;
     }
 
-    // YouTube URL 검증
     const youtubeRegex = /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/;
     const match = newVideoUrl.match(youtubeRegex);
     
@@ -332,14 +697,13 @@ export default function KanbanBoard({
 
     const videoId = match[1];
     
-    // 영상 추가 콜백 호출
     if (onAddVideo) {
       try {
         await onAddVideo({
           url: newVideoUrl,
           videoId,
           status: addingToColumn,
-          folderId: null, // Root에 저장
+          folderId: null,
         });
         
         Swal.fire({
@@ -362,26 +726,10 @@ export default function KanbanBoard({
     handleCancelAdd();
   };
 
-  // 카드에서 삭제 (칸반에서만 제거, 실제 삭제 아님)
   const handleRemoveFromBoard = async (video) => {
-    // status를 null로 설정하면 칸반에서 안 보임
     if (onStatusChange) {
       await onStatusChange(video.id, null);
     }
-  };
-
-  // 컬럼 색상 가져오기
-  const getColumnColor = (columnId) => {
-    const col = columns.find(c => c.id === columnId);
-    return col?.color || '#F8FAFC';
-  };
-
-  // 컬럼 제목 색상
-  const getColumnTextColor = (columnId) => {
-    if (columnId === 'inbox') return '#DC2626';
-    if (columnId === 'reviewing') return '#7C3AED';
-    if (columnId === 'ready') return '#16A34A';
-    return '#64748B';
   };
 
   return (
@@ -389,8 +737,13 @@ export default function KanbanBoard({
       {/* 상단 헤더 */}
       <div className="kanban-global-header">
         <div className="kanban-global-title">
-          <span className="kanban-icon">📋</span>
-          <h2>수업 준비 보드</h2>
+          {/* 🆕 보드 선택기 */}
+          <BoardSelector
+            boards={boards}
+            currentBoardId={currentBoardId}
+            onSelect={handleSelectBoard}
+            onCreateNew={handleCreateBoard}
+          />
           <span className="kanban-subtitle">폴더와 관계없이 모든 영상을 한눈에</span>
         </div>
         
@@ -407,7 +760,17 @@ export default function KanbanBoard({
             </button>
           )}
           
-          {/* 🆕 서랍 토글 버튼 */}
+          {/* 🆕 편집 모드 토글 */}
+          <button 
+            onClick={() => setIsEditMode(!isEditMode)}
+            className={`kanban-edit-mode-btn ${isEditMode ? 'active' : ''}`}
+            title="보드 편집"
+          >
+            <IconSettings />
+            {isEditMode ? '편집 완료' : '보드 편집'}
+          </button>
+
+          {/* 서랍 토글 버튼 */}
           <button 
             onClick={() => setIsDrawerOpen(!isDrawerOpen)}
             className={`kanban-drawer-toggle ${isDrawerOpen ? 'active' : ''}`}
@@ -418,8 +781,33 @@ export default function KanbanBoard({
         </div>
       </div>
 
+      {/* 🆕 편집 모드 툴바 */}
+      {isEditMode && (
+        <div className="kanban-edit-toolbar">
+          <div className="kanban-edit-toolbar-info">
+            <IconEdit /> 섹션을 클릭하여 이름과 색상을 변경하세요
+          </div>
+          <div className="kanban-edit-toolbar-actions">
+            <button 
+              className="kanban-toolbar-btn add"
+              onClick={handleAddColumn}
+            >
+              <IconPlus /> 섹션 추가
+            </button>
+            {!['default', 'weekly', 'progress'].includes(currentBoardId) && (
+              <button 
+                className="kanban-toolbar-btn delete"
+                onClick={handleDeleteBoard}
+              >
+                <IconTrash /> 보드 삭제
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="kanban-main-area">
-        {/* 🆕 자료 서랍 (찜보따리에서 가져오기) */}
+        {/* 자료 서랍 */}
         <aside className={`kanban-drawer ${isDrawerOpen ? 'open' : ''}`}>
           <div className="kanban-drawer-header">
             <h3><IconLayers /> 찜보따리에서 가져오기</h3>
@@ -506,160 +894,174 @@ export default function KanbanBoard({
 
         {/* 칸반 컬럼들 */}
         <div className="kanban-global-columns">
-        {columns.map(column => {
-          const columnVideos = videosByStatus[column.id] || [];
-          const isDropTarget = dragOverColumn === column.id;
-          
-          return (
-            <div 
-              key={column.id}
-              className={`kanban-global-column ${isDropTarget ? 'drop-target' : ''}`}
-              onDragOver={(e) => handleDragOver(e, column.id)}
-              onDragLeave={handleDragLeave}
-              onDrop={(e) => handleDrop(e, column.id)}
-            >
-              {/* 컬럼 헤더 */}
+          {columns.map((column, index) => {
+            const columnVideos = videosByStatus[column.id] || [];
+            const isDropTarget = dragOverColumn === column.id;
+            
+            return (
               <div 
-                className="kanban-column-header-v2"
-                style={{ backgroundColor: getColumnColor(column.id) }}
+                key={column.id}
+                className={`kanban-global-column ${isDropTarget ? 'drop-target' : ''} ${isEditMode ? 'edit-mode' : ''}`}
+                onDragOver={(e) => handleDragOver(e, column.id)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, column.id)}
               >
-                <span 
-                  className="kanban-column-title-v2"
-                  style={{ color: getColumnTextColor(column.id) }}
+                {/* 컬럼 헤더 */}
+                <div 
+                  className={`kanban-column-header-v2 ${isEditMode ? 'editable' : ''}`}
+                  style={{ backgroundColor: column.color }}
+                  onClick={() => isEditMode && setEditingColumn(column)}
                 >
-                  {column.title}
-                </span>
-                <span className="kanban-column-count-v2">
-                  {columnVideos.length}
-                </span>
-              </div>
+                  <span className="kanban-column-title-v2">
+                    {column.title}
+                  </span>
+                  <span className="kanban-column-count-v2">
+                    {columnVideos.length}
+                  </span>
+                  {isEditMode && (
+                    <button className="kanban-column-edit-btn">
+                      <IconEdit />
+                    </button>
+                  )}
+                </div>
 
-              {/* 카드 리스트 */}
-              <div className="kanban-column-cards-v2">
-                {columnVideos.length === 0 && !addingToColumn ? (
-                  <div className="kanban-empty-column">
-                    <p>여기로 영상을 드래그하거나<br/>+ 버튼으로 추가하세요</p>
-                  </div>
-                ) : (
-                  columnVideos.map(video => {
-                    const isUnorganized = !video.folderId;
-                    const folderName = folders.find(f => f.id === video.folderId)?.name;
-                    
-                    return (
-                      <div 
-                        key={video.id}
-                        className={`kanban-card-v2 ${draggedVideo?.id === video.id ? 'dragging' : ''}`}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, video, 'board')}
-                      >
-                        {/* 썸네일 */}
-                        <div className="kanban-card-thumb-v2">
-                          {video.videoId ? (
-                            <img 
-                              src={`https://img.youtube.com/vi/${video.videoId}/mqdefault.jpg`} 
-                              alt=""
-                              onClick={() => onOpenVideo?.(video)}
-                            />
-                          ) : (
-                            <div className="kanban-card-thumb-placeholder">
-                              <IconYoutube />
-                            </div>
-                          )}
-                          
-                          {/* 안전 배지 */}
-                          <SafetyBadge score={video.safetyScore} />
-                          
-                          {/* 삭제 버튼 */}
-                          <button 
-                            className="kanban-card-remove-v2"
-                            onClick={() => handleRemoveFromBoard(video)}
-                            title="보드에서 제거"
-                          >
-                            <IconX />
-                          </button>
-                        </div>
-                        
-                        {/* 카드 내용 */}
-                        <div className="kanban-card-content-v2">
-                          <h4 
-                            className="kanban-card-title-v2"
-                            onClick={() => onOpenVideo?.(video)}
-                          >
-                            {video.title || '제목 없음'}
-                          </h4>
-                          
-                          {/* 폴더 정보 또는 미분류 뱃지 */}
-                          <div className="kanban-card-meta-v2">
-                            {isUnorganized ? (
-                              <button 
-                                className="kanban-unorganized-badge"
-                                onClick={() => onAiOrganize?.([video])}
-                                title="AI로 자동 분류하기"
-                              >
-                                🗂️ 미분류
-                                <IconWand />
-                              </button>
-                            ) : (
-                              <span className="kanban-folder-badge">
-                                <IconFolder />
-                                {folderName}
-                              </span>
-                            )}
-                          </div>
-                          
-                          {/* 액션 버튼 */}
-                          <div className="kanban-card-actions-v2">
-                            <button 
-                              className="kanban-action-btn analyze"
-                              onClick={() => onAnalyze?.(video)}
-                            >
-                              상세분석
-                            </button>
-                            <button 
-                              className="kanban-action-btn youtube"
-                              onClick={() => window.open(video.videoUrl, '_blank')}
-                            >
-                              <IconExternalLink />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-
-                {/* 🆕 + 버튼 입력 모드 */}
-                {addingToColumn === column.id ? (
-                  <div className="kanban-add-card-form">
-                    <input
-                      ref={inputRef}
-                      type="text"
-                      placeholder="YouTube URL 붙여넣기..."
-                      value={newVideoUrl}
-                      onChange={(e) => setNewVideoUrl(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleSubmitAdd();
-                        if (e.key === 'Escape') handleCancelAdd();
-                      }}
-                    />
-                    <div className="kanban-add-card-buttons">
-                      <button onClick={handleSubmitAdd} className="btn-add">추가</button>
-                      <button onClick={handleCancelAdd} className="btn-cancel">취소</button>
+                {/* 카드 리스트 */}
+                <div className="kanban-column-cards-v2">
+                  {columnVideos.length === 0 && !addingToColumn ? (
+                    <div className="kanban-empty-column">
+                      <p>여기로 영상을 드래그하거나<br/>+ 버튼으로 추가하세요</p>
                     </div>
-                  </div>
-                ) : (
-                  <button 
-                    className="kanban-add-card-btn"
-                    onClick={() => handleAddClick(column.id)}
-                  >
-                    <IconPlus />
-                    <span>영상 추가</span>
-                  </button>
-                )}
+                  ) : (
+                    columnVideos.map(video => {
+                      const isUnorganized = !video.folderId;
+                      const folderName = folders.find(f => f.id === video.folderId)?.name;
+                      
+                      return (
+                        <div 
+                          key={video.id}
+                          className={`kanban-card-v2 ${draggedVideo?.id === video.id ? 'dragging' : ''}`}
+                          draggable={!isEditMode}
+                          onDragStart={(e) => !isEditMode && handleDragStart(e, video, 'board')}
+                        >
+                          {/* 썸네일 */}
+                          <div className="kanban-card-thumb-v2">
+                            {video.videoId ? (
+                              <img 
+                                src={`https://img.youtube.com/vi/${video.videoId}/mqdefault.jpg`} 
+                                alt=""
+                                onClick={() => onOpenVideo?.(video)}
+                              />
+                            ) : (
+                              <div className="kanban-card-thumb-placeholder">
+                                <IconYoutube />
+                              </div>
+                            )}
+                            
+                            <SafetyBadge score={video.safetyScore} />
+                            
+                            <button 
+                              className="kanban-card-remove-v2"
+                              onClick={() => handleRemoveFromBoard(video)}
+                              title="보드에서 제거"
+                            >
+                              <IconX />
+                            </button>
+                          </div>
+                          
+                          {/* 카드 내용 */}
+                          <div className="kanban-card-content-v2">
+                            <h4 
+                              className="kanban-card-title-v2"
+                              onClick={() => onOpenVideo?.(video)}
+                            >
+                              {video.title || '제목 없음'}
+                            </h4>
+                            
+                            <div className="kanban-card-meta-v2">
+                              {isUnorganized ? (
+                                <button 
+                                  className="kanban-unorganized-badge"
+                                  onClick={() => onAiOrganize?.([video])}
+                                  title="AI로 자동 분류하기"
+                                >
+                                  🗂️ 미분류
+                                  <IconWand />
+                                </button>
+                              ) : (
+                                <span className="kanban-folder-badge">
+                                  <IconFolder />
+                                  {folderName}
+                                </span>
+                              )}
+                            </div>
+                            
+                            <div className="kanban-card-actions-v2">
+                              <button 
+                                className="kanban-action-btn analyze"
+                                onClick={() => onAnalyze?.(video)}
+                              >
+                                상세분석
+                              </button>
+                              <button 
+                                className="kanban-action-btn youtube"
+                                onClick={() => window.open(video.videoUrl, '_blank')}
+                              >
+                                <IconExternalLink />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+
+                  {/* + 버튼 입력 모드 */}
+                  {addingToColumn === column.id ? (
+                    <div className="kanban-add-card-form">
+                      <input
+                        ref={inputRef}
+                        type="text"
+                        placeholder="YouTube URL 붙여넣기..."
+                        value={newVideoUrl}
+                        onChange={(e) => setNewVideoUrl(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSubmitAdd();
+                          if (e.key === 'Escape') handleCancelAdd();
+                        }}
+                      />
+                      <div className="kanban-add-card-buttons">
+                        <button onClick={handleSubmitAdd} className="btn-add">추가</button>
+                        <button onClick={handleCancelAdd} className="btn-cancel">취소</button>
+                      </div>
+                    </div>
+                  ) : (
+                    !isEditMode && (
+                      <button 
+                        className="kanban-add-card-btn"
+                        onClick={() => handleAddClick(column.id)}
+                      >
+                        <IconPlus />
+                        <span>영상 추가</span>
+                      </button>
+                    )
+                  )}
+                </div>
               </div>
+            );
+          })}
+
+          {/* 🆕 편집 모드에서 섹션 추가 버튼 */}
+          {isEditMode && (
+            <div className="kanban-add-column-area">
+              <button 
+                className="kanban-add-column-btn"
+                onClick={handleAddColumn}
+              >
+                <IconPlus />
+                <span>새 섹션 추가</span>
+              </button>
             </div>
-          );
-        })}
+          )}
         </div>
       </div>
 
@@ -667,6 +1069,17 @@ export default function KanbanBoard({
       <div className="kanban-global-footer">
         <p>💡 서랍에서 영상을 드래그하거나, 카드를 이동하여 상태를 변경하세요. 미분류 영상은 <strong>🪄 AI 정리</strong>로 폴더에 배치할 수 있습니다.</p>
       </div>
+
+      {/* 🆕 컬럼 편집 모달 */}
+      {editingColumn && (
+        <ColumnEditModal
+          column={editingColumn}
+          onSave={handleUpdateColumn}
+          onDelete={handleDeleteColumn}
+          onClose={() => setEditingColumn(null)}
+          canDelete={columns.length > 1}
+        />
+      )}
     </div>
   );
 }

@@ -1180,6 +1180,541 @@
   color: #8b5cf6;
 }
 
+/* ======================================== */
+/* 🆕 보드 선택기 v23.0 */
+/* ======================================== */
+
+.kanban-board-selector {
+  position: relative;
+}
+
+.kanban-board-selector-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.kanban-board-selector-btn:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.kanban-board-icon {
+  font-size: 20px;
+}
+
+.kanban-board-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.kanban-board-selector-btn svg {
+  color: #94a3b8;
+  transition: transform 0.2s;
+}
+
+.kanban-board-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 8px;
+  min-width: 280px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  animation: dropdownSlide 0.2s ease;
+}
+
+@keyframes dropdownSlide {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.kanban-board-dropdown-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.kanban-board-dropdown-list {
+  padding: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.kanban-board-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  background: none;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s;
+}
+
+.kanban-board-option:hover {
+  background: #f8fafc;
+}
+
+.kanban-board-option.active {
+  background: #f5f3ff;
+}
+
+.kanban-board-option-icon {
+  font-size: 18px;
+}
+
+.kanban-board-option-name {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.kanban-board-option-cols {
+  font-size: 11px;
+  color: #94a3b8;
+  background: #f1f5f9;
+  padding: 3px 8px;
+  border-radius: 10px;
+}
+
+.kanban-board-option.active .kanban-board-option-cols {
+  background: #ede9fe;
+  color: #7c3aed;
+}
+
+.kanban-board-option svg {
+  color: #7c3aed;
+}
+
+.kanban-board-dropdown-footer {
+  padding: 8px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.kanban-board-create-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border: 2px dashed #e2e8f0;
+  border-radius: 8px;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.kanban-board-create-btn:hover {
+  background: #f5f3ff;
+  border-color: #c4b5fd;
+  color: #7c3aed;
+}
+
+/* ======================================== */
+/* 🆕 편집 모드 스타일 */
+/* ======================================== */
+
+.kanban-edit-mode-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.kanban-edit-mode-btn:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.kanban-edit-mode-btn.active {
+  background: #fef3c7;
+  border-color: #fbbf24;
+  color: #d97706;
+}
+
+.kanban-edit-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border-bottom: 1px solid #fbbf24;
+}
+
+.kanban-edit-toolbar-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #92400e;
+}
+
+.kanban-edit-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.kanban-toolbar-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.kanban-toolbar-btn.add {
+  background: white;
+  border: 1px solid #e2e8f0;
+  color: #374151;
+}
+
+.kanban-toolbar-btn.add:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.kanban-toolbar-btn.delete {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+}
+
+.kanban-toolbar-btn.delete:hover {
+  background: #fee2e2;
+}
+
+/* 편집 모드에서 컬럼 */
+.kanban-global-column.edit-mode {
+  border: 2px dashed #fbbf24;
+}
+
+.kanban-column-header-v2.editable {
+  cursor: pointer;
+  position: relative;
+}
+
+.kanban-column-header-v2.editable:hover {
+  filter: brightness(0.97);
+}
+
+.kanban-column-edit-btn {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  color: #64748b;
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.15s;
+}
+
+.kanban-column-header-v2.editable:hover .kanban-column-edit-btn {
+  opacity: 1;
+}
+
+.kanban-column-edit-btn:hover {
+  background: #f5f3ff;
+  border-color: #c4b5fd;
+  color: #7c3aed;
+}
+
+/* 🆕 섹션 추가 영역 */
+.kanban-add-column-area {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 200px;
+  padding: 20px;
+}
+
+.kanban-add-column-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 160px;
+  padding: 40px 20px;
+  background: white;
+  border: 2px dashed #e2e8f0;
+  border-radius: 16px;
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.kanban-add-column-btn:hover {
+  background: #f5f3ff;
+  border-color: #c4b5fd;
+  color: #7c3aed;
+}
+
+.kanban-add-column-btn svg {
+  width: 24px;
+  height: 24px;
+}
+
+/* ======================================== */
+/* 🆕 컬럼 편집 모달 */
+/* ======================================== */
+
+.kanban-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  animation: fadeIn 0.15s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.kanban-modal {
+  width: 100%;
+  max-width: 420px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+  animation: modalSlide 0.2s ease;
+}
+
+@keyframes modalSlide {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.kanban-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.kanban-modal-header h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+}
+
+.kanban-modal-close {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f1f5f9;
+  border: none;
+  border-radius: 8px;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.kanban-modal-close:hover {
+  background: #e2e8f0;
+  color: #374151;
+}
+
+.kanban-modal-content {
+  padding: 24px;
+}
+
+.kanban-modal-field {
+  margin-bottom: 20px;
+}
+
+.kanban-modal-field:last-child {
+  margin-bottom: 0;
+}
+
+.kanban-modal-field label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 8px;
+}
+
+.kanban-modal-field input {
+  width: 100%;
+  padding: 12px 14px;
+  font-size: 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  outline: none;
+  transition: all 0.15s;
+}
+
+.kanban-modal-field input:focus {
+  background: white;
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+}
+
+.kanban-modal-field small {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+/* 색상 팔레트 */
+.kanban-color-palette {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.kanban-color-btn {
+  width: 36px;
+  height: 36px;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: transparent;
+}
+
+.kanban-color-btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.kanban-color-btn.selected {
+  border-color: #8b5cf6;
+  color: #8b5cf6;
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.3);
+}
+
+/* 모달 푸터 */
+.kanban-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  background: #f8fafc;
+  border-top: 1px solid #f1f5f9;
+  border-radius: 0 0 16px 16px;
+}
+
+.kanban-modal-btn-group {
+  display: flex;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.kanban-modal-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.kanban-modal-btn.cancel {
+  background: white;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
+}
+
+.kanban-modal-btn.cancel:hover {
+  background: #f1f5f9;
+}
+
+.kanban-modal-btn.save {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  border: none;
+  color: white;
+}
+
+.kanban-modal-btn.save:hover {
+  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+}
+
+.kanban-modal-btn.delete {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+}
+
+.kanban-modal-btn.delete:hover {
+  background: #fee2e2;
+}
+
 /* 반응형 */
 @media (max-width: 768px) {
   .kanban-global-header {
@@ -1200,6 +1735,20 @@
   .kanban-global-column {
     min-width: 280px;
   }
+  
+  .kanban-board-dropdown {
+    width: calc(100vw - 48px);
+    max-width: 320px;
+  }
+  
+  .kanban-modal {
+    margin: 16px;
+    max-width: calc(100vw - 32px);
+  }
+  
+  .kanban-edit-toolbar {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
 }
-
-
