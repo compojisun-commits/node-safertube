@@ -147,14 +147,25 @@ export default function SaveWizard({ videoData, multiLinks, user, onClose, onSuc
     }
   };
 
-  // 루트 레벨 폴더만 가져오기
-  const getRootFolders = () => folders.filter(f => !f.parentId);
+  // 루트 레벨 폴더만 가져오기 (parentId가 null, undefined, "" 모두 처리)
+  const getRootFolders = () => folders.filter(f => !f.parentId && f.parentId !== 0);
 
   // 특정 폴더의 하위 폴더 가져오기
   const getChildFolders = (parentId) => {
-    if (!parentId) return folders.filter(f => !f.parentId);
+    // 🆕 parentId가 null/undefined/"" 인 경우 루트 폴더 반환
+    if (!parentId) {
+      return folders.filter(f => !f.parentId || f.parentId === '' || f.parentId === null);
+    }
     return folders.filter(f => f.parentId === parentId);
   };
+
+  // 🆕 디버그용 로그 (폴더 목록 확인)
+  useEffect(() => {
+    if (folders.length > 0) {
+      console.log('📂 SaveWizard - 전체 폴더:', folders);
+      console.log('📂 SaveWizard - 루트 폴더:', getRootFolders());
+    }
+  }, [folders]);
 
   // 현재 드롭다운에서 보여줄 폴더들
   const getCurrentDropdownFolders = () => {
