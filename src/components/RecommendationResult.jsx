@@ -396,6 +396,12 @@ export default function RecommendationResult({ requestId, onReset, onBack }) {
     }
   };
 
+  // 분석 중일 때 (실시간 스트리밍 UI)
+  const isAnalyzing = result?.status === 'analyzing';
+  const analyzedCount = result?.analyzedCount || 0;
+  const totalVideos = result?.totalVideos || 0;
+  const streamingRecommendations = result?.recommendations || [];
+
   if (loading || result?.status === 'pending' || result?.status === 'processing') {
     return (
       <div style={{
@@ -465,6 +471,217 @@ export default function RecommendationResult({ requestId, onReset, onBack }) {
             '🔐 로그인하고 이메일 받기'
           )}
         </button>
+      </div>
+    );
+  }
+
+  // 분석 중 + 중간 결과가 있을 때 (실시간 스트리밍)
+  if (isAnalyzing) {
+    return (
+      <div style={{
+        width: '100%',
+        maxWidth: '900px',
+        padding: '40px',
+        backgroundColor: 'white',
+        borderRadius: '20px',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+        color: '#333'
+      }}>
+        {/* 진행 상황 헤더 */}
+        <div style={{
+          padding: '20px',
+          backgroundColor: '#e3f2fd',
+          borderRadius: '12px',
+          marginBottom: '30px',
+          textAlign: 'center'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '15px', marginBottom: '15px' }}>
+            <div className="spinner" style={{
+              border: '4px solid #f3f3f3',
+              borderTop: '4px solid #4285f4',
+              borderRadius: '50%',
+              width: '30px',
+              height: '30px',
+              animation: 'spin 1s linear infinite'
+            }}></div>
+            <h2 style={{ margin: 0, color: '#1976d2', fontSize: '24px' }}>
+              🔍 분석 중... ({analyzedCount}/{totalVideos})
+            </h2>
+          </div>
+
+          {/* 프로그레스 바 */}
+          <div style={{
+            width: '100%',
+            height: '12px',
+            backgroundColor: '#bbdefb',
+            borderRadius: '6px',
+            overflow: 'hidden'
+          }}>
+            <div style={{
+              width: `${totalVideos > 0 ? (analyzedCount / totalVideos) * 100 : 0}%`,
+              height: '100%',
+              backgroundColor: '#4285f4',
+              borderRadius: '6px',
+              transition: 'width 0.5s ease'
+            }}></div>
+          </div>
+
+          <p style={{ margin: '15px 0 0', color: '#666', fontSize: '14px' }}>
+            분석이 완료된 영상부터 먼저 보여드립니다
+          </p>
+        </div>
+
+        {/* 분석 완료된 영상 목록 (실시간) */}
+        {streamingRecommendations.length > 0 ? (
+          <div>
+            <h3 style={{ color: '#4285f4', marginBottom: '20px' }}>
+              ✅ 분석 완료 ({streamingRecommendations.length}개)
+            </h3>
+
+            {streamingRecommendations.map((video, idx) => {
+              const isExpanded = expandedVideos[video.videoId];
+              const safetyColor = video.safetyScore >= 80 ? '#28a745' : video.safetyScore >= 50 ? '#ffc107' : '#dc3545';
+
+              return (
+                <div
+                  key={idx}
+                  style={{
+                    padding: '20px',
+                    marginBottom: '15px',
+                    backgroundColor: '#f8f9fa',
+                    borderRadius: '12px',
+                    border: '2px solid #e0e0e0',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s',
+                    animation: 'fadeIn 0.5s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = '#4285f4';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(66, 133, 244, 0.2)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = '#e0e0e0';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
+                >
+                  {/* 영상 요약 정보 */}
+                  <div onClick={() => toggleVideo(video.videoId)}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                      <h4 style={{ margin: 0, color: '#333', fontSize: '18px', flex: 1 }}>
+                        {video.title}
+                      </h4>
+                      <span style={{
+                        padding: '4px 12px',
+                        backgroundColor: safetyColor,
+                        color: 'white',
+                        borderRadius: '12px',
+                        fontSize: '14px',
+                        fontWeight: 'bold',
+                        marginLeft: '10px'
+                      }}>
+                        {video.safetyScore}/100
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '15px', marginBottom: '10px', fontSize: '14px', color: '#666' }}>
+                      <span>⏱️ {Math.floor(video.duration / 60)}:{(video.duration % 60).toString().padStart(2, '0')}</span>
+                      {video.warningCount > 0 && (
+                        <span style={{ color: '#dc3545', fontWeight: '600' }}>
+                          ⚠️ 주의 장면 {video.warningCount}개
+                        </span>
+                      )}
+                    </div>
+
+                    <div style={{ fontSize: '14px', color: '#333', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontWeight: '600' }}>
+                        {isExpanded ? '▼ 접기' : '▶ 자세히 보기'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 상세 정보 (펼쳤을 때만) */}
+                  {isExpanded && (
+                    <div style={{
+                      marginTop: '20px',
+                      paddingTop: '20px',
+                      borderTop: '1px solid #ddd'
+                    }}>
+                      {video.summary && (
+                        <div style={{
+                          padding: '15px',
+                          backgroundColor: '#e8f4f8',
+                          borderRadius: '8px',
+                          marginBottom: '15px',
+                          borderLeft: '4px solid #4285f4'
+                        }}>
+                          <h5 style={{ color: '#4285f4', marginTop: 0, marginBottom: '8px', fontSize: '14px' }}>📝 영상 요약</h5>
+                          <p style={{ margin: 0, lineHeight: '1.5', fontSize: '13px', color: '#333' }}>{video.summary}</p>
+                        </div>
+                      )}
+
+                      {/* 액션 버튼들 */}
+                      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleJjim(video);
+                          }}
+                          style={{
+                            padding: '8px 16px',
+                            backgroundColor: jjimedVideos[video.videoId] ? '#ffc107' : '#f1f3f4',
+                            color: jjimedVideos[video.videoId] ? 'white' : '#333',
+                            border: 'none',
+                            borderRadius: '8px',
+                            fontSize: '14px',
+                            fontWeight: '600',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          ⭐ {jjimedVideos[video.videoId] ? '찜 완료' : '찜하기'}
+                        </button>
+
+                        <a
+                          href={`https://www.youtube.com/watch?v=${video.videoId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          style={{
+                            display: 'inline-block',
+                            padding: '8px 16px',
+                            backgroundColor: '#ff0000',
+                            color: 'white',
+                            textDecoration: 'none',
+                            borderRadius: '8px',
+                            fontSize: '14px',
+                            fontWeight: '600'
+                          }}
+                        >
+                          YouTube 보기
+                        </a>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div style={{
+            textAlign: 'center',
+            padding: '40px',
+            color: '#666'
+          }}>
+            <p style={{ fontSize: '16px' }}>분석 중입니다... 잠시만 기다려주세요</p>
+          </div>
+        )}
+
+        {/* CSS 애니메이션 */}
+        <style>{`
+          @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+        `}</style>
       </div>
     );
   }

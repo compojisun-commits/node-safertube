@@ -187,13 +187,17 @@ export default function VideoRecommendationDirect({ onBack }) {
         return;
       }
 
-      // 3단계: 빠른 분석 (병렬)
-      await Swal.fire({
+      // 3단계: 빠른 분석 (병렬) - 분석 완료될 때까지 로딩 표시
+      Swal.fire({
         title: "⚡ 빠른 분석 중",
-        html: `3단계: ${videos.length}개 영상 동시 분석 중...<br/><small>약 5-10초 소요</small>`,
+        html: `3단계: ${videos.length}개 영상 동시 분석 중...<br/><small>잠시만 기다려주세요</small>`,
         icon: "info",
         showConfirmButton: false,
-        timer: 2000,
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        didOpen: () => {
+          Swal.showLoading();
+        },
       });
 
       const analysisPromises = videos.map(async (video) => {
@@ -268,6 +272,8 @@ export default function VideoRecommendationDirect({ onBack }) {
         intention,
       });
 
+      // 분석 완료 후 로딩 팝업 닫고 완료 메시지 표시
+      Swal.close();
       await Swal.fire({
         title: "✅ 분석 완료!",
         html: `${results.length}개 영상 추천이 준비되었습니다`,
