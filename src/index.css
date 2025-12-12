@@ -29,7 +29,7 @@ body {
 }
 
 .header-inner {
-  max-width: 1200px;
+  max-width: 1600px;  /* 1200px → 1600px 확대 */
   margin: 0 auto;
   padding: 0 32px;
   height: 60px;
@@ -2677,7 +2677,7 @@ body {
    ========================================== */
 
 .jjim-container {
-  max-width: 1200px;
+  max-width: 1600px;  /* 1200px → 1600px 확대 */
   margin: 0 auto;
   padding: 32px 24px;
   min-height: calc(100vh - 200px);

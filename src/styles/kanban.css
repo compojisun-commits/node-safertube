@@ -652,9 +652,11 @@
 .kanban-global-container {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  height: calc(100vh - 120px);  /* 전체 화면 높이 활용 */
   background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
   padding: 0;
+  margin: -32px -24px;  /* 부모 패딩 상쇄 */
+  width: calc(100% + 48px);  /* 전체 폭 사용 */
 }
 
 /* --- 글로벌 헤더 --- */
