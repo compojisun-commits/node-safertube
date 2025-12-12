@@ -774,6 +774,39 @@
   box-shadow: 0 0 0 3px #8b5cf6, 0 4px 12px rgba(139, 92, 246, 0.2);
 }
 
+/* 🆕 섹션 드래그 스타일 */
+.kanban-global-column.column-dragging {
+  opacity: 0.5;
+  transform: scale(0.98);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+}
+
+.kanban-global-column.column-drop-target {
+  border: 3px dashed #8b5cf6;
+  background: #faf5ff;
+}
+
+.kanban-global-column.column-drop-target::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: #8b5cf6;
+  border-radius: 2px;
+}
+
+/* 헤더 드래그 커서 */
+.kanban-column-header-v2 {
+  cursor: grab;
+  position: relative;
+}
+
+.kanban-column-header-v2:active {
+  cursor: grabbing;
+}
+
 /* 컬럼 헤더 v2 */
 .kanban-column-header-v2 {
   display: flex;

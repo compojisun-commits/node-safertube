@@ -426,6 +426,10 @@ export default function KanbanBoard({
   const [inlineEditingColumnId, setInlineEditingColumnId] = useState(null);
   const [inlineEditValue, setInlineEditValue] = useState('');
   const inlineInputRef = useRef(null);
+  
+  // 🆕 섹션(컬럼) 드래그 상태
+  const [draggedColumn, setDraggedColumn] = useState(null);
+  const [dragOverColumnId, setDragOverColumnId] = useState(null);
 
   // 저장
   useEffect(() => {
@@ -597,6 +601,64 @@ export default function KanbanBoard({
     // 바로 이름 편집 모드로 진입
     setTimeout(() => handleStartInlineEdit(newColumn), 100);
   }, [columns.length, currentBoardId, handleStartInlineEdit]);
+
+  // 🆕 섹션 드래그 시작
+  const handleColumnDragStart = useCallback((e, column) => {
+    e.stopPropagation();
+    setDraggedColumn(column);
+    e.dataTransfer.effectAllowed = 'move';
+    // 드래그 이미지 설정 (투명하게)
+    const ghost = document.createElement('div');
+    ghost.style.opacity = '0';
+    document.body.appendChild(ghost);
+    e.dataTransfer.setDragImage(ghost, 0, 0);
+    setTimeout(() => document.body.removeChild(ghost), 0);
+  }, []);
+
+  // 🆕 섹션 드래그 오버
+  const handleColumnDragOver = useCallback((e, columnId) => {
+    e.preventDefault();
+    if (draggedColumn && draggedColumn.id !== columnId) {
+      setDragOverColumnId(columnId);
+    }
+  }, [draggedColumn]);
+
+  // 🆕 섹션 드롭 (순서 변경)
+  const handleColumnDrop = useCallback((e, targetColumnId) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!draggedColumn || draggedColumn.id === targetColumnId) {
+      setDraggedColumn(null);
+      setDragOverColumnId(null);
+      return;
+    }
+
+    setBoards(prev => prev.map(board => {
+      if (board.id !== currentBoardId) return board;
+      
+      const cols = [...board.columns];
+      const draggedIndex = cols.findIndex(c => c.id === draggedColumn.id);
+      const targetIndex = cols.findIndex(c => c.id === targetColumnId);
+      
+      if (draggedIndex === -1 || targetIndex === -1) return board;
+      
+      // 드래그한 컬럼을 제거하고 타겟 위치에 삽입
+      const [removed] = cols.splice(draggedIndex, 1);
+      cols.splice(targetIndex, 0, removed);
+      
+      return { ...board, columns: cols };
+    }));
+
+    setDraggedColumn(null);
+    setDragOverColumnId(null);
+  }, [draggedColumn, currentBoardId]);
+
+  // 🆕 섹션 드래그 종료
+  const handleColumnDragEnd = useCallback(() => {
+    setDraggedColumn(null);
+    setDragOverColumnId(null);
+  }, []);
 
   // 영상을 status별로 그룹화
   const videosByStatus = useMemo(() => {
@@ -948,19 +1010,34 @@ export default function KanbanBoard({
             const columnVideos = videosByStatus[column.id] || [];
             const isDropTarget = dragOverColumn === column.id;
             
+            const isColumnDragging = draggedColumn?.id === column.id;
+            const isColumnDropTarget = dragOverColumnId === column.id;
+            
             return (
               <div 
                 key={column.id}
-                className={`kanban-global-column ${isDropTarget ? 'drop-target' : ''} ${isEditMode ? 'edit-mode' : ''}`}
-                onDragOver={(e) => handleDragOver(e, column.id)}
+                className={`kanban-global-column ${isDropTarget ? 'drop-target' : ''} ${isEditMode ? 'edit-mode' : ''} ${isColumnDragging ? 'column-dragging' : ''} ${isColumnDropTarget ? 'column-drop-target' : ''}`}
+                onDragOver={(e) => {
+                  handleDragOver(e, column.id);
+                  handleColumnDragOver(e, column.id);
+                }}
                 onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDrop(e, column.id)}
+                onDrop={(e) => {
+                  if (draggedColumn) {
+                    handleColumnDrop(e, column.id);
+                  } else {
+                    handleDrop(e, column.id);
+                  }
+                }}
               >
-                {/* 컬럼 헤더 */}
+                {/* 컬럼 헤더 (드래그 가능) */}
                 <div 
                   className={`kanban-column-header-v2 ${isEditMode ? 'editable' : ''}`}
                   style={{ backgroundColor: column.color }}
                   onClick={() => isEditMode && setEditingColumn(column)}
+                  draggable={!inlineEditingColumnId}
+                  onDragStart={(e) => handleColumnDragStart(e, column)}
+                  onDragEnd={handleColumnDragEnd}
                 >
                   <div className="kanban-column-title-area">
                     {/* 🆕 인라인 편집 모드 */}
