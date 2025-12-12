@@ -387,6 +387,10 @@ export default function KanbanBoard({
   onAddVideo,
   onAiOrganize,
 }) {
+  // 🆕 onStatusChange를 onUpdateVideoStatus로 alias (호환성 유지)
+  const onUpdateVideoStatus = onStatusChange || ((videoId, newStatus) => {
+    console.log('Status change:', videoId, newStatus);
+  });
   // 🆕 다중 보드 상태
   const [boards, setBoards] = useState(() => {
     try {
