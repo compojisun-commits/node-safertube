@@ -13,8 +13,10 @@ import {
 } from '../utils/jjim';
 import { classifyVideo, getClassificationSummary } from '../utils/aiClassifier';
 import CascadingPathSelector from './CascadingPathSelector';
+import KanbanBoard from './KanbanBoard';
 import '../styles/cascading-path.css';
 import '../styles/auto-organize-v2.css';
+import '../styles/kanban.css';
 
 // ==========================================
 // [아이콘 컴포넌트들]
@@ -1091,57 +1093,39 @@ export default function JjimList({ onBack }) {
                       </button>
                     </div>
         ) : viewMode === 'board' ? (
-          // 칸반 보드 뷰
-          <div className="jjim-board">
-            {boardColumns.map(col => {
-              const colVideos = currentVideos.filter(v => (v.status || 'inbox') === col.id);
-            return (
-                <div key={col.id} className="jjim-board-column">
-                  <div className="jjim-board-column-header">
-                    <span className={`jjim-column-label ${col.color}`}>{col.label}</span>
-                    <span className="jjim-column-count">{colVideos.length}</span>
-                  </div>
-                  <div className="jjim-board-column-content">
-                    {colVideos.map(video => (
-                      <div 
-                        key={video.id} 
-                        className={`jjim-board-card ${selectedIds.has(video.id) ? 'selected' : ''}`}
-                        onClick={(e) => { e.stopPropagation(); handleSelect(video.id); }}
-                      >
-                        <div className="jjim-board-card-checkbox">
-                          <Checkbox checked={selectedIds.has(video.id)} onChange={() => handleSelect(video.id)} />
-                        </div>
-                        <div className="jjim-board-card-thumbnail">
-                          <img 
-                            src={video.videoId ? `https://img.youtube.com/vi/${video.videoId}/mqdefault.jpg` : video.thumbnail || 'https://via.placeholder.com/320x180'} 
-                            alt={video.title}
-                          />
-                        </div>
-                        <div className="jjim-board-card-title">{video.title}</div>
-                        <div className="jjim-board-card-footer">
-                          {video.safetyScore !== undefined ? (
-                            <SafetyBadge score={video.safetyScore} />
-                          ) : (
-                            <SafetyBadge score={100} />
-                          )}
-                          <select 
-                            className="jjim-status-select"
-                            value={video.status || 'inbox'}
-                            onChange={(e) => { e.stopPropagation(); handleStatusChange(video.id, e.target.value); }}
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            {boardColumns.map(c => (
-                              <option key={c.id} value={c.id}>{c.label}</option>
-                            ))}
-                          </select>
-                      </div>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+          // 🆕 KanbanBoard 컴포넌트 사용
+          <KanbanBoard
+            videos={videos}
+            folders={folders}
+            onAnalyze={(video) => handleVideoClick(video)}
+            onOpenVideo={(video) => handleVideoClick(video)}
+            onStatusChange={handleStatusChange}
+            onAddVideo={async ({ url, videoId, status, folderId }) => {
+              try {
+                await addLinkDirectly({
+                  user,
+                  videoUrl: url,
+                  videoId,
+                  folderId: folderId || currentFolderId,
+                  status,
+                });
+                await loadData();
+              } catch (error) {
+                throw error;
+              }
+            }}
+            onAiOrganize={(targetVideos) => {
+              if (targetVideos) {
+                setAutoOrganizeTargets(targetVideos);
+              } else {
+                const unorganized = videos.filter(v => !v.folderId);
+                if (unorganized.length > 0) {
+                  setAutoOrganizeTargets(unorganized);
+                }
+              }
+              setShowAutoOrganize(true);
+            }}
+          />
       ) : (
           // 리스트 & 그리드 뷰
           <>
