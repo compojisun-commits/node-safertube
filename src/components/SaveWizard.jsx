@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { AutoOrganizeModal } from './JjimList';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { createFolder, addLinkDirectly } from '../utils/jjim';
@@ -95,8 +94,6 @@ export default function SaveWizard({ videoData, multiLinks, user, onClose, onSuc
   // 일괄 적용 폴더 네비게이션 상태
   const [bulkPath, setBulkPath] = useState([]); // 일괄 적용에서 탐색 중인 경로
   const [showBulkDropdown, setShowBulkDropdown] = useState(false);
-  const [showAutoModal, setShowAutoModal] = useState(false);
-  const [autoModalVideos, setAutoModalVideos] = useState([]);
   
   // 멀티 링크 모드 확인
   const isMultiMode = multiLinks && multiLinks.length > 0;
@@ -374,22 +371,6 @@ export default function SaveWizard({ videoData, multiLinks, user, onClose, onSuc
     }
   };
 
-  // 현재 단일 영상으로 자동분류 모달을 띄우기 위한 데이터 구성
-  const openAutoModalForCurrent = () => {
-    if (isMultiMode) return;
-    const displayTitle = videoData?.title || videoData?.url || '제목 없음';
-    const autoVideo = {
-      id: videoData?.url || videoData?.title || 'temp',
-      title: displayTitle,
-      memo: '',
-      tags: [],
-      folderId: null,
-      videoUrl: videoData?.url || ''
-    };
-    setAutoModalVideos([autoVideo]);
-    setShowAutoModal(true);
-  };
-
   if (loading) {
     return (
       <div className="sw-overlay">
@@ -404,9 +385,8 @@ export default function SaveWizard({ videoData, multiLinks, user, onClose, onSuc
   }
 
   return (
-    <>
-      <div className="sw-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-        <div className={`sw-modal ${isMultiMode ? 'sw-modal-multi' : ''}`}>
+    <div className="sw-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className={`sw-modal ${isMultiMode ? 'sw-modal-multi' : ''}`}>
         {/* 헤더 */}
         <div className="sw-header">
           <h2 className="sw-title">
@@ -837,34 +817,17 @@ export default function SaveWizard({ videoData, multiLinks, user, onClose, onSuc
           {/* 저장 후 바로 AI 자동분류 페이지로 이동 */}
           <button
             type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (isMultiMode) {
-                alert('여러 링크 저장 모드에서는 한 번에 AI 자동분류를 실행할 수 없습니다.');
-                return;
-              }
-              openAutoModalForCurrent();
+            onClick={() => {
+              const url = `${window.location.origin}/jjim?auto=1`;
+              window.open(url, '_blank', 'noopener');
             }}
             className="sw-btn ghost"
-            title="찜보따리에서 AI 자동분류/정리 실행"
+            title="찜보따리에서 AI 자동분류/정리 실행 (새 탭)"
           >
             AI 자동분류 열기
           </button>
         </div>
-        </div>
       </div>
-
-      {/* AI 자동분류 모달 (단일 영상용, 현재 페이지에서 바로 표시) */}
-      {showAutoModal && (
-        <AutoOrganizeModal
-          videos={autoModalVideos}
-          folders={[]}
-          user={user}
-          scanTargets={autoModalVideos}
-          onClose={() => setShowAutoModal(false)}
-          onApply={() => setShowAutoModal(false)}
-        />
-      )}
-    </>
+    </div>
   );
 }

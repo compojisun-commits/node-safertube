@@ -46,11 +46,6 @@ export async function addToJjim({ user, videoUrl, videoId, analysis, title, fold
     tags,
     isManualAdd: false,
     createdAt: Timestamp.now(),
-    metadata: {
-      grade: "",
-      semester: "",
-      subject: "",
-    },
   };
 
   // 메인 문서 ID
@@ -252,11 +247,6 @@ export async function addLinkDirectly({ user, videoUrl, title, memo = "", folder
     isManualAdd: true, // 직접 추가된 영상 표시
     analysis: null,
     createdAt: Timestamp.now(),
-    metadata: {
-      grade: "",
-      semester: "",
-      subject: "",
-    },
   };
 
   const mainDocId = user.uid;

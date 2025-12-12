@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import VideoInput from "./components/VideoInput";
 import AnalysisResult from "./components/AnalysisResult";
@@ -25,18 +25,6 @@ function AppContent() {
     completedChunks: 0,
   });
   const [showSettings, setShowSettings] = useState(false);
-
-  // URL에 auto=1 또는 /jjim 경로로 진입 시 찜보따리 화면으로 전환해 자동분류 모달이 뜨도록 함
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const auto = params.get("auto") || params.get("autoClassify");
-    const path = window.location.pathname;
-    if (auto === "1" || path.includes("/jjim")) {
-      setMode("jjim");
-      setCurrentRequestId(null);
-      setCurrentResult(null);
-    }
-  }, []);
 
   const handleAnalysisStart = (requestId, result = null) => {
     setCurrentRequestId(requestId);
