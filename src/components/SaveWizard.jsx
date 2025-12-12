@@ -463,10 +463,10 @@ export default function SaveWizard({ videoData, multiLinks, user, onClose, onSuc
                       </span>
                     </button>
                     
-                    {/* 하위 폴더 목록 */}
+                    {/* 폴더 목록 */}
                     {getCurrentBulkFolders().length > 0 && (
                       <div className="sw-dropdown-section-label">
-                        하위 폴더로 이동
+                        {bulkPath.length === 0 ? '📁 폴더 선택' : '📂 하위 폴더'}
                       </div>
                     )}
                     
@@ -475,23 +475,41 @@ export default function SaveWizard({ videoData, multiLinks, user, onClose, onSuc
                         key={folder.id}
                         className="sw-dropdown-item sw-dropdown-folder"
                         onClick={() => {
+                          // 🆕 폴더 클릭 시 바로 선택 가능하도록 수정
+                          // Shift 키를 누르면 들어가기, 그냥 클릭하면 선택
+                          applyBulkFolder(folder.id);
+                        }}
+                        onDoubleClick={() => {
+                          // 더블클릭하면 하위 폴더로 이동
                           if (hasChildren(folder.id)) {
                             navigateIntoBulkFolder(folder);
-                          } else {
-                            applyBulkFolder(folder.id);
                           }
                         }}
                       >
                         <IconFolder />
                         <span>{folder.name}</span>
-                        {hasChildren(folder.id) ? (
-                          <IconChevronRight />
-                        ) : null}
+                        {hasChildren(folder.id) && (
+                          <button
+                            className="sw-folder-expand-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigateIntoBulkFolder(folder);
+                            }}
+                            title="하위 폴더 보기"
+                          >
+                            <IconChevronRight />
+                          </button>
+                        )}
                       </button>
                     ))}
                     
                     {/* 폴더 없을 때 */}
-                    {getCurrentBulkFolders().length === 0 && (
+                    {getCurrentBulkFolders().length === 0 && folders.length === 0 && (
+                      <div className="sw-dropdown-empty">
+                        📭 폴더가 없습니다. 새 폴더를 만들어주세요.
+                      </div>
+                    )}
+                    {getCurrentBulkFolders().length === 0 && folders.length > 0 && bulkPath.length > 0 && (
                       <div className="sw-dropdown-empty">
                         하위 폴더가 없습니다
                       </div>

@@ -1996,22 +1996,39 @@ body {
 
 .sw-dropdown-folder {
   position: relative;
+  display: flex;
+  align-items: center;
 }
 
-.sw-dropdown-folder svg:last-child {
+.sw-dropdown-folder svg:first-of-type {
+  flex-shrink: 0;
+}
+
+/* 🆕 하위 폴더 보기 버튼 */
+.sw-folder-expand-btn {
   margin-left: auto;
-  color: #d1d5db;
+  padding: 4px 6px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: #9ca3af;
+  cursor: pointer;
+  transition: all 150ms ease;
+  display: flex;
+  align-items: center;
 }
 
-.sw-dropdown-folder:hover svg:last-child {
-  color: #6b7280;
+.sw-folder-expand-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--primary-600, #7c3aed);
 }
 
 .sw-dropdown-empty {
-  padding: 16px;
+  padding: 20px 16px;
   text-align: center;
-  font-size: 12px;
-  color: #9ca3af;
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.5;
 }
 
 .sw-folder-path-text {

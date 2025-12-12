@@ -692,6 +692,7 @@ export default function KanbanBoard({
 
   // 🆕 섹션 더보기 메뉴 상태
   const [columnMenuOpen, setColumnMenuOpen] = useState(null);
+  const [cardMenuOpen, setCardMenuOpen] = useState(null); // 🆕 카드 더보기 메뉴 상태
 
   // 🆕 외부 클릭 시 메뉴 닫기
   useEffect(() => {
@@ -699,11 +700,33 @@ export default function KanbanBoard({
       if (columnMenuOpen && !e.target.closest('.kanban-column-menu-wrapper')) {
         setColumnMenuOpen(null);
       }
+      if (cardMenuOpen && !e.target.closest('.kanban-card-menu-wrapper')) {
+        setCardMenuOpen(null);
+      }
     };
     
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
-  }, [columnMenuOpen]);
+  }, [columnMenuOpen, cardMenuOpen]);
+
+  // 🆕 카드 삭제 확인 (Swal 모달)
+  const handleConfirmRemoveFromBoard = async (video) => {
+    const result = await Swal.fire({
+      title: '보드에서 제거',
+      html: `<p>"<strong>${video.title || '이 영상'}</strong>"을<br/>보드에서 제거하시겠습니까?</p>`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: '제거',
+      cancelButtonText: '취소',
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#6b7280',
+    });
+    
+    if (result.isConfirmed) {
+      handleRemoveFromBoard(video);
+      setCardMenuOpen(null);
+    }
+  };
 
   // 영상을 status별로 그룹화
   const videosByStatus = useMemo(() => {
@@ -1245,9 +1268,64 @@ export default function KanbanBoard({
                         <div 
                           key={video.id}
                           className={`kanban-card-v2 ${draggedVideo?.id === video.id ? 'dragging' : ''}`}
-                          draggable={!isEditMode}
-                          onDragStart={(e) => !isEditMode && handleDragStart(e, video, 'board')}
+                          draggable={!isEditMode && cardMenuOpen !== video.id}
+                          onDragStart={(e) => {
+                            if (isEditMode || cardMenuOpen) return;
+                            handleDragStart(e, video, 'board');
+                          }}
                         >
+                          {/* 🆕 Notion 스타일 더보기 메뉴 */}
+                          <div className="kanban-card-menu-wrapper">
+                            <button 
+                              className="kanban-card-more-btn"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setCardMenuOpen(cardMenuOpen === video.id ? null : video.id);
+                              }}
+                              title="더보기"
+                            >
+                              <IconMoreHorizontal />
+                            </button>
+                            
+                            {cardMenuOpen === video.id && (
+                              <div className="kanban-card-dropdown-menu">
+                                <button 
+                                  className="kanban-card-dropdown-item"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setCardMenuOpen(null);
+                                    onOpenVideo?.(video);
+                                  }}
+                                >
+                                  <IconExternalLink />
+                                  <span>열기</span>
+                                </button>
+                                <button 
+                                  className="kanban-card-dropdown-item"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setCardMenuOpen(null);
+                                    onAnalyze?.(video);
+                                  }}
+                                >
+                                  <IconCheck />
+                                  <span>상세 분석</span>
+                                </button>
+                                <div className="kanban-card-dropdown-divider"></div>
+                                <button 
+                                  className="kanban-card-dropdown-item danger"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleConfirmRemoveFromBoard(video);
+                                  }}
+                                >
+                                  <IconTrash />
+                                  <span>보드에서 제거</span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          
                           {/* 썸네일 */}
                           <div className="kanban-card-thumb-v2">
                             {video.videoId ? (
@@ -1263,14 +1341,6 @@ export default function KanbanBoard({
                             )}
                             
                             <SafetyBadge score={video.safetyScore} />
-                            
-                            <button 
-                              className="kanban-card-remove-v2"
-                              onClick={() => handleRemoveFromBoard(video)}
-                              title="보드에서 제거"
-                            >
-                              <IconX />
-                            </button>
                           </div>
                           
                           {/* 카드 내용 */}
