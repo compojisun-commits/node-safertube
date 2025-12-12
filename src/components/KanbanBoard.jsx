@@ -912,12 +912,29 @@ export default function KanbanBoard({
                   style={{ backgroundColor: column.color }}
                   onClick={() => isEditMode && setEditingColumn(column)}
                 >
-                  <span className="kanban-column-title-v2">
-                    {column.title}
-                  </span>
-                  <span className="kanban-column-count-v2">
-                    {columnVideos.length}
-                  </span>
+                  <div className="kanban-column-title-area">
+                    <span className="kanban-column-title-v2">
+                      {column.title}
+                    </span>
+                    <span className="kanban-column-count-v2">
+                      {columnVideos.length}
+                    </span>
+                  </div>
+                  
+                  {/* 🆕 헤더에 + 버튼 (편집 모드가 아닐 때만) */}
+                  {!isEditMode && (
+                    <button 
+                      className="kanban-header-add-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAddClick(column.id);
+                      }}
+                      title="영상 추가"
+                    >
+                      <IconPlus />
+                    </button>
+                  )}
+                  
                   {isEditMode && (
                     <button className="kanban-column-edit-btn">
                       <IconEdit />

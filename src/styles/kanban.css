@@ -765,9 +765,17 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px;
+  padding: 14px 16px;
   border-radius: 16px 16px 0 0;
   border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  gap: 10px;
+}
+
+.kanban-column-title-area {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
 }
 
 .kanban-column-title-v2 {
@@ -783,6 +791,34 @@
   padding: 4px 10px;
   border-radius: 20px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+/* 🆕 헤더 더하기 버튼 */
+.kanban-header-add-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.kanban-header-add-btn:hover {
+  background: #f5f3ff;
+  border-color: #c4b5fd;
+  color: #7c3aed;
+  transform: scale(1.05);
+}
+
+.kanban-header-add-btn svg {
+  width: 16px;
+  height: 16px;
 }
 
 /* 카드 리스트 v2 */
