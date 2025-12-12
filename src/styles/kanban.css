@@ -1244,6 +1244,143 @@
   margin: 4px 0;
 }
 
+/* ========================================
+   🆕 다중 선택 체크박스
+   ======================================== */
+.kanban-card-checkbox {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 15;
+  opacity: 0;
+  transition: opacity 200ms ease;
+  cursor: pointer;
+}
+
+.kanban-card-v2:hover .kanban-card-checkbox,
+.kanban-card-v2.selected .kanban-card-checkbox {
+  opacity: 1;
+}
+
+.kanban-card-checkbox input {
+  display: none;
+}
+
+.kanban-checkbox-custom {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: white;
+  border: 2px solid #d1d5db;
+  border-radius: 4px;
+  transition: all 150ms ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.kanban-card-checkbox input:checked + .kanban-checkbox-custom {
+  background: var(--primary-500, #8b5cf6);
+  border-color: var(--primary-500, #8b5cf6);
+}
+
+.kanban-card-checkbox input:checked + .kanban-checkbox-custom::after {
+  content: '✓';
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+/* 선택된 카드 스타일 */
+.kanban-card-v2.selected {
+  border-color: var(--primary-400, #a78bfa);
+  background: linear-gradient(135deg, white 0%, var(--primary-50, #f5f3ff) 100%);
+  box-shadow: 0 0 0 2px var(--primary-200, #ddd6fe), var(--shadow-md);
+}
+
+/* ========================================
+   🆕 Floating Action Bar
+   ======================================== */
+.kanban-floating-bar {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  animation: floatUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes floatUp {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.kanban-floating-bar-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 20px;
+  background: var(--gray-900, #1f2937);
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.kanban-floating-count {
+  font-size: 14px;
+  font-weight: 600;
+  color: white;
+  padding-right: 16px;
+  border-right: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.kanban-floating-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.kanban-floating-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.kanban-floating-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.kanban-floating-btn.move:hover {
+  background: var(--primary-500, #8b5cf6);
+}
+
+.kanban-floating-btn.delete:hover {
+  background: #ef4444;
+}
+
+.kanban-floating-btn.clear {
+  padding: 8px;
+}
+
+.kanban-floating-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
 /* 스태거드 애니메이션 */
 .kanban-card-v2:nth-child(1) { animation-delay: 0ms; }
 .kanban-card-v2:nth-child(2) { animation-delay: 50ms; }

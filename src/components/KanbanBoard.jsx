@@ -693,6 +693,10 @@ export default function KanbanBoard({
   // 🆕 섹션 더보기 메뉴 상태
   const [columnMenuOpen, setColumnMenuOpen] = useState(null);
   const [cardMenuOpen, setCardMenuOpen] = useState(null); // 🆕 카드 더보기 메뉴 상태
+  
+  // 🆕 다중 선택 상태
+  const [selectedCardIds, setSelectedCardIds] = useState(new Set());
+  const [lastSelectedId, setLastSelectedId] = useState(null); // Shift 선택용
 
   // 🆕 외부 클릭 시 메뉴 닫기
   useEffect(() => {
@@ -708,6 +712,117 @@ export default function KanbanBoard({
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
   }, [columnMenuOpen, cardMenuOpen]);
+
+  // 🆕 카드 선택 토글 (체크박스 클릭)
+  const handleCardSelect = useCallback((e, video, allVideos = []) => {
+    e.stopPropagation();
+    
+    const videoId = video.id;
+    const newSet = new Set(selectedCardIds);
+    
+    // Shift 키 + 클릭: 범위 선택
+    if (e.shiftKey && lastSelectedId && allVideos.length > 0) {
+      const lastIndex = allVideos.findIndex(v => v.id === lastSelectedId);
+      const currentIndex = allVideos.findIndex(v => v.id === videoId);
+      
+      if (lastIndex !== -1 && currentIndex !== -1) {
+        const start = Math.min(lastIndex, currentIndex);
+        const end = Math.max(lastIndex, currentIndex);
+        
+        for (let i = start; i <= end; i++) {
+          newSet.add(allVideos[i].id);
+        }
+        setSelectedCardIds(newSet);
+        return;
+      }
+    }
+    
+    // 일반 클릭: 토글
+    if (newSet.has(videoId)) {
+      newSet.delete(videoId);
+    } else {
+      newSet.add(videoId);
+    }
+    
+    setSelectedCardIds(newSet);
+    setLastSelectedId(videoId);
+  }, [selectedCardIds, lastSelectedId]);
+
+  // 🆕 전체 선택 해제
+  const handleClearSelection = useCallback(() => {
+    setSelectedCardIds(new Set());
+    setLastSelectedId(null);
+  }, []);
+
+  // 🆕 선택된 카드 일괄 삭제
+  const handleBatchDelete = useCallback(async () => {
+    if (selectedCardIds.size === 0) return;
+    
+    const result = await Swal.fire({
+      title: '일괄 삭제',
+      html: `<p>선택한 <strong>${selectedCardIds.size}개</strong>의 영상을 보드에서 제거하시겠습니까?</p>`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: '삭제',
+      cancelButtonText: '취소',
+      confirmButtonColor: '#ef4444',
+    });
+    
+    if (result.isConfirmed) {
+      // 선택된 모든 카드의 status를 첫 번째 컬럼으로 변경 (또는 제거)
+      const firstColumnId = columns[0]?.id;
+      for (const videoId of selectedCardIds) {
+        await onUpdateVideoStatus?.(videoId, firstColumnId);
+      }
+      
+      handleClearSelection();
+      
+      Swal.fire({
+        icon: 'success',
+        title: '완료',
+        text: `${selectedCardIds.size}개 영상이 이동되었습니다.`,
+        timer: 1500,
+        showConfirmButton: false
+      });
+    }
+  }, [selectedCardIds, columns, onUpdateVideoStatus, handleClearSelection]);
+
+  // 🆕 선택된 카드 일괄 이동
+  const handleBatchMove = useCallback(async () => {
+    if (selectedCardIds.size === 0) return;
+    
+    const columnOptions = columns.reduce((acc, col) => {
+      acc[col.id] = col.title;
+      return acc;
+    }, {});
+    
+    const { value: targetColumnId } = await Swal.fire({
+      title: '일괄 이동',
+      text: `${selectedCardIds.size}개의 영상을 이동할 섹션을 선택하세요`,
+      input: 'select',
+      inputOptions: columnOptions,
+      inputPlaceholder: '섹션 선택',
+      showCancelButton: true,
+      confirmButtonText: '이동',
+      cancelButtonText: '취소',
+      confirmButtonColor: '#8b5cf6',
+    });
+    
+    if (targetColumnId) {
+      for (const videoId of selectedCardIds) {
+        await onUpdateVideoStatus?.(videoId, targetColumnId);
+      }
+      
+      handleClearSelection();
+      
+      Swal.fire({
+        icon: 'success',
+        title: '이동 완료',
+        timer: 1500,
+        showConfirmButton: false
+      });
+    }
+  }, [selectedCardIds, columns, onUpdateVideoStatus, handleClearSelection]);
 
   // 🆕 카드 삭제 확인 (Swal 모달)
   const handleConfirmRemoveFromBoard = async (video) => {
@@ -1357,16 +1472,32 @@ export default function KanbanBoard({
                       const isUnorganized = !video.folderId;
                       const folderName = folders.find(f => f.id === video.folderId)?.name;
                       
+                      const isSelected = selectedCardIds.has(video.id);
+                      
                       return (
                         <div 
                           key={video.id}
-                          className={`kanban-card-v2 ${draggedVideo?.id === video.id ? 'dragging' : ''}`}
-                          draggable={!isEditMode && cardMenuOpen !== video.id}
+                          className={`kanban-card-v2 ${draggedVideo?.id === video.id ? 'dragging' : ''} ${isSelected ? 'selected' : ''}`}
+                          draggable={!isEditMode && cardMenuOpen !== video.id && !isSelected}
                           onDragStart={(e) => {
-                            if (isEditMode || cardMenuOpen) return;
+                            if (isEditMode || cardMenuOpen || isSelected) return;
                             handleDragStart(e, video, 'board');
                           }}
                         >
+                          {/* 🆕 다중 선택 체크박스 */}
+                          <label 
+                            className="kanban-card-checkbox"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={(e) => handleCardSelect(e, video, columnVideos)}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                            <span className="kanban-checkbox-custom"></span>
+                          </label>
+                          
                           {/* 🆕 Notion 스타일 더보기 메뉴 */}
                           <div className="kanban-card-menu-wrapper">
                             <button 
@@ -1535,6 +1666,45 @@ export default function KanbanBoard({
       <div className="kanban-global-footer">
         <p>💡 서랍에서 영상을 드래그하거나, 카드를 이동하여 상태를 변경하세요. 미분류 영상은 <strong>🪄 AI 정리</strong>로 폴더에 배치할 수 있습니다.</p>
       </div>
+
+      {/* 🆕 Floating Action Bar - 다중 선택 시 표시 */}
+      {selectedCardIds.size > 0 && (
+        <div className="kanban-floating-bar">
+          <div className="kanban-floating-bar-content">
+            <span className="kanban-floating-count">
+              ✓ {selectedCardIds.size}개 선택됨
+            </span>
+            
+            <div className="kanban-floating-actions">
+              <button 
+                className="kanban-floating-btn move"
+                onClick={handleBatchMove}
+                title="선택한 영상 이동"
+              >
+                <IconFolder />
+                <span>이동</span>
+              </button>
+              
+              <button 
+                className="kanban-floating-btn delete"
+                onClick={handleBatchDelete}
+                title="선택한 영상 삭제"
+              >
+                <IconTrash />
+                <span>삭제</span>
+              </button>
+              
+              <button 
+                className="kanban-floating-btn clear"
+                onClick={handleClearSelection}
+                title="선택 해제"
+              >
+                <IconX />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 🆕 컬럼 편집 모달 */}
       {editingColumn && (
