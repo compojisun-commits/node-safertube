@@ -628,6 +628,12 @@ export default function JjimList({ onBack }) {
     if (auto === '1') {
       setAutoOrganizeTargets(null); // 루트 미분류 영상 기준
       setAutoOrganizeOpen(true);
+      
+      // 🆕 URL 파라미터 제거 (다시 열리는 것 방지)
+      const url = new URL(window.location.href);
+      url.searchParams.delete('auto');
+      url.searchParams.delete('autoClassify');
+      window.history.replaceState({}, '', url.pathname);
     }
   }, []);
 

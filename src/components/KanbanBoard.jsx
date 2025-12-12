@@ -607,22 +607,26 @@ export default function KanbanBoard({
     setTimeout(() => handleStartInlineEdit(newColumn), 100);
   }, [columns.length, currentBoardId, handleStartInlineEdit]);
 
-  // 🆕 섹션 드래그 시작
+  // 🆕 섹션 드래그 시작 - 단순화
   const handleColumnDragStart = useCallback((e, column) => {
-    e.stopPropagation();
-    setDraggedColumn(column);
+    // 카드 드래그와 구분하기 위해 데이터 타입 설정
+    e.dataTransfer.setData('column-id', column.id);
     e.dataTransfer.effectAllowed = 'move';
-    // 드래그 이미지 설정 (투명하게)
-    const ghost = document.createElement('div');
-    ghost.style.opacity = '0';
-    document.body.appendChild(ghost);
-    e.dataTransfer.setDragImage(ghost, 0, 0);
-    setTimeout(() => document.body.removeChild(ghost), 0);
+    setDraggedColumn(column);
+    setDraggedVideo(null); // 카드 드래그 상태 초기화
+    
+    // 약간의 딜레이 후 드래그 시작 상태 적용
+    setTimeout(() => {
+      e.target.closest('.kanban-global-column')?.classList.add('column-dragging');
+    }, 0);
   }, []);
 
-  // 🆕 섹션 드래그 오버
+  // 🆕 섹션 드래그 오버 - 개선
   const handleColumnDragOver = useCallback((e, columnId) => {
     e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    
+    // 섹션 드래그 중일 때만 드롭 타겟 표시
     if (draggedColumn && draggedColumn.id !== columnId) {
       setDragOverColumnId(columnId);
     }
@@ -666,14 +670,9 @@ export default function KanbanBoard({
     setDragOverColumnId(null);
     setDragOverColumn(null);
     
-    // 포커스 해제 (보라색 테두리 제거)
-    if (document.activeElement instanceof HTMLElement) {
-      document.activeElement.blur();
-    }
-    
-    // 모든 drop-target 클래스 강제 제거
-    document.querySelectorAll('.column-drop-target, .drop-target').forEach(el => {
-      el.classList.remove('column-drop-target', 'drop-target');
+    // 모든 드래그 관련 클래스 강제 제거
+    document.querySelectorAll('.column-drop-target, .drop-target, .column-dragging').forEach(el => {
+      el.classList.remove('column-drop-target', 'drop-target', 'column-dragging');
     });
   }, []);
 
