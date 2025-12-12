@@ -438,11 +438,14 @@ export default function KanbanBoard({
   const [drawerSearch, setDrawerSearch] = useState('');
   const [expandedFolders, setExpandedFolders] = useState(new Set());
 
-  // 🆕 서랍이 열릴 때 데이터 새로고침 (동기화 보장)
+  // 🆕 서랍이 열릴 때 데이터 새로고침 (동기화 보장) - 닫혔다가 열릴 때만
+  const prevDrawerOpenRef = useRef(isDrawerOpen);
   useEffect(() => {
-    if (isDrawerOpen && onRefresh) {
+    // 이전에 닫혀있었고(false), 지금 열렸을 때(true)만 새로고침
+    if (!prevDrawerOpenRef.current && isDrawerOpen && onRefresh) {
       onRefresh();
     }
+    prevDrawerOpenRef.current = isDrawerOpen;
   }, [isDrawerOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 🆕 편집 모달 상태
