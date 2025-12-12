@@ -229,6 +229,186 @@ export async function getVideoTranscript(videoId, _retryCount = 0) {
 }
 
 /**
+ * 신뢰채널에서 최근 2개월 이내 영상 검색 (2순위)
+ * 영상이 부족하면 년도 상관없이 현재 월 ±2개월 영상도 검색 (3순위)
+ */
+export async function searchTrustedChannelVideos(
+  subject,
+  maxResults = 10,
+  preferredDuration = null,
+  _retryCount = 0
+) {
+  try {
+    const trustedChannelIds = getTrustedChannelIds(subject);
+
+    if (trustedChannelIds.length === 0) {
+      console.log(`⚠️ ${subject}에 대한 신뢰채널이 없습니다.`);
+      return [];
+    }
+
+    // 영상 길이 필터
+    let videoDuration = "";
+    if (preferredDuration) {
+      const minutes = parseInt(preferredDuration);
+      if (minutes <= 4) {
+        videoDuration = "&videoDuration=short";
+      } else if (minutes <= 20) {
+        videoDuration = "&videoDuration=medium";
+      } else {
+        videoDuration = "&videoDuration=long";
+      }
+    }
+
+    const apiKey = getCurrentApiKey();
+
+    // 2순위: 최근 2개월 이내 영상 검색
+    const twoMonthsAgo = new Date();
+    twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
+    const publishedAfter = twoMonthsAgo.toISOString();
+
+    // 각 채널에서 2~3개씩 골고루 가져오기 (최대 30개 이내)
+    const totalChannels = Math.min(trustedChannelIds.length, 15); // 최대 15개 채널
+    const videosPerChannel = Math.min(3, Math.max(2, Math.floor(30 / totalChannels))); // 채널당 2~3개
+
+    console.log(`📺 ${totalChannels}개 신뢰채널에서 각 ${videosPerChannel}개씩 검색`);
+
+    // 병렬로 모든 채널 검색
+    const searchPromises = trustedChannelIds.slice(0, totalChannels).map(async (channelId) => {
+      try {
+        const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&channelId=${channelId}&maxResults=${videosPerChannel}&order=date&publishedAfter=${publishedAfter}&videoEmbeddable=true&regionCode=KR${videoDuration}&key=${apiKey}`;
+
+        const response = await fetch(searchUrl);
+        if (!response.ok) {
+          console.warn(`채널 ${channelId} 검색 실패`);
+          return [];
+        }
+
+        const data = await response.json();
+        return data.items || [];
+      } catch (error) {
+        console.warn(`채널 ${channelId} 검색 오류:`, error);
+        return [];
+      }
+    });
+
+    const channelResults = await Promise.all(searchPromises);
+
+    // 각 채널별로 최대 2개씩만 가져와서 골고루 분배
+    let allItems = [];
+    channelResults.forEach((items, idx) => {
+      const channelItems = items.slice(0, 2); // 채널당 최대 2개
+      if (channelItems.length > 0) {
+        console.log(`  - 채널 ${idx + 1}: ${channelItems.length}개`);
+      }
+      allItems.push(...channelItems);
+    });
+
+    console.log(`📺 2순위(최근 2개월): ${allItems.length}개 영상 발견 (${channelResults.filter(r => r.length > 0).length}개 채널에서)`);
+
+    // 3순위: 2순위 영상이 부족하면 년도 상관없이 현재 월 ±2개월 영상 검색
+    if (allItems.length < maxResults) {
+      console.log(`⚠️ 최근 영상 부족(${allItems.length}개). 3순위(같은 시즌) 검색 시작...`);
+
+      const currentMonth = new Date().getMonth(); // 0-11
+
+      // 각 채널에서 골고루 가져와서 월 필터링 (채널당 5개씩)
+      const seasonSearchPromises = trustedChannelIds.slice(0, totalChannels).map(async (channelId) => {
+        try {
+          // 채널당 5개씩 가져와서 월로 필터링
+          const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&channelId=${channelId}&maxResults=5&order=viewCount&videoEmbeddable=true&regionCode=KR${videoDuration}&key=${apiKey}`;
+
+          const response = await fetch(searchUrl);
+          if (!response.ok) return [];
+
+          const data = await response.json();
+          return data.items || [];
+        } catch (error) {
+          return [];
+        }
+      });
+
+      const seasonResults = await Promise.all(seasonSearchPromises);
+
+      // 각 채널별로 최대 2개씩만 가져와서 골고루 분배
+      let seasonItems = [];
+      seasonResults.forEach((items, idx) => {
+        const channelItems = items.slice(0, 2); // 채널당 최대 2개
+        seasonItems.push(...channelItems);
+      });
+
+      // 현재 월 ±2개월에 해당하는 영상만 필터링
+      const filteredSeasonItems = seasonItems.filter((item) => {
+        const publishedDate = new Date(item.snippet.publishedAt);
+        const publishedMonth = publishedDate.getMonth();
+
+        // 월 차이 계산 (12월-1월 경계 고려)
+        let monthDiff = Math.abs(currentMonth - publishedMonth);
+        if (monthDiff > 6) monthDiff = 12 - monthDiff; // 12월↔1월 등 경계 처리
+
+        return monthDiff <= 2;
+      });
+
+      // 2순위에서 이미 가져온 영상 ID 제외
+      const existingIds = new Set(allItems.map((item) => item.id.videoId));
+      const newSeasonItems = filteredSeasonItems.filter(
+        (item) => !existingIds.has(item.id.videoId)
+      );
+
+      console.log(`📺 3순위(같은 시즌): ${newSeasonItems.length}개 추가 영상 발견`);
+      allItems = [...allItems, ...newSeasonItems];
+    }
+
+    if (allItems.length === 0) {
+      console.log("신뢰채널에서 영상을 찾지 못했습니다.");
+      return [];
+    }
+
+    // 영상 상세 정보 가져오기
+    const videoIds = allItems.slice(0, 50).map((item) => item.id.videoId).join(",");
+    const detailsUrl = `https://www.googleapis.com/youtube/v3/videos?part=contentDetails,snippet,statistics&id=${videoIds}&key=${apiKey}`;
+
+    const detailsResponse = await fetch(detailsUrl);
+    if (!detailsResponse.ok) {
+      if (detailsResponse.status === 403 && _retryCount < YOUTUBE_API_KEYS.length - 1) {
+        console.warn(`⚠️ API 키 할당량 초과. 다음 키로 전환 시도...`);
+        switchToNextKey();
+        return searchTrustedChannelVideos(subject, maxResults, preferredDuration, _retryCount + 1);
+      }
+      throw new Error(`YouTube details failed: ${detailsResponse.status}`);
+    }
+
+    const detailsData = await detailsResponse.json();
+
+    // 결과 조합
+    let videos = detailsData.items.map((item) => {
+      const duration = parseDuration(item.contentDetails.duration);
+      return {
+        videoId: item.id,
+        videoUrl: `https://www.youtube.com/watch?v=${item.id}`,
+        title: item.snippet.title,
+        channelId: item.snippet.channelId,
+        channelTitle: item.snippet.channelTitle,
+        duration: duration,
+        durationFormatted: formatDuration(duration),
+        thumbnail: item.snippet.thumbnails.medium.url,
+        viewCount: parseInt(item.statistics?.viewCount || "0"),
+        likeCount: parseInt(item.statistics?.likeCount || "0"),
+        publishedAt: item.snippet.publishedAt,
+      };
+    });
+
+    // 조회수 순으로 정렬 후 maxResults만큼 반환
+    videos.sort((a, b) => b.viewCount - a.viewCount);
+
+    console.log(`✅ 신뢰채널에서 총 ${videos.length}개 영상 발견 (${subject})`);
+    return videos.slice(0, maxResults);
+  } catch (error) {
+    console.error("신뢰채널 검색 실패:", error);
+    return [];
+  }
+}
+
+/**
  * ISO 8601 duration을 초 단위로 변환
  */
 function parseDuration(duration) {

@@ -7,7 +7,7 @@ import {
   quickAnalyzeVideo,
   checkSimilarityWithGemini,
 } from "../utils/gemini";
-import { searchYouTubeVideos, getVideoTranscript } from "../utils/youtube";
+import { searchYouTubeVideos, getVideoTranscript, searchTrustedChannelVideos } from "../utils/youtube";
 import {
   doc,
   getDoc,
@@ -26,7 +26,7 @@ export default function VideoRecommendationDirect({ onBack }) {
   const [recommendations, setRecommendations] = useState(null);
 
   // 폼 상태
-  const [gradeLevel, setGradeLevel] = useState("초등 6학년");
+  const [gradeLevel, setGradeLevel] = useState("초등 고학년");
   const [subject, setSubject] = useState("미술");
   const [intention, setIntention] = useState("");
   const [preferredDuration, setPreferredDuration] = useState("");
@@ -37,6 +37,7 @@ export default function VideoRecommendationDirect({ onBack }) {
   const [jjimedVideos, setJjimedVideos] = useState({});
   const [previousKeywords, setPreviousKeywords] = useState([]); // 이전 검색 키워드 저장
   const [playingVideo, setPlayingVideo] = useState(null); // 현재 재생 중인 영상
+  const [newlyAddedIds, setNewlyAddedIds] = useState(new Set()); // 새로 추가된 영상 ID
 
   //
   const [sortedVideos, setSortedVideos] = useState([]);
@@ -142,6 +143,176 @@ export default function VideoRecommendationDirect({ onBack }) {
     setLoading(true);
 
     try {
+      // 수업의도가 비어있는 경우: 기존 추천목록 또는 신뢰채널 검색
+      if (!intention.trim()) {
+        await Swal.fire({
+          title: "⚡ 빠른 추천 시작",
+          html: "기존 추천 목록 확인 중...",
+          icon: "info",
+          showConfirmButton: false,
+          timer: 1000,
+        });
+
+        // 1순위: Firestore에서 학년-주제 문서 찾기
+        const docName = `${gradeLevel}-${subject}`;
+        const keywordDocRef = doc(db, "recommendKeywords", docName);
+        const keywordDoc = await getDoc(keywordDocRef);
+
+        if (keywordDoc.exists()) {
+          const data = keywordDoc.data();
+          const lists = data.lists || [];
+
+          if (lists.length > 0) {
+            // 좋아요 많은 순으로 정렬해서 가장 인기있는 목록 선택
+            const sortedLists = [...lists].sort((a, b) => (b.likes || 0) - (a.likes || 0));
+            const bestList = sortedLists[0];
+
+            console.log(`✅ 기존 추천목록 발견: ${docName}, ${bestList.videos?.length || 0}개 영상`);
+
+            // 한도 증가
+            if (!isLocalDev) {
+              incrementLimit();
+            }
+
+            setRecommendations({
+              videos: bestList.videos || [],
+              subject,
+              gradeLevel,
+              intention: bestList.keywords || "",
+              fromSavedList: true,
+            });
+
+            Swal.close();
+            await Swal.fire({
+              title: "✅ 추천 완료!",
+              html: `기존 인기 추천 목록을 불러왔습니다<br/><small>키워드: ${bestList.keywords || "없음"}</small>`,
+              icon: "success",
+              confirmButtonColor: "#4285f4",
+              timer: 2000,
+            });
+
+            setLoading(false);
+            return;
+          }
+        }
+
+        // 2,3순위: 신뢰채널에서 영상 검색
+        Swal.fire({
+          title: "⚡ 신뢰채널 검색",
+          html: `${subject} 신뢰채널에서 영상 검색 및 분석 중...<br/><small>안전도 70점 이상 영상만 선별합니다</small>`,
+          icon: "info",
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          allowEscapeKey: false,
+          didOpen: () => {
+            Swal.showLoading();
+          },
+        });
+
+        // 넉넉하게 가져와서 필터링
+        const trustedVideos = await searchTrustedChannelVideos(
+          subject,
+          20, // 필터링 후 10개 남기려면 넉넉하게
+          preferredDuration
+        );
+
+        if (trustedVideos.length === 0) {
+          Swal.close();
+          await Swal.fire({
+            title: "검색 결과 없음",
+            text: "신뢰채널에서 영상을 찾을 수 없습니다. 수업 의도를 입력해보세요!",
+            icon: "warning",
+            confirmButtonColor: "#4285f4",
+          });
+          setLoading(false);
+          return;
+        }
+
+        // 각 영상 분석 후 안전도 70점 이상만 필터링
+        const analysisPromises = trustedVideos.map(async (video) => {
+          try {
+            const transcript = await getVideoTranscript(video.videoId);
+            const analysis = await quickAnalyzeVideo(
+              video.videoId,
+              transcript,
+              gradeLevel,
+              subject,
+              ""
+            );
+            return {
+              ...video,
+              safetyScore: analysis.safetyScore,
+              safetyDescription: analysis.summary,
+              summary: analysis.summary,
+              warnings: [],
+              warningCount: 0,
+              chapters: [],
+              flow: [],
+            };
+          } catch (error) {
+            console.error(`분석 실패 (${video.videoId}):`, error);
+            return {
+              ...video,
+              safetyScore: 0, // 분석 실패 시 낮은 점수로 제외되도록
+              safetyDescription: "분석 실패",
+              summary: "분석 중 오류가 발생했습니다",
+              warnings: [],
+              warningCount: 0,
+              chapters: [],
+              flow: [],
+            };
+          }
+        });
+
+        const allResults = await Promise.all(analysisPromises);
+
+        // 안전도 70점 초과 영상만 필터링
+        const safeResults = allResults.filter((video) => video.safetyScore > 70);
+        console.log(`✅ 안전도 필터링: ${allResults.length}개 → ${safeResults.length}개 (70점 초과)`);
+
+        if (safeResults.length === 0) {
+          Swal.close();
+          await Swal.fire({
+            title: "적합한 영상 없음",
+            text: "안전도 기준을 충족하는 영상을 찾지 못했습니다. 수업 의도를 입력해보세요!",
+            icon: "warning",
+            confirmButtonColor: "#4285f4",
+          });
+          setLoading(false);
+          return;
+        }
+
+        // 조회수 순 정렬 후 최대 10개
+        safeResults.sort((a, b) => b.viewCount - a.viewCount);
+        const finalResults = safeResults.slice(0, 10);
+
+        // 한도 증가
+        if (!isLocalDev) {
+          incrementLimit();
+        }
+
+        setRecommendations({
+          videos: finalResults,
+          subject,
+          gradeLevel,
+          intention: "",
+          fromTrustedChannels: true,
+        });
+
+        Swal.close();
+        await Swal.fire({
+          title: "✅ 분석 완료!",
+          html: `${finalResults.length}개 신뢰채널 영상 추천!<br/><small>(안전도 70점 초과 영상만 선별)</small>`,
+          icon: "success",
+          confirmButtonColor: "#4285f4",
+          timer: 2000,
+        });
+
+        setLoading(false);
+        return;
+      }
+
+      // 수업의도가 있는 경우: 기존 로직 (키워드 검색)
       // 1단계: 검색어 생성
       await Swal.fire({
         title: "⚡ 빠른 추천 시작",
@@ -631,7 +802,7 @@ export default function VideoRecommendationDirect({ onBack }) {
 
     const confirmResult = await Swal.fire({
       title: "새로고침",
-      html: `같은 조건으로 4개의 영상을 더 추가할까요?<br/><small>남은 횟수: ${
+      html: `같은 조건으로 영상을 더 추가할까요?<br/><small>남은 횟수: ${
         2 - refreshCount
       }/2</small>`,
       icon: "question",
@@ -647,34 +818,53 @@ export default function VideoRecommendationDirect({ onBack }) {
     setLoading(true);
 
     try {
-      // 다른 키워드 생성 (중복 방지)
-      const keywords = await generateAlternativeKeywords(
-        subject,
-        intention,
-        gradeLevel,
-        previousKeywords
-      );
-      console.log("🔍 새로고침 검색어:", keywords);
-
       // 기존 영상 ID 목록
       const existingVideoIds = new Set(
         recommendations.videos.map((v) => v.videoId)
       );
 
-      const videos = await searchYouTubeVideos(
-        keywords,
-        4,
-        preferredDuration,
-        subject
-      );
+      let newVideos = [];
 
-      // 중복 영상 필터링
-      const newVideos = videos.filter((v) => !existingVideoIds.has(v.videoId));
+      // 수업의도가 비어있으면 신뢰채널에서 검색
+      if (!intention.trim()) {
+        console.log("🔍 새로고침: 신뢰채널에서 추가 검색");
+
+        const trustedVideos = await searchTrustedChannelVideos(
+          subject,
+          15,
+          preferredDuration
+        );
+
+        // 중복 제거
+        newVideos = trustedVideos.filter((v) => !existingVideoIds.has(v.videoId));
+      } else {
+        // 수업의도가 있으면 키워드 검색
+        const keywords = await generateAlternativeKeywords(
+          subject,
+          intention,
+          gradeLevel,
+          previousKeywords
+        );
+        console.log("🔍 새로고침 검색어:", keywords);
+
+        const videos = await searchYouTubeVideos(
+          keywords,
+          8,
+          preferredDuration,
+          subject
+        );
+
+        // 중복 제거
+        newVideos = videos.filter((v) => !existingVideoIds.has(v.videoId));
+
+        // 사용한 키워드 추가
+        setPreviousKeywords((prev) => [...prev, ...keywords]);
+      }
 
       if (newVideos.length === 0) {
         await Swal.fire({
           title: "검색 결과 없음",
-          text: "추가 영상을 찾을 수 없습니다. (중복 제외됨)",
+          text: "추가 영상을 찾을 수 없습니다.",
           icon: "warning",
           confirmButtonColor: "#4285f4",
         });
@@ -682,6 +872,7 @@ export default function VideoRecommendationDirect({ onBack }) {
         return;
       }
 
+      // 분석 진행
       const analysisPromises = newVideos.map(async (video) => {
         try {
           const transcript = await getVideoTranscript(video.videoId);
@@ -706,8 +897,8 @@ export default function VideoRecommendationDirect({ onBack }) {
           console.error(`분석 실패 (${video.videoId}):`, error);
           return {
             ...video,
-            safetyScore: 70,
-            safetyDescription: "분석 중 오류 발생",
+            safetyScore: 0,
+            safetyDescription: "분석 실패",
             summary: "분석 중 오류가 발생했습니다",
             warnings: [],
             warningCount: 0,
@@ -717,23 +908,46 @@ export default function VideoRecommendationDirect({ onBack }) {
         }
       });
 
-      const results = await Promise.all(analysisPromises);
+      const allResults = await Promise.all(analysisPromises);
 
-      // 기존 영상에 새 영상 추가
+      // 안전도 70점 초과만 필터링 (신뢰채널 검색일 때)
+      let results;
+      if (!intention.trim()) {
+        results = allResults.filter((video) => video.safetyScore > 70);
+        console.log(`✅ 안전도 필터링: ${allResults.length}개 → ${results.length}개`);
+      } else {
+        results = allResults;
+      }
+
+      if (results.length === 0) {
+        await Swal.fire({
+          title: "적합한 영상 없음",
+          text: "안전도 기준을 충족하는 추가 영상을 찾지 못했습니다.",
+          icon: "warning",
+          confirmButtonColor: "#4285f4",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // 기존 영상에 새 영상 추가 (최대 5개)
+      const finalResults = results.slice(0, 5);
+
+      // 새로 추가된 영상 ID 저장
+      const newIds = new Set(finalResults.map((v) => v.videoId));
+      setNewlyAddedIds(newIds);
+
       setRecommendations((prev) => ({
         ...prev,
-        videos: [...prev.videos, ...results],
+        videos: [...prev.videos, ...finalResults],
       }));
-
-      // 사용한 키워드 추가
-      setPreviousKeywords((prev) => [...prev, ...keywords]);
 
       // 새로고침 횟수 증가
       localStorage.setItem(refreshKey, (refreshCount + 1).toString());
 
       await Swal.fire({
         title: "추가 완료!",
-        text: `${results.length}개 영상이 추가되었습니다.`,
+        text: `${finalResults.length}개 영상이 추가되었습니다.`,
         icon: "success",
         confirmButtonColor: "#4285f4",
         timer: 1500,
@@ -753,12 +967,13 @@ export default function VideoRecommendationDirect({ onBack }) {
 
   const handleReset = () => {
     setRecommendations(null);
-    setGradeLevel("초등 6학년");
+    setGradeLevel("초등 고학년");
     setSubject("미술");
     setIntention("");
     setPreferredDuration("");
     setLikedVideos({});
     setJjimedVideos({});
+    setNewlyAddedIds(new Set());
   };
 
   // 결과 화면
@@ -772,24 +987,48 @@ export default function VideoRecommendationDirect({ onBack }) {
           <div className="flex gap-2">
             <button
               onClick={recommendListsAdd}
-              className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm"
+              disabled={loading}
+              className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
               👍 목록추천
             </button>
             <button
               onClick={handleRefresh}
-              className="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 text-sm"
+              disabled={loading}
+              className="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 text-sm disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              🔄 새로고침
+              {loading ? (
+                <>
+                  <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  로딩중...
+                </>
+              ) : (
+                "🔄 새로고침"
+              )}
             </button>
             <button
               onClick={handleReset}
-              className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-sm"
+              disabled={loading}
+              className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-sm disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
               ✨ 처음부터
             </button>
           </div>
         </div>
+
+        {/* 로딩 오버레이 */}
+        {loading && (
+          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-3">
+            <svg className="animate-spin h-6 w-6 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span className="text-blue-700 font-medium">추가 영상 검색 및 분석 중...</span>
+          </div>
+        )}
 
         {/* 정렬 버튼 */}
         <div className="flex gap-2 mb-4 flex-wrap">
@@ -829,8 +1068,18 @@ export default function VideoRecommendationDirect({ onBack }) {
           {sortedVideos.map((video, idx) => (
             <div
               key={`${video.videoId}_${idx}`}
-              className="border rounded-xl p-6 hover:shadow-2xl transition bg-white"
+              className={`border rounded-xl p-6 hover:shadow-2xl transition relative ${
+                newlyAddedIds.has(video.videoId)
+                  ? "bg-green-50 border-green-300"
+                  : "bg-white"
+              }`}
             >
+              {/* 새로 추가된 영상 배지 */}
+              {newlyAddedIds.has(video.videoId) && (
+                <div className="absolute top-3 right-3 bg-green-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                  NEW
+                </div>
+              )}
               {/* 썸네일 또는 플레이어 */}
               {playingVideo === video.videoId ? (
                 <div className="w-full h-72 mb-4">
@@ -951,12 +1200,9 @@ export default function VideoRecommendationDirect({ onBack }) {
           </label>
           <div className="flex flex-wrap gap-1.5 sm:gap-2">
             {[
-              { value: "초등 1학년", label: "초등\n1학년" },
-              { value: "초등 2학년", label: "초등\n2학년" },
-              { value: "초등 3학년", label: "초등\n3학년" },
-              { value: "초등 4학년", label: "초등\n4학년" },
-              { value: "초등 5학년", label: "초등\n5학년" },
-              { value: "초등 6학년", label: "초등\n6학년" },
+              { value: "초등 저학년", label: "초등 저학년", sub: "1-2학년" },
+              { value: "초등 중학년", label: "초등 중학년", sub: "3-4학년" },
+              { value: "초등 고학년", label: "초등 고학년", sub: "5-6학년" },
               { value: "중학생", label: "중학생" },
               { value: "고등학생", label: "고등학생" },
             ].map((grade) => (
@@ -964,7 +1210,7 @@ export default function VideoRecommendationDirect({ onBack }) {
                 key={grade.value}
                 type="button"
                 onClick={() => setGradeLevel(grade.value)}
-                className={`p-2 sm:p-4 rounded-lg sm:rounded-xl border-2 text-xs sm:text-sm font-medium transition-all flex flex-col items-center justify-center min-w-[60px] sm:min-w-[70px] min-h-[50px] sm:min-h-[60px] ${
+                className={`p-2 sm:p-4 rounded-lg sm:rounded-xl border-2 text-xs sm:text-sm font-medium transition-all flex flex-col items-center justify-center min-w-[70px] sm:min-w-[80px] min-h-[55px] sm:min-h-[65px] ${
                   gradeLevel === grade.value
                     ? "bg-blue-600 text-white border-blue-600 shadow-lg"
                     : "bg-white text-gray-700 border-gray-300 hover:bg-blue-50 hover:border-blue-400"
@@ -973,6 +1219,13 @@ export default function VideoRecommendationDirect({ onBack }) {
                 <div className="leading-tight text-center whitespace-pre-line">
                   {grade.label}
                 </div>
+                {grade.sub && (
+                  <div className={`text-[10px] sm:text-xs mt-0.5 ${
+                    gradeLevel === grade.value ? "text-blue-200" : "text-gray-400"
+                  }`}>
+                    {grade.sub}
+                  </div>
+                )}
               </button>
             ))}
           </div>
