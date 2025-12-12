@@ -772,14 +772,10 @@
   box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.1));
   display: flex;
   flex-direction: column;
-  /* 🆕 부드러운 레이아웃 전환 (섹션 이동 시) */
-  transition: 
-    transform 280ms cubic-bezier(0.2, 0, 0, 1),
-    box-shadow 200ms ease,
-    opacity 200ms ease;
+  /* ✅ 드래그 충돌 방지: transform 제외, box-shadow/opacity만 transition */
+  transition: box-shadow 200ms ease, opacity 200ms ease;
   animation: columnAppear 0.25s ease-out;
   position: relative;
-  will-change: transform;
 }
 
 @keyframes columnAppear {
@@ -830,7 +826,7 @@
   transform: scale(0.98);
   box-shadow: var(--shadow-2xl, 0 25px 50px rgba(0, 0, 0, 0.25));
   z-index: 1000;
-  pointer-events: none;
+  /* ✅ pointer-events: none 제거 - 드롭 타겟 감지 허용 */
 }
 
 /* 섹션 드롭 타겟 - 왼쪽에만 보라색 바 표시 */
