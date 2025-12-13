@@ -9,22 +9,40 @@ const GEMINI_API_URL =
 
 /**
  * YouTube 영상 길이 가져오기
+ * 🆕 수정: 실패 시 기본값을 7200초(2시간)로 증가 - 10분 제한 버그 수정
  */
 export async function getVideoDuration(videoId) {
+  // 🆕 기본값을 2시간으로 설정 (10분 제한 버그 방지)
+  const DEFAULT_DURATION = 7200; // 2시간 = 7200초
+  
   try {
+    if (!YOUTUBE_API_KEY) {
+      console.warn("YouTube API 키가 없습니다. 기본 길이 사용:", DEFAULT_DURATION);
+      return { duration: DEFAULT_DURATION, title: "제목 없음" };
+    }
+    
     const url = `https://www.googleapis.com/youtube/v3/videos?part=contentDetails,snippet&id=${videoId}&key=${YOUTUBE_API_KEY}`;
     const response = await fetch(url);
+    
+    if (!response.ok) {
+      console.error("YouTube API 응답 오류:", response.status, response.statusText);
+      return { duration: DEFAULT_DURATION, title: "제목 없음" };
+    }
+    
     const data = await response.json();
 
     if (data.items && data.items.length > 0) {
       const duration = parseDuration(data.items[0].contentDetails.duration);
       const title = data.items[0].snippet.title;
+      console.log(`[영상 길이] ${videoId}: ${Math.floor(duration / 60)}분 ${duration % 60}초`);
       return { duration, title };
     }
-    return { duration: 600, title: "제목 없음" };
+    
+    console.warn("영상 정보를 찾을 수 없습니다. 기본 길이 사용:", DEFAULT_DURATION);
+    return { duration: DEFAULT_DURATION, title: "제목 없음" };
   } catch (error) {
     console.error("영상 정보 가져오기 실패:", error);
-    return { duration: 600, title: "제목 없음" };
+    return { duration: DEFAULT_DURATION, title: "제목 없음" };
   }
 }
 

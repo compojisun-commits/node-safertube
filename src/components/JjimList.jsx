@@ -14,6 +14,7 @@ import {
 import { classifyVideo, getClassificationSummary } from '../utils/aiClassifier';
 import CascadingPathSelector from './CascadingPathSelector';
 import KanbanBoard from './KanbanBoard';
+import FolderAutoCreateModal from './FolderAutoCreateModal';
 import '../styles/cascading-path.css';
 import '../styles/auto-organize-v2.css';
 import '../styles/kanban.css';
@@ -147,6 +148,13 @@ const IconFolderPlus = () => (
   </svg>
 );
 
+const IconArrowLeft = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="19" y1="12" x2="5" y2="12"/>
+    <polyline points="12 19 5 12 12 5"/>
+  </svg>
+);
+
 const IconFileVideo = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -202,6 +210,169 @@ const Checkbox = ({ checked, onChange }) => (
     {checked && <IconCheck />}
   </div>
 );
+
+// ==========================================
+// [폴더 이동 모달 - SaveWizard 스타일]
+// ==========================================
+const FolderMoveModal = ({ folders, selectedCount, onClose, onMove }) => {
+  const [currentPath, setCurrentPath] = useState([]); // 현재 탐색 경로
+  const [selectedFolderId, setSelectedFolderId] = useState(null);
+
+  // 루트 레벨 폴더
+  const getRootFolders = () => folders.filter(f => !f.parentId);
+
+  // 특정 폴더의 하위 폴더
+  const getChildFolders = (parentId) => {
+    if (!parentId) return folders.filter(f => !f.parentId);
+    return folders.filter(f => f.parentId === parentId);
+  };
+
+  // 현재 위치의 폴더 목록
+  const getCurrentFolders = () => {
+    const currentParentId = currentPath.length > 0 
+      ? currentPath[currentPath.length - 1].id 
+      : null;
+    return getChildFolders(currentParentId);
+  };
+
+  // 하위 폴더 존재 여부
+  const hasChildren = (folderId) => folders.some(f => f.parentId === folderId);
+
+  // 폴더 이름 가져오기
+  const getFolderName = (folderId) => {
+    if (!folderId) return '최상위';
+    const folder = folders.find(f => f.id === folderId);
+    return folder ? folder.name : '최상위';
+  };
+
+  // 폴더로 들어가기
+  const navigateInto = (folder) => {
+    setCurrentPath([...currentPath, folder]);
+  };
+
+  // 상위로 이동
+  const navigateUp = () => {
+    setCurrentPath(currentPath.slice(0, -1));
+  };
+
+  // 현재 위치 선택
+  const selectCurrentLocation = () => {
+    const folderId = currentPath.length > 0 
+      ? currentPath[currentPath.length - 1].id 
+      : null;
+    setSelectedFolderId(folderId);
+    onMove(folderId);
+  };
+
+  // 특정 폴더 선택
+  const selectFolder = (folder) => {
+    setSelectedFolderId(folder.id);
+    onMove(folder.id);
+  };
+
+  return (
+    <div className="jjim-modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="jjim-folder-move-modal">
+        {/* 헤더 */}
+        <div className="jjim-fmm-header">
+          <div className="jjim-fmm-title">
+            <IconMove /> 폴더로 이동
+          </div>
+          <button onClick={onClose} className="jjim-close-btn">
+            <IconX />
+          </button>
+        </div>
+        
+        <p className="jjim-fmm-desc">
+          {selectedCount}개 항목을 이동할 폴더를 선택하세요
+        </p>
+
+        {/* 폴더 탐색 영역 */}
+        <div className="jjim-fmm-content">
+          {/* 현재 경로 표시 및 상위 이동 */}
+          {currentPath.length > 0 && (
+            <div className="jjim-fmm-nav">
+              <button className="jjim-fmm-back-btn" onClick={navigateUp}>
+                <IconArrowLeft />
+                <span>상위로</span>
+              </button>
+              <span className="jjim-fmm-current-path">
+                📁 {currentPath[currentPath.length - 1].name}
+              </span>
+            </div>
+          )}
+
+          {/* 현재 위치 선택 버튼 */}
+          <button
+            className="jjim-fmm-select-current"
+            onClick={selectCurrentLocation}
+          >
+            <IconCheck />
+            <span>
+              {currentPath.length > 0 
+                ? `'${currentPath[currentPath.length - 1].name}'(으)로 이동` 
+                : '최상위(루트)로 이동'}
+            </span>
+          </button>
+
+          {/* 폴더 목록 */}
+          {getCurrentFolders().length > 0 && (
+            <div className="jjim-fmm-section-label">
+              {currentPath.length === 0 ? '📁 폴더 선택' : '📂 하위 폴더'}
+            </div>
+          )}
+
+          <div className="jjim-fmm-folder-list">
+            {getCurrentFolders().map(folder => (
+              <button
+                key={folder.id}
+                className={`jjim-fmm-folder-item ${selectedFolderId === folder.id ? 'selected' : ''}`}
+                onClick={() => selectFolder(folder)}
+                onDoubleClick={() => {
+                  if (hasChildren(folder.id)) {
+                    navigateInto(folder);
+                  }
+                }}
+              >
+                <IconFolder className="jjim-fmm-folder-icon" />
+                <span className="jjim-fmm-folder-name">{folder.name}</span>
+                {hasChildren(folder.id) && (
+                  <button
+                    className="jjim-fmm-expand-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigateInto(folder);
+                    }}
+                    title="하위 폴더 보기"
+                  >
+                    <IconChevronRight />
+                  </button>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* 폴더 없을 때 */}
+          {getCurrentFolders().length === 0 && folders.length === 0 && (
+            <div className="jjim-fmm-empty">
+              📭 폴더가 없습니다. 새 폴더를 먼저 만들어주세요.
+            </div>
+          )}
+          {getCurrentFolders().length === 0 && folders.length > 0 && currentPath.length > 0 && (
+            <div className="jjim-fmm-empty">
+              하위 폴더가 없습니다
+            </div>
+          )}
+        </div>
+
+        {/* 푸터 */}
+        <div className="jjim-fmm-footer">
+          <button onClick={onClose} className="jjim-btn secondary">닫기</button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // ==========================================
 // [AI 자동 정리 모달 - 브레드크럼 스타일]
@@ -598,13 +769,31 @@ export default function JjimList({ onBack }) {
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // 뷰 모드: 'list', 'grid', 'board'
-  const [viewMode, setViewMode] = useState('list');
+  // 뷰 모드: 'list', 'folder', 'kanban' (localStorage에서 초기값 로드)
+  const [viewMode, setViewMode] = useState(() => {
+    const saved = localStorage.getItem('default_jjim_view');
+    // folder -> list로 매핑 (기존 호환성), kanban -> board
+    if (saved === 'folder') return 'list';
+    if (saved === 'kanban') return 'board';
+    if (saved === 'list') return 'list';
+    return 'list'; // 기본값
+  });
   const [currentFolderId, setCurrentFolderId] = useState(null);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [autoOrganizeOpen, setAutoOrganizeOpen] = useState(false);
   const [autoOrganizeTargets, setAutoOrganizeTargets] = useState(null); // 선택 분류용
+  const [folderCreateModalOpen, setFolderCreateModalOpen] = useState(false); // 폴더 자동 생성 모달
+  const [folderMoveModalOpen, setFolderMoveModalOpen] = useState(false); // 폴더 이동 모달
+  
+  // 🆕 와이드 뷰 상태 (칸반보드와 동기화)
+  const [isWideView, setIsWideView] = useState(() => {
+    try {
+      return localStorage.getItem('kanban_wide_view') === 'true';
+    } catch {
+      return false;
+    }
+  });
   
   // 칸반 보드 컬럼
   const [boardColumns] = useState([
@@ -733,81 +922,9 @@ export default function JjimList({ onBack }) {
     setSelectedIds(allIds);
   };
 
-  // 🆕 폴더 자동생성
-  const handleAutoGenerateFolders = async () => {
-    // folderGenerator 모듈 가져오기
-    const { generateFolderStructure } = await import('../utils/folderGenerator');
-    
-    const { value: formValues } = await Swal.fire({
-      title: '📁 폴더 자동 생성',
-      html: `
-        <div style="text-align: left; margin-bottom: 16px;">
-          <p style="font-size: 14px; color: #64748b; margin-bottom: 16px;">
-            학년과 과목을 선택하면 교육과정에 맞는 폴더를 자동으로 만들어 드립니다.
-          </p>
-          <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px;">학년</label>
-          <select id="grade-select" class="swal2-select" style="width: 100%; margin-bottom: 12px;">
-            <option value="">학년 선택</option>
-            <option value="1">1학년</option>
-            <option value="2">2학년</option>
-            <option value="3">3학년</option>
-            <option value="4">4학년</option>
-            <option value="5">5학년</option>
-            <option value="6">6학년</option>
-          </select>
-          <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px;">과목</label>
-          <select id="subject-select" class="swal2-select" style="width: 100%;">
-            <option value="">전체 과목</option>
-            <option value="kor">국어</option>
-            <option value="math">수학</option>
-            <option value="social">사회</option>
-            <option value="science">과학</option>
-            <option value="eng">영어</option>
-            <option value="int">통합교과</option>
-          </select>
-        </div>
-      `,
-      showCancelButton: true,
-      confirmButtonText: '폴더 생성',
-      cancelButtonText: '취소',
-      confirmButtonColor: '#8b5cf6',
-      preConfirm: () => {
-        const grade = document.getElementById('grade-select').value;
-        const subject = document.getElementById('subject-select').value;
-        if (!grade) {
-          Swal.showValidationMessage('학년을 선택해주세요');
-          return false;
-        }
-        return { grade: parseInt(grade), subject: subject || null };
-      }
-    });
-
-    if (formValues) {
-      try {
-        setLoading(true);
-        const result = await generateFolderStructure(user, formValues.grade, formValues.subject ? [formValues.subject] : null);
-        
-        // 폴더 목록 새로고침
-        await loadData();
-        
-        Swal.fire({
-          icon: 'success',
-          title: '폴더 생성 완료!',
-          html: `<p>${result.created}개의 폴더가 생성되었습니다.</p>`,
-          confirmButtonColor: '#8b5cf6'
-        });
-      } catch (error) {
-        console.error('폴더 생성 오류:', error);
-        Swal.fire({
-          icon: 'error',
-          title: '오류 발생',
-          text: error.message,
-          confirmButtonColor: '#ef4444'
-        });
-      } finally {
-        setLoading(false);
-      }
-    }
+  // 🆕 폴더 자동생성 모달 열기
+  const handleAutoGenerateFolders = () => {
+    setFolderCreateModalOpen(true);
   };
 
   // 새 폴더 만들기
@@ -894,53 +1011,39 @@ export default function JjimList({ onBack }) {
     }
   };
 
-  // 선택된 항목 이동
-  const handleMoveSelected = async () => {
+  // 선택된 항목 이동 - 모달 열기
+  const handleMoveSelected = () => {
     if (selectedIds.size === 0) return;
-    
-    const folderOptions = folders.reduce((acc, folder) => {
-      acc[folder.id] = folder.name;
-      return acc;
-    }, { 'null': '📁 최상위 (루트)' });
+    setFolderMoveModalOpen(true);
+  };
 
-    const { value: targetFolderId } = await Swal.fire({
-      title: '폴더로 이동',
-      input: 'select',
-      inputOptions: folderOptions,
-      showCancelButton: true,
-      confirmButtonText: '이동',
-      cancelButtonText: '취소',
-      confirmButtonColor: '#3b82f6',
-    });
-
-    if (targetFolderId !== undefined) {
-      try {
-        const folderId = targetFolderId === 'null' ? null : targetFolderId;
-        
-        for (const id of selectedIds) {
-          const video = videos.find(v => v.id === id);
-          if (video) {
-            await moveVideoToFolder({ user, videoId: id, folderId });
-          }
+  // 실제 이동 처리
+  const handleMoveToFolder = async (targetFolderId) => {
+    try {
+      for (const id of selectedIds) {
+        const video = videos.find(v => v.id === id);
+        if (video) {
+          await moveVideoToFolder({ user, videoId: id, folderId: targetFolderId });
         }
-        
-        await Swal.fire({
-          title: '이동 완료!',
-          icon: 'success',
-          confirmButtonColor: '#3b82f6',
-          timer: 1500
-        });
-        
-        setSelectedIds(new Set());
-        loadJjimData();
-      } catch (error) {
-        Swal.fire({
-          title: '오류',
-          text: error.message || '이동 중 오류가 발생했습니다',
-          icon: 'error',
-          confirmButtonColor: '#ef4444'
-        });
       }
+      
+      await Swal.fire({
+        title: '이동 완료!',
+        icon: 'success',
+        confirmButtonColor: '#3b82f6',
+        timer: 1500
+      });
+      
+      setSelectedIds(new Set());
+      setFolderMoveModalOpen(false);
+      loadJjimData();
+    } catch (error) {
+      Swal.fire({
+        title: '오류',
+        text: error.message || '이동 중 오류가 발생했습니다',
+        icon: 'error',
+        confirmButtonColor: '#ef4444'
+      });
     }
   };
 
@@ -1079,7 +1182,7 @@ export default function JjimList({ onBack }) {
   }
 
   return (
-    <div className="jjim-container">
+    <div className={`jjim-container ${viewMode === 'board' && isWideView ? 'wide-mode' : ''}`}>
       {/* 헤더 */}
       <div className="jjim-header">
         <h1 className="jjim-title">내 찜보따리</h1>
@@ -1200,17 +1303,68 @@ export default function JjimList({ onBack }) {
             onAnalyze={(video) => handleVideoClick(video)}
             onOpenVideo={(video) => handleVideoClick(video)}
             onStatusChange={handleStatusChange}
-            onAddVideo={async ({ url, videoId, status, folderId }) => {
+            onWideViewChange={(wide) => setIsWideView(wide)}
+            onAddVideo={async ({ url, videoUrl, videoId, title, thumbnail, linkType, status, folderId }) => {
               try {
+                // 🆕 제목 Fallback 로직 (필수값 보장)
+                let finalTitle = title;
+                if (!finalTitle) {
+                  if (videoId) {
+                    finalTitle = 'YouTube 영상';
+                  } else if (linkType === 'twitter') {
+                    finalTitle = 'X(Twitter) 게시물';
+                  } else if (linkType === 'instagram') {
+                    finalTitle = 'Instagram 게시물';
+                  } else if (linkType === 'blog') {
+                    finalTitle = '블로그 글';
+                  } else {
+                    finalTitle = url || videoUrl || '새 링크';
+                  }
+                }
+
+                // 🆕 썸네일 자동 생성
+                const finalThumbnail = thumbnail || (videoId ? `https://img.youtube.com/vi/${videoId}/mqdefault.jpg` : '');
+                const finalLinkType = linkType || (videoId ? 'youtube' : 'generic');
+                const finalUrl = videoUrl || url;
+
+                // 🆕 즉시 렌더링: State 먼저 업데이트 (Optimistic Update)
+                const newVideo = {
+                  id: `temp_${Date.now()}`, // 임시 ID
+                  videoId,
+                  videoUrl: finalUrl,
+                  title: finalTitle,
+                  thumbnail: finalThumbnail,
+                  linkType: finalLinkType,
+                  status: status,
+                  folderId: folderId || currentFolderId,
+                  tags: [],
+                  memo: '',
+                  isManualAdd: true,
+                  createdAt: { seconds: Date.now() / 1000 },
+                };
+
+                // State에 즉시 추가 (화면에 바로 표시)
+                setVideos(prev => [newVideo, ...prev]);
+
+                // 그 다음 DB에 저장 (백그라운드)
                 await addLinkDirectly({
                   user,
-                  videoUrl: url,
-                  videoId,
+                  videoUrl: finalUrl,
+                  title: finalTitle,
                   folderId: folderId || currentFolderId,
-                  status,
+                  linkType: finalLinkType,
+                  thumbnail: finalThumbnail,
+                  status: status, // 🆕 칸반 컬럼 ID 전달!
+                  tags: [],
+                  memo: '',
                 });
-                await loadData();
+                
+                // DB 저장 후 실제 데이터로 동기화
+                await loadJjimData();
               } catch (error) {
+                console.error('링크 추가 오류:', error);
+                // 에러 시 롤백 (추가했던 임시 항목 제거)
+                setVideos(prev => prev.filter(v => !v.id.startsWith('temp_')));
                 throw error;
               }
             }}
@@ -1230,6 +1384,39 @@ export default function JjimList({ onBack }) {
       ) : (
           // 리스트 & 그리드 뷰
           <>
+            {/* 🆕 리스트 헤더 바 (전체 선택) */}
+            {(filteredFolders.length > 0 || filteredVideos.length > 0) && (
+              <div className="jjim-list-header-bar">
+                <label className="jjim-select-all-label">
+                  <Checkbox 
+                    checked={selectedIds.size > 0 && selectedIds.size === (filteredFolders.length + filteredVideos.length)}
+                    indeterminate={selectedIds.size > 0 && selectedIds.size < (filteredFolders.length + filteredVideos.length)}
+                    onChange={() => {
+                      if (selectedIds.size === (filteredFolders.length + filteredVideos.length)) {
+                        // 전체 해제
+                        setSelectedIds(new Set());
+                      } else {
+                        // 전체 선택
+                        const allIds = new Set();
+                        filteredFolders.forEach(f => allIds.add(f.id));
+                        filteredVideos.forEach(v => allIds.add(v.id));
+                        setSelectedIds(allIds);
+                      }
+                    }}
+                  />
+                  <span>전체 선택</span>
+                </label>
+                {selectedIds.size > 0 && (
+                  <span className="jjim-selected-count-badge">
+                    {selectedIds.size}개 선택됨
+                  </span>
+                )}
+                <span className="jjim-item-count">
+                  총 {filteredFolders.length + filteredVideos.length}개
+                </span>
+              </div>
+            )}
+
             {/* 폴더 섹션 */}
             {filteredFolders.length > 0 && (
               <div className="jjim-section">
@@ -1339,6 +1526,24 @@ export default function JjimList({ onBack }) {
           scanTargets={autoOrganizeTargets}
           onClose={() => { setAutoOrganizeOpen(false); setAutoOrganizeTargets(null); }}
           onApply={handleApplyAutoOrganize}
+        />
+      )}
+
+      {/* 폴더 자동 생성 모달 */}
+      {folderCreateModalOpen && (
+        <FolderAutoCreateModal
+          onClose={() => setFolderCreateModalOpen(false)}
+          onComplete={() => loadJjimData()}
+        />
+      )}
+
+      {/* 폴더 이동 모달 */}
+      {folderMoveModalOpen && (
+        <FolderMoveModal
+          folders={folders}
+          selectedCount={selectedIds.size}
+          onClose={() => setFolderMoveModalOpen(false)}
+          onMove={handleMoveToFolder}
         />
       )}
     </div>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import VideoInput from "./components/VideoInput";
 import AnalysisResult from "./components/AnalysisResult";
@@ -11,11 +11,19 @@ import Header from "./components/Header";
 import Footer from "./components/Footer";
 import Terms from "./components/Terms";
 import Privacy from "./components/Privacy";
-import SettingsModal from "./components/SettingsModal";
+import NewSettingsModal from "./components/NewSettingsModal";
+// import SettingsModal from "./components/SettingsModal"; // 🔒 백업됨 - 나중에 사용 예정
+
+// 기본 시작 페이지 가져오기
+const getDefaultLandingPage = () => {
+  const saved = localStorage.getItem('default_landing_page');
+  const validPages = ['analyze', 'recommend', 'jjim'];
+  return validPages.includes(saved) ? saved : 'analyze';
+};
 
 function AppContent() {
   const { user } = useAuth();
-  const [mode, setMode] = useState("analyze");
+  const [mode, setMode] = useState(getDefaultLandingPage);
   const [currentRequestId, setCurrentRequestId] = useState(null);
   const [currentResult, setCurrentResult] = useState(null);
   const [currentProgress, setCurrentProgress] = useState({
@@ -61,9 +69,7 @@ function AppContent() {
   };
 
   const handleSettingsClick = () => {
-    if (user) {
-      setShowSettings(true);
-    }
+    setShowSettings(true);
   };
 
   return (
@@ -137,10 +143,11 @@ function AppContent() {
 
         <Footer onNavigate={handleFooterNavigate} />
 
-        {/* 설정 모달 */}
-        {showSettings && (
-          <SettingsModal onClose={() => setShowSettings(false)} />
-        )}
+        {/* 새 설정 모달 */}
+        <NewSettingsModal 
+          isOpen={showSettings} 
+          onClose={() => setShowSettings(false)} 
+        />
     </div>
   );
 }

@@ -44,16 +44,17 @@ export default function Header({ mode, onModeChange, onSettingsClick }) {
 
         {/* 오른쪽 버튼들 */}
         <div className="header-actions">
+          {/* 설정 버튼 - 항상 표시 */}
+          <button 
+            className="btn-settings"
+            onClick={onSettingsClick}
+            title="설정"
+          >
+            <IconSettings />
+          </button>
+          
           {user ? (
             <>
-              {/* 설정 버튼 */}
-              <button 
-                className="btn-settings"
-                onClick={onSettingsClick}
-                title="내 설정 (학년/과목)"
-              >
-                <IconSettings />
-              </button>
               <button 
                 className="user-profile"
                 onClick={() => onModeChange('history')}

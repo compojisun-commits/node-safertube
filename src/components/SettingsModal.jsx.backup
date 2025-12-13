@@ -59,7 +59,9 @@ export default function SettingsModal({ onClose }) {
   const [targetSubjects, setTargetSubjects] = useState([]);
   const [folderHierarchy, setFolderHierarchy] = useState('grade-semester-subject');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [hasChanges, setHasChanges] = useState(false);
+  
+  // 초기 설정값 저장 (변경 감지용)
+  const [initialSettings, setInitialSettings] = useState(null);
 
   // 기존 설정 불러오기
   useEffect(() => {
@@ -70,11 +72,35 @@ export default function SettingsModal({ onClose }) {
         const userDoc = await getDoc(doc(db, 'users', user.uid));
         if (userDoc.exists()) {
           const data = userDoc.data();
-          setRole(data.role || 'homeroom');
-          setGrade(data.grade || null);
-          setTargetGrades(data.target_grades || []);
-          setTargetSubjects(data.target_subjects || SUBJECTS.map(s => s.id));
-          setFolderHierarchy(data.folder_hierarchy || 'grade-semester-subject');
+          const loadedRole = data.role || 'homeroom';
+          const loadedGrade = data.grade || null;
+          const loadedTargetGrades = data.target_grades || [];
+          const loadedTargetSubjects = data.target_subjects || SUBJECTS.map(s => s.id);
+          const loadedFolderHierarchy = data.folder_hierarchy || 'grade-semester-subject';
+          
+          setRole(loadedRole);
+          setGrade(loadedGrade);
+          setTargetGrades(loadedTargetGrades);
+          setTargetSubjects(loadedTargetSubjects);
+          setFolderHierarchy(loadedFolderHierarchy);
+          
+          // 초기값 저장
+          setInitialSettings({
+            role: loadedRole,
+            grade: loadedGrade,
+            targetGrades: loadedTargetGrades,
+            targetSubjects: loadedTargetSubjects,
+            folderHierarchy: loadedFolderHierarchy
+          });
+        } else {
+          // 새 사용자의 경우 현재 기본값을 초기값으로 저장
+          setInitialSettings({
+            role: 'homeroom',
+            grade: null,
+            targetGrades: [],
+            targetSubjects: SUBJECTS.map(s => s.id),
+            folderHierarchy: 'grade-semester-subject'
+          });
         }
       } catch (error) {
         console.error('설정 로드 오류:', error);
@@ -86,10 +112,23 @@ export default function SettingsModal({ onClose }) {
     loadSettings();
   }, [user]);
 
-  // 변경 감지
-  useEffect(() => {
-    setHasChanges(true);
-  }, [role, grade, targetGrades, targetSubjects, folderHierarchy]);
+  // 실제 변경 감지 함수
+  const hasChanges = () => {
+    if (!initialSettings) return false;
+    
+    const gradesSame = JSON.stringify([...targetGrades].sort()) === 
+                       JSON.stringify([...initialSettings.targetGrades].sort());
+    const subjectsSame = JSON.stringify([...targetSubjects].sort()) === 
+                         JSON.stringify([...initialSettings.targetSubjects].sort());
+    
+    return (
+      role !== initialSettings.role ||
+      grade !== initialSettings.grade ||
+      !gradesSame ||
+      !subjectsSame ||
+      folderHierarchy !== initialSettings.folderHierarchy
+    );
+  };
 
   // 역할 변경
   const handleRoleChange = (newRole) => {
@@ -128,11 +167,19 @@ export default function SettingsModal({ onClose }) {
     }
   };
 
+  // Swal 공통 옵션 (z-index 문제 해결)
+  const swalOptions = {
+    customClass: {
+      container: 'swal-above-modal'
+    }
+  };
+
   // 저장
   const handleSave = async () => {
     // 유효성 검사
     if (role === 'homeroom' && !grade) {
       Swal.fire({
+        ...swalOptions,
         icon: 'warning',
         title: '학년을 선택해주세요',
         confirmButtonColor: '#3b82f6'
@@ -142,6 +189,7 @@ export default function SettingsModal({ onClose }) {
 
     if (role === 'subject' && targetGrades.length === 0) {
       Swal.fire({
+        ...swalOptions,
         icon: 'warning',
         title: '담당 학년을 선택해주세요',
         confirmButtonColor: '#3b82f6'
@@ -151,6 +199,7 @@ export default function SettingsModal({ onClose }) {
 
     if (targetSubjects.length === 0) {
       Swal.fire({
+        ...swalOptions,
         icon: 'warning',
         title: '담당 과목을 선택해주세요',
         confirmButtonColor: '#3b82f6'
@@ -158,8 +207,22 @@ export default function SettingsModal({ onClose }) {
       return;
     }
 
+    // 변경 사항이 없는 경우
+    if (!hasChanges()) {
+      Swal.fire({
+        ...swalOptions,
+        icon: 'info',
+        title: '변경 사항이 없습니다',
+        text: '설정을 변경한 후 저장해주세요.',
+        confirmButtonColor: '#6366f1',
+        timer: 2000
+      });
+      return;
+    }
+
     // 폴더 재생성 확인
     const confirmResult = await Swal.fire({
+      ...swalOptions,
       title: '설정을 변경하시겠습니까?',
       html: `
         <p style="color: #64748b; font-size: 14px;">
@@ -202,6 +265,7 @@ export default function SettingsModal({ onClose }) {
 
       // 3. 완료 알림
       await Swal.fire({
+        ...swalOptions,
         icon: 'success',
         title: '설정 저장 완료! ✨',
         text: '새로운 폴더가 추가되었습니다.',
@@ -213,6 +277,7 @@ export default function SettingsModal({ onClose }) {
     } catch (error) {
       console.error('Settings save error:', error);
       Swal.fire({
+        ...swalOptions,
         icon: 'error',
         title: '오류 발생',
         text: '설정 저장 중 문제가 발생했습니다.',
@@ -387,16 +452,21 @@ export default function SettingsModal({ onClose }) {
             취소
           </button>
           <button 
-            className="complete-btn"
+            className={`complete-btn ${!hasChanges() ? 'no-changes' : ''}`}
             onClick={handleSave}
             disabled={isSubmitting}
           >
-            {isSubmitting ? '저장 중...' : '💾 설정 저장'}
+            {isSubmitting ? '저장 중...' : hasChanges() ? '💾 설정 저장' : '✓ 변경 사항 없음'}
           </button>
         </div>
       </div>
 
       <style>{`
+        /* Swal이 모달 위에 뜨도록 z-index 설정 */
+        .swal-above-modal {
+          z-index: 10001 !important;
+        }
+        
         .settings-modal {
           max-width: 550px;
         }
@@ -586,8 +656,20 @@ export default function SettingsModal({ onClose }) {
         .hierarchy-option.selected .hierarchy-example {
           color: #a78bfa;
         }
+        
+        /* 변경 사항 없음 상태의 버튼 */
+        .complete-btn.no-changes {
+          background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%);
+          cursor: default;
+        }
+        
+        .complete-btn.no-changes:hover {
+          transform: none;
+          box-shadow: none;
+        }
       `}</style>
     </div>
   );
 }
+
 
