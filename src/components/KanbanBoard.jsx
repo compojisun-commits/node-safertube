@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import Swal from 'sweetalert2';
+import '../styles/kanban.css';
 
 // ==========================================
 // 아이콘 컴포넌트들
