@@ -172,60 +172,117 @@
 }
 
 /* ============================================================
-   🚪 서랍 & 레이아웃 (Push & Squeeze Mode)
-   서랍이 열리면 메인 보드가 좁아지며 자리를 비켜줍니다.
+   🚪 서랍 (Push & Squeeze 방식)
    ============================================================ */
 
-/* 서랍 영역 */
+/* 서랍 - 기본 (닫힘) */
 .kanban-drawer {
-  position: relative !important;
-  height: 100% !important;
-  width: 320px !important;
-  flex-shrink: 0 !important;
-  background: linear-gradient(180deg, #ffffff 0%, #fafbfc 100%) !important;
-  border-left: 1px solid #e2e8f0 !important;
-  z-index: 50 !important;
-  transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  box-shadow: 4px 0 20px rgba(0,0,0,0.06) !important;
-  display: flex !important;
-  flex-direction: column !important;
-  overflow: hidden !important;
+  width: 0;
+  min-width: 0;
+  height: 100%;
+  background: #ffffff;
+  border-right: 1px solid #e2e8f0;
+  box-shadow: 2px 0 12px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: width 0.3s ease, min-width 0.3s ease;
+  flex-shrink: 0;
 }
 
-/* 서랍 닫힘: 왼쪽 화면 밖으로 숨김 */
-.kanban-drawer:not(.open) {
-  margin-left: -320px !important;
-  visibility: hidden !important;
-}
-
-/* 서랍 열림: 제자리로 옴 */
+/* 서랍 - 열림 */
 .kanban-drawer.open {
-  margin-left: 0 !important;
-  visibility: visible !important;
-  overflow-y: auto !important;
+  width: 320px;
+  min-width: 320px;
 }
 
-.kanban-drawer.open .kanban-drawer-content {
+/* 서랍 내부 스크롤 */
+.kanban-drawer .kanban-drawer-content {
   overflow-y: auto;
+  flex: 1;
+}
+
+/* 서랍 내부 요소들이 줄어들지 않도록 */
+.kanban-drawer-header,
+.kanban-drawer-content,
+.kanban-drawer-footer {
+  min-width: 320px;
+}
+
+/* 서랍 닫기 버튼 */
+.kanban-drawer-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f3f4f6;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #6b7280;
+  transition: all 0.15s;
+}
+
+.kanban-drawer-close:hover {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+/* 서랍 배경 오버레이 - Push 방식에서는 숨김 */
+.kanban-drawer-backdrop {
+  display: none;
 }
 
 .kanban-drawer-header {
   padding: 16px;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid #e5e7eb;
+  background: #fafbfc;
+}
+
+.kanban-drawer-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
 }
 
 .kanban-drawer-header h3 {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   color: #374151;
-  margin-bottom: 12px;
+  margin: 0;
 }
 
 .kanban-drawer-header h3 svg {
   color: #7c3aed;
+}
+
+/* 서랍 접기 버튼 (<< 스타일) */
+.kanban-drawer-collapse-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #6b7280;
+  transition: all 0.15s;
+}
+
+.kanban-drawer-collapse-btn:hover {
+  background: #e5e7eb;
+  color: #374151;
+  border-color: #d1d5db;
 }
 
 .kanban-drawer-search {
@@ -262,10 +319,11 @@
   padding: 8px;
 }
 
-.kanban-drawer-folder {
+.kanban-drawer-folder,
+.kanban-drawer-folder-section {
   margin-bottom: 4px;
   background: white;
-  border: 1px solid #f3f4f6;
+  border: 1px solid #e5e7eb;
   border-radius: 8px;
   overflow: hidden;
 }
@@ -320,21 +378,25 @@
   padding: 10px;
   background: white;
   border: 1px solid var(--gray-200, #e5e7eb);
-  transition: all 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
   border-radius: 8px;
   margin-bottom: 6px;
   cursor: grab;
-  transition: all 0.15s;
+  user-select: none;
+  -webkit-user-drag: element;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
 }
 
 .kanban-drawer-file:hover {
   border-color: var(--primary-500, #7c3aed);
-  box-shadow: var(--shadow-md);
-  transform: translateY(-2px) scale(1.01);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
 }
 
-.kanban-drawer-file:active {
+.kanban-drawer-file:active,
+.kanban-drawer-file.dragging {
   cursor: grabbing;
+  opacity: 0.8;
+  transform: scale(0.98);
 }
 
 .kanban-drawer-file-thumb {
@@ -354,6 +416,13 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.kanban-drawer-file-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
 }
 
 .kanban-drawer-file-info {
@@ -1706,6 +1775,39 @@
   color: #7c3aed;
 }
 
+/* 🆕 제목 인라인 편집 */
+.kanban-title-edit-wrapper {
+  margin-bottom: 10px;
+}
+
+.kanban-title-edit-input {
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+  border: 2px solid #8b5cf6;
+  border-radius: 6px;
+  outline: none;
+  background: white;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15);
+}
+
+.kanban-title-edit-input:focus {
+  border-color: #7c3aed;
+}
+
+/* 리스트뷰 제목 편집 */
+.kanban-column-cards-v2.list-view .kanban-title-edit-wrapper {
+  flex: 1;
+  margin: 0;
+}
+
+.kanban-column-cards-v2.list-view .kanban-title-edit-input {
+  font-size: 12px;
+  padding: 4px 8px;
+}
+
 /* 메타 정보 (폴더/미분류) */
 .kanban-card-meta-v2 {
   margin-bottom: 12px;
@@ -2063,6 +2165,32 @@
   display: none;
 }
 
+/* 리스트 뷰 드래그 */
+.kanban-column-cards-v2.list-view .kanban-card-wrapper {
+  cursor: grab;
+  user-select: none;
+}
+
+.kanban-column-cards-v2.list-view .kanban-card-wrapper:active {
+  cursor: grabbing;
+}
+
+.kanban-column-cards-v2.list-view .kanban-card-wrapper.dragging,
+.kanban-column-cards-v2.list-view .kanban-card-v2.dragging {
+  opacity: 0.5;
+  transform: scale(0.98);
+}
+
+/* 갤러리 뷰 드래그 */
+.kanban-card-wrapper {
+  cursor: grab;
+  user-select: none;
+}
+
+.kanban-card-wrapper:active {
+  cursor: grabbing;
+}
+
 /* 🆕 영상 추가 버튼 */
 .kanban-add-card-btn {
   display: flex;
@@ -2194,11 +2322,10 @@
   box-shadow: 0 2px 8px rgba(139, 92, 246, 0.15);
 }
 
-/* 컬럼 컨테이너 - 서랍에 밀려서 줄어드는 영역 */
+/* 컬럼 컨테이너 */
 .kanban-global-columns {
   flex: 1 !important;
   min-width: 0 !important;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
 /* 서랍 하단 안내 */
@@ -3996,6 +4123,249 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+/* ============================================================
+   🆕 새 보드 만들기 모달 (Notion 스타일)
+   ============================================================ */
+
+.create-board-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  backdrop-filter: blur(4px);
+}
+
+.create-board-modal {
+  background: white;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  animation: modalSlideIn 0.2s ease;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.create-board-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.create-board-header h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0;
+}
+
+.create-board-close {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f3f4f6;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #6b7280;
+  transition: all 0.15s;
+}
+
+.create-board-close:hover {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+/* 입력 영역 */
+.create-board-input-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 24px;
+}
+
+/* 이모지 선택 버튼 */
+.emoji-trigger-wrapper {
+  position: relative;
+}
+
+.emoji-trigger-btn {
+  width: 56px;
+  height: 56px;
+  font-size: 28px;
+  background: #f9fafb;
+  border: 2px dashed #d1d5db;
+  border-radius: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.emoji-trigger-btn:hover {
+  border-color: #8b5cf6;
+  background: #f5f3ff;
+}
+
+/* 이모지 피커 팝오버 */
+.emoji-picker-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  padding: 12px;
+  z-index: 100;
+  animation: fadeIn 0.15s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.emoji-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+}
+
+.emoji-option {
+  width: 36px;
+  height: 36px;
+  font-size: 20px;
+  background: none;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.1s;
+}
+
+.emoji-option:hover {
+  background: #f3f4f6;
+  transform: scale(1.1);
+}
+
+.emoji-option.selected {
+  background: #f5f3ff;
+  border-color: #8b5cf6;
+}
+
+/* 보드 이름 입력 */
+.create-board-input {
+  flex: 1;
+  height: 56px;
+  padding: 0 16px;
+  font-size: 16px;
+  font-weight: 500;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  outline: none;
+  transition: all 0.15s;
+}
+
+.create-board-input:focus {
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+}
+
+.create-board-input::placeholder {
+  color: #9ca3af;
+}
+
+/* 미리보기 */
+.create-board-preview {
+  padding: 0 24px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.preview-label {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.preview-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  padding: 4px 10px;
+  background: #f3f4f6;
+  border-radius: 6px;
+}
+
+/* 하단 버튼 */
+.create-board-footer {
+  display: flex;
+  gap: 12px;
+  padding: 16px 24px 24px;
+  border-top: 1px solid #f3f4f6;
+}
+
+.create-board-btn {
+  flex: 1;
+  padding: 14px;
+  font-size: 15px;
+  font-weight: 600;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.create-board-btn.cancel {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.create-board-btn.cancel:hover {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.create-board-btn.confirm {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+}
+
+.create-board-btn.confirm:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(139, 92, 246, 0.4);
+}
+
+.create-board-btn.confirm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* 반응형 */

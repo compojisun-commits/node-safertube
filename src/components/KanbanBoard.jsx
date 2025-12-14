@@ -83,6 +83,13 @@ const IconChevronLeft = () => (
   </svg>
 );
 
+const IconChevronsLeft = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polyline points="11 17 6 12 11 7"/>
+    <polyline points="18 17 13 12 18 7"/>
+  </svg>
+);
+
 const IconEdit = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
@@ -1579,6 +1586,7 @@ export default function KanbanBoard({
   onAiOrganize,
   onRefresh, // 🆕 데이터 새로고침 콜백
   onWideViewChange, // 🆕 와이드 뷰 변경 콜백
+  onUpdateTitle, // 🆕 제목 수정 콜백
 }) {
   // 🆕 onStatusChange를 onUpdateVideoStatus로 alias (호환성 유지)
   const onUpdateVideoStatus = onStatusChange || ((videoId, newStatus) => {
@@ -1692,26 +1700,33 @@ export default function KanbanBoard({
   const [datePickerMemoId, setDatePickerMemoId] = useState(null);
   const [datePickerPosition, setDatePickerPosition] = useState({ x: 0, y: 0 });
   
-  // 서랍 상태 - useState로 관리 (CSS가 처리)
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  // 서랍 상태 - localStorage로 유지
+  const [isDrawerOpen, setIsDrawerOpen] = useState(() => {
+    try {
+      return localStorage.getItem('kanban_drawer_open') === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [drawerSearch, setDrawerSearch] = useState('');
   const [expandedFolders, setExpandedFolders] = useState(new Set());
   const drawerRef = useRef(null);
+  
+  // 서랍 상태 localStorage에 저장
+  useEffect(() => {
+    try {
+      localStorage.setItem('kanban_drawer_open', isDrawerOpen ? 'true' : 'false');
+    } catch {}
+  }, [isDrawerOpen]);
 
-  // 🆕 서랍 토글 함수
+  // 🆕 서랍 토글 함수 (단순화)
   const toggleDrawer = useCallback(() => {
+    console.log('🚪 서랍 토글 시작, 현재:', isDrawerOpen);
     setIsDrawerOpen(prev => {
-      const newState = !prev;
-      console.log('🚪 서랍 토글:', newState ? '열기' : '닫기');
-      
-      // 서랍이 열릴 때 데이터 새로고침
-      if (newState && onRefresh) {
-        onRefresh();
-      }
-      
-      return newState;
+      console.log('🔄 setState 실행, prev:', prev, '→ new:', !prev);
+      return !prev;
     });
-  }, [onRefresh]);
+  }, []);
 
   // 🆕 편집 모달 상태
   const [editingColumn, setEditingColumn] = useState(null);
@@ -1979,6 +1994,10 @@ export default function KanbanBoard({
   // 🆕 섹션 더보기 메뉴 상태
   const [columnMenuOpen, setColumnMenuOpen] = useState(null);
   const [cardMenuOpen, setCardMenuOpen] = useState(null); // 🆕 카드 더보기 메뉴 상태
+  
+  // 🆕 제목 편집 상태
+  const [editingTitleId, setEditingTitleId] = useState(null);
+  const [editingTitleValue, setEditingTitleValue] = useState('');
   
   // 🆕 다중 선택 상태
   const [selectedCardIds, setSelectedCardIds] = useState(new Set());
@@ -2561,24 +2580,31 @@ export default function KanbanBoard({
 
   // 🆕 모달에서 링크 추가
   const handleAddLinkFromModal = useCallback(async (linkData) => {
+    const typeEmoji = {
+      youtube: '🎬',
+      twitter: '𝕏',
+      instagram: '📷',
+      blog: '📝',
+      web: '🔗'
+    };
+
     if (onAddVideo) {
       try {
+        // 1. DB 저장
         await onAddVideo(linkData);
         
-        const typeEmoji = {
-          youtube: '🎬',
-          twitter: '𝕏',
-          instagram: '📷',
-          blog: '📝',
-          web: '🔗'
-        };
-        
+        // 2. 성공 알림
         Swal.fire({
           title: `${typeEmoji[linkData.linkType] || '🔗'} 링크가 추가되었습니다!`,
           icon: 'success',
           timer: 1500,
           showConfirmButton: false,
         });
+
+        // 3. 🆕 데이터 새로고침으로 화면 즉시 업데이트
+        if (onRefresh) {
+          await onRefresh();
+        }
       } catch (error) {
         console.error('링크 추가 실패:', error);
         Swal.fire({
@@ -2588,7 +2614,28 @@ export default function KanbanBoard({
         });
       }
     }
-  }, [onAddVideo]);
+  }, [onAddVideo, onRefresh]);
+
+  // 🆕 제목 편집 시작
+  const handleStartEditTitle = useCallback((video) => {
+    setEditingTitleId(video.id);
+    setEditingTitleValue(video.title || '');
+  }, []);
+
+  // 🆕 제목 편집 저장
+  const handleSaveTitle = useCallback(async (videoId) => {
+    if (onUpdateTitle && editingTitleValue.trim()) {
+      await onUpdateTitle(videoId, editingTitleValue.trim());
+    }
+    setEditingTitleId(null);
+    setEditingTitleValue('');
+  }, [onUpdateTitle, editingTitleValue]);
+
+  // 🆕 제목 편집 취소
+  const handleCancelEditTitle = useCallback(() => {
+    setEditingTitleId(null);
+    setEditingTitleValue('');
+  }, []);
 
   const handleCancelAdd = () => {
     setAddingToColumn(null);
@@ -2691,9 +2738,9 @@ export default function KanbanBoard({
         await onAddVideo({
           url: validUrl,
           videoUrl: validUrl,
-          title: autoTitle, // 🆕 제목 추가
+          title: autoTitle,
           videoId: videoId,
-          thumbnail: thumbnail, // 🆕 썸네일 추가
+          thumbnail: thumbnail,
           linkType: linkType.type,
           status: addingToColumn,
           folderId: null,
@@ -2714,6 +2761,11 @@ export default function KanbanBoard({
           timer: 2000,
           showConfirmButton: false,
         });
+
+        // 🆕 데이터 새로고침으로 화면 즉시 업데이트
+        if (onRefresh) {
+          await onRefresh();
+        }
       } catch (error) {
         console.error('링크 추가 실패:', error);
         Swal.fire({
@@ -2783,7 +2835,11 @@ export default function KanbanBoard({
 
           {/* 서랍 토글 버튼 */}
           <button 
-            onClick={toggleDrawer}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              toggleDrawer();
+            }}
             className={`kanban-drawer-toggle ${isDrawerOpen ? 'active' : ''}`}
             type="button"
           >
@@ -2818,15 +2874,42 @@ export default function KanbanBoard({
         </div>
       )}
 
+      {/* 메인 영역 */}
       <div className="kanban-main-area">
-        {/* 자료 서랍 */}
+        {/* 서랍 백드롭 */}
+        {isDrawerOpen && (
+          <div 
+            className="kanban-drawer-backdrop open"
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleDrawer();
+            }}
+          />
+        )}
+
+        {/* 🆕 자료 서랍 */}
         <aside 
           ref={drawerRef}
           className={`kanban-drawer ${isDrawerOpen ? 'open' : ''}`}
         >
           <div className="kanban-drawer-header">
-            <h3><IconLayers /> 찜보따리에서 가져오기</h3>
-            <div className="kanban-drawer-search">
+            <div className="kanban-drawer-title-row">
+              <h3><IconLayers /> 찜보따리</h3>
+              <button 
+                className="kanban-drawer-collapse-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleDrawer();
+                }}
+                title="서랍 닫기"
+              >
+                <IconChevronsLeft />
+              </button>
+            </div>
+            <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+              드래그하여 보드에 추가하세요
+            </p>
+            <div className="kanban-drawer-search" style={{ marginTop: '12px' }}>
               <IconSearch />
               <input 
                 type="text"
@@ -2836,77 +2919,88 @@ export default function KanbanBoard({
               />
             </div>
           </div>
-          
+            
           <div className="kanban-drawer-content">
             {Object.entries(videosByFolder).map(([folderName, folderVideos]) => {
               if (folderVideos.length === 0) return null;
+              
+              // 검색 필터 적용
+              const filteredFolderVideos = folderVideos.filter(v => 
+                !drawerSearch || 
+                (v.title || '').toLowerCase().includes(drawerSearch.toLowerCase())
+              );
+              if (filteredFolderVideos.length === 0) return null;
+              
               const isOpen = expandedFolders.has(folderName);
               
               return (
-                <div key={folderName} className="kanban-drawer-folder">
+                <div key={folderName} className="kanban-drawer-folder-section">
                   <button 
                     className="kanban-drawer-folder-header"
-                    onClick={() => toggleDrawerFolder(folderName)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleDrawerFolder(folderName);
+                    }}
                   >
                     {isOpen ? <IconChevronDown /> : <IconChevronRight />}
                     <IconFolder />
                     <span className="kanban-drawer-folder-name">{folderName}</span>
-                    <span className="kanban-drawer-folder-count">{folderVideos.length}</span>
+                    <span className="kanban-drawer-folder-count">{filteredFolderVideos.length}</span>
                   </button>
                   
                   {isOpen && (
                     <div className="kanban-drawer-files">
-                      {folderVideos.map(video => (
-                        <div 
-                          key={video.id}
-                          className={`kanban-drawer-file ${video.status ? 'on-board' : ''}`}
-                          draggable
-                          onDragStart={(e) => handleDragStart(e, video, 'drawer')}
-                        >
-                          {(() => {
-                            const drawerLinkType = detectLinkType(video.videoUrl || video.url);
-                            const DrawerLinkIcon = drawerLinkType.icon;
-                            return (
-                              <>
-                                <div className="kanban-drawer-file-thumb">
-                                  {video.videoId ? (
-                                    <img 
-                                      src={`https://img.youtube.com/vi/${video.videoId}/mqdefault.jpg`} 
-                                      alt=""
-                                    />
-                                  ) : (
-                                    <div style={{ color: drawerLinkType.color }}>
-                                      <DrawerLinkIcon />
-                                    </div>
-                                  )}
+                      {filteredFolderVideos.map(video => {
+                        const linkType = detectLinkType(video.videoUrl || video.url);
+                        const LinkIcon = linkType.icon;
+                        
+                        return (
+                          <div 
+                            key={video.id}
+                            className={`kanban-drawer-file ${video.status ? 'on-board' : ''}`}
+                            draggable="true"
+                            onDragStart={(e) => {
+                              e.stopPropagation();
+                              handleDragStart(e, video, 'drawer');
+                            }}
+                            onDragEnd={() => setDraggedVideo(null)}
+                          >
+                            <div className="kanban-drawer-file-thumb">
+                              {video.videoId ? (
+                                <img 
+                                  src={`https://img.youtube.com/vi/${video.videoId}/mqdefault.jpg`} 
+                                  alt=""
+                                />
+                              ) : (
+                                <div className="kanban-drawer-file-icon" style={{ color: linkType.color }}>
+                                  <LinkIcon />
                                 </div>
-                                <div className="kanban-drawer-file-info">
-                                  <h4>{video.title || '제목 없음'}</h4>
-                                  <div className="kanban-drawer-file-meta">
-                                    {/* 링크 타입 미니 뱃지 */}
-                                    <span 
-                                      className="kanban-link-type-mini"
-                                      style={{ color: drawerLinkType.color }}
-                                      title={drawerLinkType.label}
-                                    >
-                                      <DrawerLinkIcon />
-                                    </span>
-                                    <SafetyBadge score={video.safetyScore} />
-                                    {video.status && (
-                                      <span className="kanban-drawer-status-badge">
-                                        보드에 있음
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                                <div className="kanban-drawer-file-grip">
-                                  <IconGrip />
-                                </div>
-                              </>
-                            );
-                          })()}
-                        </div>
-                      ))}
+                              )}
+                            </div>
+                            <div className="kanban-drawer-file-info">
+                              <h4>{video.title || '제목 없음'}</h4>
+                              <div className="kanban-drawer-file-meta">
+                                <span 
+                                  className="kanban-link-type-mini"
+                                  style={{ color: linkType.color }}
+                                  title={linkType.label}
+                                >
+                                  <LinkIcon />
+                                </span>
+                                <SafetyBadge score={video.safetyScore} />
+                                {video.status && (
+                                  <span className="kanban-drawer-status-badge">
+                                    보드
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="kanban-drawer-file-grip">
+                              <IconGrip />
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -2915,7 +3009,8 @@ export default function KanbanBoard({
             
             {Object.values(videosByFolder).flat().length === 0 && (
               <div className="kanban-drawer-empty">
-                <p>검색 결과가 없습니다</p>
+                <IconLayers />
+                <p>찜보따리가 비어있습니다</p>
               </div>
             )}
           </div>
@@ -3176,7 +3271,13 @@ export default function KanbanBoard({
                       return (
                         <div 
                           key={video.id}
-                          className="kanban-card-wrapper"
+                          className={`kanban-card-wrapper ${viewMode === 'list' ? 'list-view' : ''}`}
+                          draggable={!isEditMode && cardMenuOpen !== video.id}
+                          onDragStart={(e) => {
+                            if (isEditMode || cardMenuOpen) return;
+                            handleDragStart(e, { ...video, status: column.id }, 'board', itemIndex);
+                          }}
+                          onDragEnd={() => setDraggedVideo(null)}
                           onDragOver={(e) => handleCardDragOver(e, column.id, itemIndex)}
                           onDragLeave={() => setDragOverIndex(null)}
                         >
@@ -3185,12 +3286,7 @@ export default function KanbanBoard({
                             <div className="kanban-drop-indicator" />
                           )}
                           <div 
-                            className={`kanban-card-v2 ${draggedVideo?.id === video.id ? 'dragging' : ''} ${isSelected ? 'selected' : ''}`}
-                            draggable={!isEditMode && cardMenuOpen !== video.id}
-                            onDragStart={(e) => {
-                              if (isEditMode || cardMenuOpen) return;
-                              handleDragStart(e, video, 'board', itemIndex);
-                            }}
+                            className={`kanban-card-v2 ${viewMode === 'list' ? 'list-view' : ''} ${draggedVideo?.id === video.id ? 'dragging' : ''} ${isSelected ? 'selected' : ''}`}
                           >
                           {/* 다중 선택 체크박스 */}
                           <label 
@@ -3231,6 +3327,17 @@ export default function KanbanBoard({
                                 >
                                   <IconExternalLink />
                                   <span>열기</span>
+                                </button>
+                                <button 
+                                  className="kanban-card-dropdown-item"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setCardMenuOpen(null);
+                                    handleStartEditTitle(video);
+                                  }}
+                                >
+                                  <IconEdit />
+                                  <span>제목 수정</span>
                                 </button>
                                 <button 
                                   className="kanban-card-dropdown-item"
@@ -3345,12 +3452,36 @@ export default function KanbanBoard({
                           
                           {/* 카드 내용 */}
                           <div className="kanban-card-content-v2">
-                            <h4 
-                              className="kanban-card-title-v2"
-                              onClick={() => onOpenVideo?.(video)}
-                            >
-                              {video.title || '제목 없음'}
-                            </h4>
+                            {/* 🆕 인라인 제목 편집 */}
+                            {editingTitleId === video.id ? (
+                              <div className="kanban-title-edit-wrapper">
+                                <input
+                                  type="text"
+                                  className="kanban-title-edit-input"
+                                  value={editingTitleValue}
+                                  onChange={(e) => setEditingTitleValue(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleSaveTitle(video.id);
+                                    if (e.key === 'Escape') handleCancelEditTitle();
+                                  }}
+                                  onBlur={() => handleSaveTitle(video.id)}
+                                  autoFocus
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                              </div>
+                            ) : (
+                              <h4 
+                                className="kanban-card-title-v2"
+                                onClick={() => onOpenVideo?.(video)}
+                                onDoubleClick={(e) => {
+                                  e.stopPropagation();
+                                  handleStartEditTitle(video);
+                                }}
+                                title="더블클릭으로 제목 수정"
+                              >
+                                {video.title || '제목 없음'}
+                              </h4>
+                            )}
                             
                             <div className="kanban-card-meta-v2">
                               {/* 🆕 링크 타입 아이콘 */}

@@ -87,6 +87,13 @@ const IconTrash = () => (
   </svg>
 );
 
+const IconEdit = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+  </svg>
+);
+
 const IconMove = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
@@ -890,6 +897,42 @@ export default function JjimList({ onBack }) {
     }
   };
 
+  // 🆕 선택된 항목 제목 수정 (1개 선택 시에만)
+  const handleEditSelectedTitle = async () => {
+    if (selectedIds.size !== 1) return;
+    
+    const selectedId = [...selectedIds][0];
+    const selectedVideo = videos.find(v => v.id === selectedId);
+    if (!selectedVideo) return;
+    
+    const { value: newTitle } = await Swal.fire({
+      title: '제목 수정',
+      input: 'text',
+      inputLabel: '새 제목을 입력하세요',
+      inputValue: selectedVideo.title || '',
+      showCancelButton: true,
+      confirmButtonText: '저장',
+      cancelButtonText: '취소',
+      confirmButtonColor: '#8b5cf6',
+      inputValidator: (value) => {
+        if (!value || !value.trim()) {
+          return '제목을 입력해주세요';
+        }
+      }
+    });
+    
+    if (newTitle) {
+      await handleUpdateVideoTitle(selectedId, newTitle.trim());
+      setSelectedIds(new Set());
+      Swal.fire({
+        title: '제목이 수정되었습니다!',
+        icon: 'success',
+        timer: 1500,
+        showConfirmButton: false
+      });
+    }
+  };
+
   // 영상 상태 변경 (칸반 보드용)
   const handleStatusChange = async (videoId, newStatus) => {
     try {
@@ -910,6 +953,28 @@ export default function JjimList({ onBack }) {
       }
     } catch (error) {
       console.error('상태 변경 오류:', error);
+    }
+  };
+
+  // 🆕 영상 제목 수정
+  const handleUpdateVideoTitle = async (videoId, newTitle) => {
+    try {
+      if (!newTitle || !newTitle.trim()) return;
+      
+      const mainDocRef = doc(db, 'jjimVideos', user.uid);
+      const mainDoc = await getDoc(mainDocRef);
+      
+      if (mainDoc.exists()) {
+        const data = mainDoc.data();
+        const updatedVideos = (data.videos || []).map(v => 
+          v.id === videoId ? { ...v, title: newTitle.trim() } : v
+        );
+        
+        await updateDoc(mainDocRef, { videos: updatedVideos });
+        loadJjimData();
+      }
+    } catch (error) {
+      console.error('제목 수정 오류:', error);
     }
   };
 
@@ -1052,16 +1117,22 @@ export default function JjimList({ onBack }) {
             </button>
             <span className="jjim-selection-count">{selectedIds.size}개 선택됨</span>
             <div className="jjim-selection-actions">
+              {/* 🆕 1개 선택 시에만 제목 수정 버튼 표시 */}
+              {selectedIds.size === 1 && (
+                <button onClick={handleEditSelectedTitle} className="jjim-action-btn">
+                  <IconEdit /> 제목 수정
+                </button>
+              )}
               <button onClick={handleClassifySelected} className="jjim-action-btn primary">
                 <IconWand /> AI 정리
               </button>
               <button onClick={handleDeleteSelected} className="jjim-action-btn danger">
                 <IconTrash /> 삭제
-          </button>
+              </button>
               <button onClick={handleMoveSelected} className="jjim-action-btn primary">
                 <IconMove /> 이동
-          </button>
-        </div>
+              </button>
+            </div>
           </div>
         ) : (
           // 기본 툴바
@@ -1146,16 +1217,22 @@ export default function JjimList({ onBack }) {
             onAnalyze={(video) => handleVideoClick(video)}
             onOpenVideo={(video) => handleVideoClick(video)}
             onStatusChange={handleStatusChange}
-            onAddVideo={async ({ url, videoId, status, folderId }) => {
+            onUpdateTitle={handleUpdateVideoTitle}
+            onAddVideo={async ({ url, videoUrl, videoId, status, folderId, title, thumbnail, linkType }) => {
               try {
+                // 1. DB에 저장
                 await addLinkDirectly({
                   user,
-                  videoUrl: url,
+                  videoUrl: url || videoUrl,
                   videoId,
+                  title: title || '', // Fallback은 addLinkDirectly에서 처리
+                  thumbnail: thumbnail || '',
+                  linkType: linkType || 'youtube',
                   folderId: folderId || currentFolderId,
                   status,
                 });
-                await loadData();
+                // 2. 화면 갱신 (새로운 데이터 불러오기)
+                await loadJjimData();
               } catch (error) {
                 throw error;
               }
