@@ -236,6 +236,7 @@ export async function searchTrustedChannelVideos(
   subject,
   maxResults = 10,
   preferredDuration = null,
+  keywords = null, // 안전교육용 키워드
   _retryCount = 0
 ) {
   try {
@@ -260,6 +261,7 @@ export async function searchTrustedChannelVideos(
     }
 
     const apiKey = getCurrentApiKey();
+    console.log(`🔑 현재 API 키 인덱스: ${getCurrentKeyIndex()} / 총 ${YOUTUBE_API_KEYS.length}개`);
 
     // 2순위: 최근 2개월 이내 영상 검색
     const twoMonthsAgo = new Date();
@@ -271,68 +273,113 @@ export async function searchTrustedChannelVideos(
     const videosPerChannel = Math.min(3, Math.max(2, Math.floor(30 / totalChannels))); // 채널당 2~3개
 
     console.log(`📺 ${totalChannels}개 신뢰채널에서 각 ${videosPerChannel}개씩 검색`);
+    if (keywords) {
+      console.log(`🔍 키워드: "${keywords}"`);
+    }
+
+    // 403 에러 감지용 플래그
+    let hasQuotaError = false;
 
     // 병렬로 모든 채널 검색
     const searchPromises = trustedChannelIds.slice(0, totalChannels).map(async (channelId) => {
       try {
-        const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&channelId=${channelId}&maxResults=${videosPerChannel}&order=date&publishedAfter=${publishedAfter}&videoEmbeddable=true&regionCode=KR${videoDuration}&key=${apiKey}`;
+        // 안전교육일 때는 키워드 + 채널 필터로 검색
+        let searchUrl;
+        if (keywords) {
+          searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&channelId=${channelId}&maxResults=${videosPerChannel}&order=date&publishedAfter=${publishedAfter}&videoEmbeddable=true&regionCode=KR&q=${encodeURIComponent(keywords)}${videoDuration}&key=${apiKey}`;
+        } else {
+          searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&channelId=${channelId}&maxResults=${videosPerChannel}&order=date&publishedAfter=${publishedAfter}&videoEmbeddable=true&regionCode=KR${videoDuration}&key=${apiKey}`;
+        }
 
         const response = await fetch(searchUrl);
         if (!response.ok) {
-          console.warn(`채널 ${channelId} 검색 실패`);
-          return [];
+          if (response.status === 403) {
+            hasQuotaError = true;
+            console.warn(`⚠️ API 할당량 초과 (채널: ${channelId})`);
+          } else {
+            console.warn(`채널 ${channelId} 검색 실패: ${response.status}`);
+          }
+          return { error: response.status, items: [] };
         }
 
         const data = await response.json();
-        return data.items || [];
+        return { error: null, items: data.items || [] };
       } catch (error) {
         console.warn(`채널 ${channelId} 검색 오류:`, error);
-        return [];
+        return { error: 'network', items: [] };
       }
     });
 
     const channelResults = await Promise.all(searchPromises);
 
+    // 403 에러가 발생했고 재시도 가능하면 다음 키로 전환 후 재시도
+    if (hasQuotaError && _retryCount < YOUTUBE_API_KEYS.length - 1) {
+      console.warn(`🔄 API 키 전환 후 재시도... (${_retryCount + 1}/${YOUTUBE_API_KEYS.length - 1})`);
+      switchToNextKey();
+      return searchTrustedChannelVideos(subject, maxResults, preferredDuration, keywords, _retryCount + 1);
+    }
+
     // 각 채널별로 최대 2개씩만 가져와서 골고루 분배
     let allItems = [];
-    channelResults.forEach((items, idx) => {
-      const channelItems = items.slice(0, 2); // 채널당 최대 2개
+    channelResults.forEach((result, idx) => {
+      const channelItems = result.items.slice(0, 2); // 채널당 최대 2개
       if (channelItems.length > 0) {
         console.log(`  - 채널 ${idx + 1}: ${channelItems.length}개`);
       }
       allItems.push(...channelItems);
     });
 
-    console.log(`📺 2순위(최근 2개월): ${allItems.length}개 영상 발견 (${channelResults.filter(r => r.length > 0).length}개 채널에서)`);
+    console.log(`📺 2순위(최근 2개월): ${allItems.length}개 영상 발견 (${channelResults.filter(r => r.items.length > 0).length}개 채널에서)`);
 
     // 3순위: 2순위 영상이 부족하면 년도 상관없이 현재 월 ±2개월 영상 검색
     if (allItems.length < maxResults) {
       console.log(`⚠️ 최근 영상 부족(${allItems.length}개). 3순위(같은 시즌) 검색 시작...`);
 
       const currentMonth = new Date().getMonth(); // 0-11
+      const currentApiKey = getCurrentApiKey(); // 최신 키 다시 가져오기
+
+      // 403 에러 감지용
+      let hasSeasonQuotaError = false;
 
       // 각 채널에서 골고루 가져와서 월 필터링 (채널당 5개씩)
       const seasonSearchPromises = trustedChannelIds.slice(0, totalChannels).map(async (channelId) => {
         try {
           // 채널당 5개씩 가져와서 월로 필터링
-          const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&channelId=${channelId}&maxResults=5&order=viewCount&videoEmbeddable=true&regionCode=KR${videoDuration}&key=${apiKey}`;
+          let searchUrl;
+          if (keywords) {
+            searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&channelId=${channelId}&maxResults=5&order=viewCount&videoEmbeddable=true&regionCode=KR&q=${encodeURIComponent(keywords)}${videoDuration}&key=${currentApiKey}`;
+          } else {
+            searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&channelId=${channelId}&maxResults=5&order=viewCount&videoEmbeddable=true&regionCode=KR${videoDuration}&key=${currentApiKey}`;
+          }
 
           const response = await fetch(searchUrl);
-          if (!response.ok) return [];
+          if (!response.ok) {
+            if (response.status === 403) {
+              hasSeasonQuotaError = true;
+            }
+            return { error: response.status, items: [] };
+          }
 
           const data = await response.json();
-          return data.items || [];
+          return { error: null, items: data.items || [] };
         } catch (error) {
-          return [];
+          return { error: 'network', items: [] };
         }
       });
 
       const seasonResults = await Promise.all(seasonSearchPromises);
 
+      // 3순위에서도 403 에러 발생 시 키 전환 후 재시도
+      if (hasSeasonQuotaError && _retryCount < YOUTUBE_API_KEYS.length - 1) {
+        console.warn(`🔄 3순위 검색 중 API 키 전환 후 재시도...`);
+        switchToNextKey();
+        return searchTrustedChannelVideos(subject, maxResults, preferredDuration, keywords, _retryCount + 1);
+      }
+
       // 각 채널별로 최대 2개씩만 가져와서 골고루 분배
       let seasonItems = [];
-      seasonResults.forEach((items, idx) => {
-        const channelItems = items.slice(0, 2); // 채널당 최대 2개
+      seasonResults.forEach((result, idx) => {
+        const channelItems = result.items.slice(0, 2); // 채널당 최대 2개
         seasonItems.push(...channelItems);
       });
 
@@ -372,7 +419,7 @@ export async function searchTrustedChannelVideos(
       if (detailsResponse.status === 403 && _retryCount < YOUTUBE_API_KEYS.length - 1) {
         console.warn(`⚠️ API 키 할당량 초과. 다음 키로 전환 시도...`);
         switchToNextKey();
-        return searchTrustedChannelVideos(subject, maxResults, preferredDuration, _retryCount + 1);
+        return searchTrustedChannelVideos(subject, maxResults, preferredDuration, keywords, _retryCount + 1);
       }
       throw new Error(`YouTube details failed: ${detailsResponse.status}`);
     }

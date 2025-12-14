@@ -15,10 +15,13 @@ import {
   updateDoc,
   arrayUnion,
   Timestamp,
+  collection,
+  getDocs,
 } from "firebase/firestore";
 import { db } from "../firebase/config";
 import { addToJjim } from "../utils/jjim";
 import { addLikeSubject, removeLikeSubject } from "../utils/likeSubject";
+import { gradeSubject } from "../data/curriculum/gradeSubject";
 
 export default function VideoRecommendationDirect({ onBack }) {
   const { user, loginWithGoogle } = useAuth();
@@ -42,12 +45,78 @@ export default function VideoRecommendationDirect({ onBack }) {
   //
   const [sortedVideos, setSortedVideos] = useState([]);
 
+  // 인기 영상 상태
+  const [popularVideos, setPopularVideos] = useState([]);
+  const [loadingPopular, setLoadingPopular] = useState(false);
+
   useEffect(() => {
     if (recommendations) {
       const sorted = sortVideos(recommendations.videos);
       setSortedVideos(sorted);
     }
   }, [recommendations, sortBy]);
+
+  // 학년별 인기 영상 가져오기
+  useEffect(() => {
+    if (!recommendations) {
+      fetchPopularVideos();
+    }
+  }, [gradeLevel, recommendations]);
+
+  // 인기 영상 가져오기 함수
+  const fetchPopularVideos = async () => {
+    setLoadingPopular(true);
+    try {
+      // recommendKeywords 컬렉션에서 해당 학년으로 시작하는 문서들 조회
+      const keywordsRef = collection(db, "recommendKeywords");
+      const snapshot = await getDocs(keywordsRef);
+
+      const allPopularVideos = [];
+      const seenVideoIds = new Set();
+
+      snapshot.forEach((doc) => {
+        const docId = doc.id;
+        // 해당 학년으로 시작하는 문서만 필터링
+        if (docId.startsWith(gradeLevel)) {
+          const data = doc.data();
+          const lists = data.lists || [];
+
+          // 좋아요 많은 순으로 정렬
+          const sortedLists = [...lists].sort((a, b) => (b.likes || 0) - (a.likes || 0));
+
+          // 상위 리스트에서 영상 추출
+          sortedLists.forEach((list) => {
+            const videos = list.videos || [];
+            videos.forEach((video) => {
+              if (!seenVideoIds.has(video.videoId) && video.safetyScore > 70) {
+                seenVideoIds.add(video.videoId);
+                allPopularVideos.push({
+                  ...video,
+                  likes: list.likes || 0,
+                  keywords: list.keywords || "",
+                  subject: data.subject || docId.split("-")[1] || "",
+                });
+              }
+            });
+          });
+        }
+      });
+
+      // 좋아요 + 안전도 기준 정렬 후 상위 10개
+      allPopularVideos.sort((a, b) => {
+        const scoreA = (a.likes || 0) * 10 + (a.safetyScore || 0);
+        const scoreB = (b.likes || 0) * 10 + (b.safetyScore || 0);
+        return scoreB - scoreA;
+      });
+
+      setPopularVideos(allPopularVideos.slice(0, 10));
+    } catch (error) {
+      console.error("인기 영상 가져오기 실패:", error);
+      setPopularVideos([]);
+    } finally {
+      setLoadingPopular(false);
+    }
+  };
 
   // 정렬 함수
   const sortVideos = (videos) => {
@@ -197,9 +266,30 @@ export default function VideoRecommendationDirect({ onBack }) {
         }
 
         // 2,3순위: 신뢰채널에서 영상 검색
+        // 안전교육일 경우 gradeSubject.js에서 키워드 생성
+        let searchKeywords = null;
+        if (subject === "안전교육") {
+          const weightedKeywords = findKeywordsFromCurriculum(gradeLevel, subject);
+          if (weightedKeywords && weightedKeywords.length > 0) {
+            // 가중치 기반 랜덤 선택
+            const totalWeight = weightedKeywords.reduce((sum, item) => sum + item.weight, 0);
+            let random = Math.random() * totalWeight;
+
+            searchKeywords = weightedKeywords[0].keyword;
+            for (const item of weightedKeywords) {
+              random -= item.weight;
+              if (random <= 0) {
+                searchKeywords = item.keyword;
+                break;
+              }
+            }
+            console.log(`🔍 안전교육 키워드 생성: "${searchKeywords}"`);
+          }
+        }
+
         Swal.fire({
           title: "⚡ 신뢰채널 검색",
-          html: `${subject} 신뢰채널에서 영상 검색 및 분석 중...<br/><small>안전도 70점 이상 영상만 선별합니다</small>`,
+          html: `${subject} 신뢰채널에서 영상 검색 및 분석 중...${searchKeywords ? `<br/><small>키워드: ${searchKeywords}</small>` : ""}<br/><small>안전도 70점 이상 영상만 선별합니다</small>`,
           icon: "info",
           showConfirmButton: false,
           allowOutsideClick: false,
@@ -213,7 +303,8 @@ export default function VideoRecommendationDirect({ onBack }) {
         const trustedVideos = await searchTrustedChannelVideos(
           subject,
           20, // 필터링 후 10개 남기려면 넉넉하게
-          preferredDuration
+          preferredDuration,
+          searchKeywords // 안전교육일 때만 키워드 전달
         );
 
         if (trustedVideos.length === 0) {
@@ -465,46 +556,192 @@ export default function VideoRecommendationDirect({ onBack }) {
     }
   };
 
+  // 학년 매핑 함수 (초등 저학년 -> 1학년, 2학년 등)
+  const getGradeNumbers = (grade) => {
+    switch (grade) {
+      case "초등 저학년":
+        return ["1학년", "2학년"];
+      case "초등 중학년":
+        return ["3학년", "4학년"];
+      case "초등 고학년":
+        return ["5학년", "6학년"];
+      default:
+        return [];
+    }
+  };
+
+  // 현재 월에 맞는 키워드 찾기 (가중치 기반 랜덤)
+  const findKeywordsFromCurriculum = (grade, subj) => {
+    const currentMonth = new Date().getMonth() + 1; // 1-12
+
+    // 안전교육은 학년 상관없이 "안전교육" 키에서 검색
+    if (subj === "안전교육") {
+      const curriculumData = gradeSubject["안전교육"];
+      if (!curriculumData) return null;
+
+      const weightedKeywords = []; // { keyword, weight }
+
+      for (const item of curriculumData) {
+        const itemMonthMatch = item.month.match(/(\d+)월/);
+        if (itemMonthMatch) {
+          const itemMonth = parseInt(itemMonthMatch[1]);
+          let monthDiff = Math.abs(currentMonth - itemMonth);
+          if (monthDiff > 6) monthDiff = 12 - monthDiff;
+
+          const validKeywords = item.keywords.filter(
+            (k) => typeof k === "string" && k.length > 0
+          );
+
+          // 월 차이에 따라 가중치 부여
+          // 0개월: 10, 1개월: 5, 2개월: 3, 3개월 이상: 1
+          let weight = 1;
+          if (monthDiff === 0) weight = 10;
+          else if (monthDiff === 1) weight = 5;
+          else if (monthDiff === 2) weight = 3;
+
+          validKeywords.forEach((kw) => {
+            weightedKeywords.push({ keyword: kw, weight });
+          });
+        }
+      }
+
+      return weightedKeywords.length > 0 ? weightedKeywords : null;
+    }
+
+    const gradeNumbers = getGradeNumbers(grade);
+    if (gradeNumbers.length === 0) return null;
+
+    // 주제별 매핑
+    const subjectMapping = {
+      "미술": {
+        "1학년": ["통합교과"],
+        "2학년": ["통합교과"],
+        "3학년": ["미술"],
+        "4학년": ["미술"],
+        "5학년": ["미술"],
+        "6학년": ["미술"],
+      },
+      "체육": {
+        "1학년": ["통합교과"],
+        "2학년": ["통합교과"],
+        "3학년": ["체육"],
+        "4학년": ["체육"],
+        "5학년": ["체육"],
+        "6학년": ["체육"],
+      },
+      "짜투리영상": ["통합교과", "국어", "실과"],
+    };
+
+    const weightedKeywords = []; // { keyword, weight }
+
+    // 해당 학년들에서 키워드 검색
+    for (const gradeNum of gradeNumbers) {
+      let targetSubjects;
+
+      if (subj === "미술" || subj === "체육") {
+        targetSubjects = subjectMapping[subj][gradeNum] || ["통합교과"];
+      } else {
+        targetSubjects = subjectMapping[subj] || ["통합교과"];
+      }
+
+      for (const targetSubj of targetSubjects) {
+        const key = `${gradeNum}-${targetSubj}`;
+        const curriculumData = gradeSubject[key];
+        if (!curriculumData) continue;
+
+        for (const item of curriculumData) {
+          const itemMonthMatch = item.month.match(/(\d+)월/);
+          if (itemMonthMatch) {
+            const itemMonth = parseInt(itemMonthMatch[1]);
+            let monthDiff = Math.abs(currentMonth - itemMonth);
+            if (monthDiff > 6) monthDiff = 12 - monthDiff;
+
+            const validKeywords = item.keywords.filter(
+              (k) => typeof k === "string" && k.length > 0
+            );
+
+            // 월 차이에 따라 가중치 부여
+            // 0개월: 10, 1개월: 5, 2개월: 3, 3개월 이상: 1
+            let weight = 1;
+            if (monthDiff === 0) weight = 10;
+            else if (monthDiff === 1) weight = 5;
+            else if (monthDiff === 2) weight = 3;
+
+            validKeywords.forEach((kw) => {
+              weightedKeywords.push({ keyword: kw, weight });
+            });
+          }
+        }
+      }
+    }
+
+    return weightedKeywords.length > 0 ? weightedKeywords : null;
+  };
+
   // 랜덤 키워드 생성
   const handleRandomKeyword = async () => {
     try {
+      // 1순위: Firestore 문서에서 키워드 찾기
       const docName = `${gradeLevel}-${subject}`;
       const keywordDocRef = doc(db, "recommendKeywords", docName);
       const keywordDoc = await getDoc(keywordDocRef);
 
-      if (!keywordDoc.exists()) {
+      if (keywordDoc.exists()) {
+        const data = keywordDoc.data();
+        const keywords = data.keywords || [];
+
+        if (keywords.length > 0) {
+          const randomKeyword =
+            keywords[Math.floor(Math.random() * keywords.length)];
+          setIntention(randomKeyword);
+
+          await Swal.fire({
+            title: "키워드 생성!",
+            text: `"${randomKeyword}" 키워드를 선택했습니다.`,
+            icon: "success",
+            confirmButtonColor: "#4285f4",
+            timer: 1500,
+          });
+          return;
+        }
+      }
+
+      // 2순위: gradeSubject.js에서 현재 학년/과목/월에 맞는 키워드 찾기
+      console.log("📚 Firestore에 키워드 없음, 교육과정에서 검색...");
+      const weightedKeywords = findKeywordsFromCurriculum(gradeLevel, subject);
+
+      if (weightedKeywords && weightedKeywords.length > 0) {
+        // 가중치 기반 랜덤 선택
+        const totalWeight = weightedKeywords.reduce((sum, item) => sum + item.weight, 0);
+        let random = Math.random() * totalWeight;
+
+        let selectedKeyword = weightedKeywords[0].keyword;
+        for (const item of weightedKeywords) {
+          random -= item.weight;
+          if (random <= 0) {
+            selectedKeyword = item.keyword;
+            break;
+          }
+        }
+
+        setIntention(selectedKeyword);
+
         await Swal.fire({
-          title: "키워드 없음",
-          text: `${gradeLevel} ${subject}에 대한 추천 키워드가 아직 없습니다.`,
-          icon: "info",
+          title: "키워드 생성!",
+          html: `"${selectedKeyword}" 키워드를 선택했습니다.<br/><small>(교육과정 기반)</small>`,
+          icon: "success",
           confirmButtonColor: "#4285f4",
+          timer: 1500,
         });
         return;
       }
 
-      const data = keywordDoc.data();
-      const keywords = data.keywords || [];
-
-      if (keywords.length === 0) {
-        await Swal.fire({
-          title: "키워드 없음",
-          text: "저장된 키워드가 없습니다.",
-          icon: "info",
-          confirmButtonColor: "#4285f4",
-        });
-        return;
-      }
-
-      const randomKeyword =
-        keywords[Math.floor(Math.random() * keywords.length)];
-      setIntention(randomKeyword);
-
+      // 키워드를 찾지 못한 경우
       await Swal.fire({
-        title: "키워드 생성!",
-        text: `"${randomKeyword}" 키워드를 선택했습니다.`,
-        icon: "success",
+        title: "키워드 없음",
+        text: `${gradeLevel} ${subject}에 대한 추천 키워드가 아직 없습니다.`,
+        icon: "info",
         confirmButtonColor: "#4285f4",
-        timer: 1500,
       });
     } catch (error) {
       console.error("랜덤 키워드 생성 오류:", error);
@@ -1329,6 +1566,105 @@ export default function VideoRecommendationDirect({ onBack }) {
           하루 {user ? "10" : "3"}개 무료
         </p>
       </form>
+
+      {/* 인기 영상 섹션 */}
+      {popularVideos.length > 0 && (
+        <div className="mt-6 pt-6 border-t border-gray-200">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-base sm:text-lg font-bold text-gray-800">
+              🔥 {gradeLevel} 인기 영상
+            </h3>
+            {loadingPopular && (
+              <svg className="animate-spin h-4 w-4 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+            {popularVideos.map((video, idx) => (
+              <div
+                key={`${video.videoId}_${idx}`}
+                className="group relative bg-gray-50 rounded-lg overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+                onClick={() => {
+                  // 인기 영상 클릭 시 수업의도에 키워드 입력하고 검색
+                  if (video.keywords) {
+                    setIntention(video.keywords);
+                  }
+                  if (video.subject) {
+                    setSubject(video.subject);
+                  }
+                }}
+              >
+                {/* 썸네일 */}
+                <div className="relative aspect-video">
+                  <img
+                    src={video.thumbnail || `https://img.youtube.com/vi/${video.videoId}/mqdefault.jpg`}
+                    alt={video.title}
+                    className="w-full h-full object-cover"
+                  />
+                  {/* 호버 오버레이 */}
+                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all flex items-center justify-center">
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="w-10 h-10 bg-red-600 rounded-full flex items-center justify-center">
+                        <svg className="w-5 h-5 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                  {/* 안전도 배지 */}
+                  <div className={`absolute top-1 right-1 text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                    video.safetyScore >= 85
+                      ? "bg-green-500 text-white"
+                      : video.safetyScore >= 70
+                      ? "bg-yellow-500 text-white"
+                      : "bg-red-500 text-white"
+                  }`}>
+                    {video.safetyScore}점
+                  </div>
+                  {/* 좋아요 배지 */}
+                  {video.likes > 0 && (
+                    <div className="absolute top-1 left-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-pink-500 text-white">
+                      ❤️ {video.likes}
+                    </div>
+                  )}
+                </div>
+
+                {/* 제목 */}
+                <div className="p-2">
+                  <p className="text-xs font-medium text-gray-800 line-clamp-2 leading-tight">
+                    {video.title}
+                  </p>
+                  {video.subject && (
+                    <span className="inline-block mt-1 text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
+                      {video.subject}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <p className="text-xs text-gray-400 text-center mt-3">
+            영상 클릭 시 해당 키워드로 검색됩니다
+          </p>
+        </div>
+      )}
+
+      {/* 인기 영상 로딩 중 */}
+      {loadingPopular && popularVideos.length === 0 && (
+        <div className="mt-6 pt-6 border-t border-gray-200">
+          <div className="flex items-center justify-center gap-2 py-8 text-gray-500">
+            <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span className="text-sm">인기 영상 불러오는 중...</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
