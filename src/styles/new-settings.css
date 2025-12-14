@@ -441,6 +441,38 @@
   background: linear-gradient(135deg, #10b981 0%, #059669 100%);
 }
 
+/* 초기화 버튼 */
+.nsm-reset-section {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px dashed #e2e8f0;
+  text-align: center;
+}
+
+.nsm-reset-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #dc2626;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.nsm-reset-btn:hover {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.nsm-reset-btn:active {
+  transform: scale(0.98);
+}
+
 /* 푸터 */
 .nsm-footer {
   display: flex;

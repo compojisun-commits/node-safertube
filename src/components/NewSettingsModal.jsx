@@ -264,6 +264,24 @@ export default function NewSettingsModal({ isOpen, onClose }) {
               )}
             </div>
           </div>
+
+          {/* 데이터 초기화 */}
+          <div className="nsm-reset-section">
+            <button 
+              className="nsm-reset-btn"
+              onClick={() => {
+                if (window.confirm('모든 설정을 기본값으로 되돌리시겠습니까?')) {
+                  localStorage.removeItem('default_landing_page');
+                  localStorage.removeItem('default_jjim_view');
+                  setLandingPage('analyze');
+                  setJjimViewMode('folder');
+                  setInitialSettings({ landingPage: 'analyze', jjimViewMode: 'folder' });
+                }
+              }}
+            >
+              🔄 모든 설정 초기화
+            </button>
+          </div>
         </div>
 
         {/* 푸터 */}
