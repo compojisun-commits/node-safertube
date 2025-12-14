@@ -1,0 +1,676 @@
+import { useState, useEffect } from 'react';
+import { doc, setDoc, getDoc, Timestamp } from 'firebase/firestore';
+import { db } from '../firebase/config';
+import { useAuth } from '../context/AuthContext';
+import { generateUserFolders } from '../utils/folderGenerator';
+import Swal from 'sweetalert2';
+import '../styles/onboarding.css';
+
+const SUBJECTS = [
+  { id: 'kor', name: '국어', color: '#ef4444' },
+  { id: 'math', name: '수학', color: '#3b82f6' },
+  { id: 'soc', name: '사회', color: '#f59e0b' },
+  { id: 'sci', name: '과학', color: '#10b981' },
+  { id: 'moral', name: '도덕', color: '#8b5cf6' },
+  { id: 'prac', name: '실과', color: '#06b6d4' },
+  { id: 'music', name: '음악', color: '#ec4899' },
+  { id: 'art', name: '미술', color: '#f97316' },
+  { id: 'pe', name: '체육', color: '#22c55e' },
+  { id: 'eng', name: '영어', color: '#6366f1' },
+];
+
+const GRADES = [1, 2, 3, 4, 5, 6];
+
+// 아이콘 컴포넌트
+const IconX = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+  </svg>
+);
+
+// 폴더 계층 구조 옵션
+const FOLDER_HIERARCHY_OPTIONS = [
+  { 
+    id: 'grade-semester-subject', 
+    name: '학년 > 학기 > 과목', 
+    example: '6학년 > 1학기 > 국어 > 단원',
+    icon: '📚'
+  },
+  { 
+    id: 'grade-subject-semester', 
+    name: '학년 > 과목 > 학기', 
+    example: '6학년 > 국어 > 1학기 > 단원',
+    icon: '📖'
+  },
+  { 
+    id: 'grade-subject', 
+    name: '학년 > 과목 (학기 없음)', 
+    example: '6학년 > 국어 > 단원',
+    icon: '📁'
+  },
+];
+
+export default function SettingsModal({ onClose }) {
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [role, setRole] = useState('homeroom');
+  const [grade, setGrade] = useState(null);
+  const [targetGrades, setTargetGrades] = useState([]);
+  const [targetSubjects, setTargetSubjects] = useState([]);
+  const [folderHierarchy, setFolderHierarchy] = useState('grade-semester-subject');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // 초기 설정값 저장 (변경 감지용)
+  const [initialSettings, setInitialSettings] = useState(null);
+
+  // 기존 설정 불러오기
+  useEffect(() => {
+    const loadSettings = async () => {
+      if (!user) return;
+      
+      try {
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          const loadedRole = data.role || 'homeroom';
+          const loadedGrade = data.grade || null;
+          const loadedTargetGrades = data.target_grades || [];
+          const loadedTargetSubjects = data.target_subjects || SUBJECTS.map(s => s.id);
+          const loadedFolderHierarchy = data.folder_hierarchy || 'grade-semester-subject';
+          
+          setRole(loadedRole);
+          setGrade(loadedGrade);
+          setTargetGrades(loadedTargetGrades);
+          setTargetSubjects(loadedTargetSubjects);
+          setFolderHierarchy(loadedFolderHierarchy);
+          
+          // 초기값 저장
+          setInitialSettings({
+            role: loadedRole,
+            grade: loadedGrade,
+            targetGrades: loadedTargetGrades,
+            targetSubjects: loadedTargetSubjects,
+            folderHierarchy: loadedFolderHierarchy
+          });
+        } else {
+          // 새 사용자의 경우 현재 기본값을 초기값으로 저장
+          setInitialSettings({
+            role: 'homeroom',
+            grade: null,
+            targetGrades: [],
+            targetSubjects: SUBJECTS.map(s => s.id),
+            folderHierarchy: 'grade-semester-subject'
+          });
+        }
+      } catch (error) {
+        console.error('설정 로드 오류:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadSettings();
+  }, [user]);
+
+  // 실제 변경 감지 함수
+  const hasChanges = () => {
+    if (!initialSettings) return false;
+    
+    const gradesSame = JSON.stringify([...targetGrades].sort()) === 
+                       JSON.stringify([...initialSettings.targetGrades].sort());
+    const subjectsSame = JSON.stringify([...targetSubjects].sort()) === 
+                         JSON.stringify([...initialSettings.targetSubjects].sort());
+    
+    return (
+      role !== initialSettings.role ||
+      grade !== initialSettings.grade ||
+      !gradesSame ||
+      !subjectsSame ||
+      folderHierarchy !== initialSettings.folderHierarchy
+    );
+  };
+
+  // 역할 변경
+  const handleRoleChange = (newRole) => {
+    setRole(newRole);
+    if (newRole === 'homeroom') {
+      setTargetSubjects(SUBJECTS.map(s => s.id));
+      setTargetGrades([]);
+    } else {
+      setTargetSubjects([]);
+      setGrade(null);
+    }
+  };
+
+  // 학년 토글 (전담용)
+  const toggleGrade = (g) => {
+    setTargetGrades(prev => 
+      prev.includes(g) ? prev.filter(x => x !== g) : [...prev, g]
+    );
+  };
+
+  // 과목 토글
+  const toggleSubject = (subjectId) => {
+    setTargetSubjects(prev =>
+      prev.includes(subjectId) 
+        ? prev.filter(x => x !== subjectId) 
+        : [...prev, subjectId]
+    );
+  };
+
+  // 전체 선택/해제
+  const toggleAllSubjects = () => {
+    if (targetSubjects.length === SUBJECTS.length) {
+      setTargetSubjects([]);
+    } else {
+      setTargetSubjects(SUBJECTS.map(s => s.id));
+    }
+  };
+
+  // Swal 공통 옵션 (z-index 문제 해결)
+  const swalOptions = {
+    customClass: {
+      container: 'swal-above-modal'
+    }
+  };
+
+  // 저장
+  const handleSave = async () => {
+    // 유효성 검사
+    if (role === 'homeroom' && !grade) {
+      Swal.fire({
+        ...swalOptions,
+        icon: 'warning',
+        title: '학년을 선택해주세요',
+        confirmButtonColor: '#3b82f6'
+      });
+      return;
+    }
+
+    if (role === 'subject' && targetGrades.length === 0) {
+      Swal.fire({
+        ...swalOptions,
+        icon: 'warning',
+        title: '담당 학년을 선택해주세요',
+        confirmButtonColor: '#3b82f6'
+      });
+      return;
+    }
+
+    if (targetSubjects.length === 0) {
+      Swal.fire({
+        ...swalOptions,
+        icon: 'warning',
+        title: '담당 과목을 선택해주세요',
+        confirmButtonColor: '#3b82f6'
+      });
+      return;
+    }
+
+    // 변경 사항이 없는 경우
+    if (!hasChanges()) {
+      Swal.fire({
+        ...swalOptions,
+        icon: 'info',
+        title: '변경 사항이 없습니다',
+        text: '설정을 변경한 후 저장해주세요.',
+        confirmButtonColor: '#6366f1',
+        timer: 2000
+      });
+      return;
+    }
+
+    // 폴더 재생성 확인
+    const confirmResult = await Swal.fire({
+      ...swalOptions,
+      title: '설정을 변경하시겠습니까?',
+      html: `
+        <p style="color: #64748b; font-size: 14px;">
+          변경된 설정에 맞춰 새로운 폴더가 추가됩니다.
+        </p>
+        <p style="color: #94a3b8; font-size: 12px; margin-top: 8px;">
+          (기존 폴더와 저장된 영상은 유지됩니다)
+        </p>
+      `,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#6366f1',
+      cancelButtonColor: '#94a3b8',
+      confirmButtonText: '저장',
+      cancelButtonText: '취소'
+    });
+
+    if (!confirmResult.isConfirmed) return;
+
+    setIsSubmitting(true);
+
+    try {
+      // 1. 사용자 프로필 저장
+      const userData = {
+        school_level: 'elementary',
+        role,
+        grade: role === 'homeroom' ? grade : null,
+        target_grades: role === 'subject' ? targetGrades.sort((a, b) => a - b) : [grade],
+        target_subjects: targetSubjects,
+        folder_hierarchy: folderHierarchy,
+        onboardingCompleted: true,
+        updatedAt: Timestamp.now()
+      };
+
+      await setDoc(doc(db, 'users', user.uid), userData, { merge: true });
+
+      // 2. 폴더 추가 생성 (기존 폴더는 유지, 새로운 폴더만 추가)
+      const grades = role === 'homeroom' ? [grade] : targetGrades;
+      await generateUserFolders(user.uid, grades, targetSubjects, folderHierarchy);
+
+      // 3. 완료 알림
+      await Swal.fire({
+        ...swalOptions,
+        icon: 'success',
+        title: '설정 저장 완료! ✨',
+        text: '새로운 폴더가 추가되었습니다.',
+        confirmButtonColor: '#10b981',
+        timer: 2000
+      });
+
+      onClose();
+    } catch (error) {
+      console.error('Settings save error:', error);
+      Swal.fire({
+        ...swalOptions,
+        icon: 'error',
+        title: '오류 발생',
+        text: '설정 저장 중 문제가 발생했습니다.',
+        confirmButtonColor: '#ef4444'
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="onboarding-overlay">
+        <div className="onboarding-modal" style={{ maxWidth: '400px', textAlign: 'center', padding: '60px' }}>
+          <div className="settings-loading">
+            <div className="spinner"></div>
+            <p>설정 불러오는 중...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="onboarding-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="onboarding-modal settings-modal">
+        {/* 헤더 */}
+        <div className="settings-header">
+          <div className="settings-header-content">
+            <span className="settings-icon">⚙️</span>
+            <div>
+              <h2>내 설정</h2>
+              <p>담당 학년과 과목을 설정하세요</p>
+            </div>
+          </div>
+          <button className="settings-close-btn" onClick={onClose}>
+            <IconX />
+          </button>
+        </div>
+
+        {/* 컨텐츠 */}
+        <div className="onboarding-content settings-content">
+          {/* 역할 선택 */}
+          <div className="settings-section">
+            <label className="settings-label">역할</label>
+            <div className="settings-role-toggle">
+              <button
+                className={`role-toggle-btn ${role === 'homeroom' ? 'active' : ''}`}
+                onClick={() => handleRoleChange('homeroom')}
+              >
+                👩‍🏫 담임 교사
+              </button>
+              <button
+                className={`role-toggle-btn ${role === 'subject' ? 'active' : ''}`}
+                onClick={() => handleRoleChange('subject')}
+              >
+                📖 교과 전담
+              </button>
+            </div>
+          </div>
+
+          {/* 학년 선택 */}
+          <div className="settings-section">
+            <label className="settings-label">
+              {role === 'homeroom' ? '담당 학년' : '담당 학년 (복수 선택)'}
+            </label>
+            <div className={`grade-grid ${role === 'homeroom' ? 'single' : ''}`}>
+              {GRADES.map(g => (
+                <button
+                  key={g}
+                  className={`grade-btn ${
+                    role === 'homeroom' 
+                      ? grade === g ? 'selected' : ''
+                      : targetGrades.includes(g) ? 'selected' : ''
+                  }`}
+                  onClick={() => {
+                    if (role === 'homeroom') {
+                      setGrade(g);
+                    } else {
+                      toggleGrade(g);
+                    }
+                  }}
+                >
+                  {g}학년
+                  {role === 'subject' && targetGrades.includes(g) && (
+                    <span className="check">✓</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 과목 선택 */}
+          <div className="settings-section">
+            <div className="subject-header">
+              <label className="settings-label">담당 과목</label>
+              <button className="toggle-all-btn" onClick={toggleAllSubjects}>
+                {targetSubjects.length === SUBJECTS.length ? '전체 해제' : '전체 선택'}
+              </button>
+            </div>
+            <div className="subject-grid">
+              {SUBJECTS.map(subject => (
+                <button
+                  key={subject.id}
+                  className={`subject-btn ${targetSubjects.includes(subject.id) ? 'selected' : ''}`}
+                  style={{ '--subject-color': subject.color }}
+                  onClick={() => toggleSubject(subject.id)}
+                >
+                  {subject.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 폴더 계층 구조 선택 */}
+          <div className="settings-section">
+            <label className="settings-label">📂 폴더 계층 구조</label>
+            <div className="hierarchy-options">
+              {FOLDER_HIERARCHY_OPTIONS.map(option => (
+                <button
+                  key={option.id}
+                  className={`hierarchy-option ${folderHierarchy === option.id ? 'selected' : ''}`}
+                  onClick={() => setFolderHierarchy(option.id)}
+                >
+                  <div className="hierarchy-option-header">
+                    <span className="hierarchy-icon">{option.icon}</span>
+                    <span className="hierarchy-name">{option.name}</span>
+                    {folderHierarchy === option.id && <span className="hierarchy-check">✓</span>}
+                  </div>
+                  <div className="hierarchy-example">{option.example}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 현재 설정 요약 */}
+          <div className="selection-summary">
+            <h4>현재 설정</h4>
+            <div className="summary-content">
+              <div className="summary-item">
+                <span className="label">역할:</span>
+                <span className="value">{role === 'homeroom' ? '담임 교사' : '교과 전담'}</span>
+              </div>
+              <div className="summary-item">
+                <span className="label">학년:</span>
+                <span className="value">
+                  {role === 'homeroom' 
+                    ? (grade ? `${grade}학년` : '미선택') 
+                    : (targetGrades.length > 0 ? targetGrades.map(g => `${g}학년`).join(', ') : '미선택')
+                  }
+                </span>
+              </div>
+              <div className="summary-item">
+                <span className="label">과목:</span>
+                <span className="value" style={{ flex: 1 }}>
+                  {targetSubjects.length > 0 
+                    ? (targetSubjects.length === SUBJECTS.length 
+                        ? '전 과목'
+                        : targetSubjects.map(id => SUBJECTS.find(s => s.id === id)?.name).join(', ')
+                      )
+                    : '미선택'
+                  }
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 푸터 */}
+        <div className="settings-footer">
+          <button className="back-btn" onClick={onClose}>
+            취소
+          </button>
+          <button 
+            className={`complete-btn ${!hasChanges() ? 'no-changes' : ''}`}
+            onClick={handleSave}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? '저장 중...' : hasChanges() ? '💾 설정 저장' : '✓ 변경 사항 없음'}
+          </button>
+        </div>
+      </div>
+
+      <style>{`
+        /* Swal이 모달 위에 뜨도록 z-index 설정 */
+        .swal-above-modal {
+          z-index: 10001 !important;
+        }
+        
+        .settings-modal {
+          max-width: 550px;
+        }
+        
+        .settings-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 24px 30px;
+          background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+          color: white;
+        }
+        
+        .settings-header-content {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+        }
+        
+        .settings-icon {
+          font-size: 36px;
+        }
+        
+        .settings-header h2 {
+          font-size: 20px;
+          font-weight: 600;
+          margin: 0;
+        }
+        
+        .settings-header p {
+          font-size: 13px;
+          opacity: 0.9;
+          margin: 4px 0 0;
+        }
+        
+        .settings-close-btn {
+          background: rgba(255,255,255,0.2);
+          border: none;
+          border-radius: 8px;
+          padding: 8px;
+          cursor: pointer;
+          color: white;
+          transition: background 0.2s;
+        }
+        
+        .settings-close-btn:hover {
+          background: rgba(255,255,255,0.3);
+        }
+        
+        .settings-content {
+          padding: 24px 30px;
+        }
+        
+        .settings-section {
+          margin-bottom: 20px;
+        }
+        
+        .settings-label {
+          display: block;
+          font-size: 13px;
+          font-weight: 600;
+          color: #475569;
+          margin-bottom: 10px;
+        }
+        
+        .settings-role-toggle {
+          display: flex;
+          gap: 10px;
+        }
+        
+        .role-toggle-btn {
+          flex: 1;
+          padding: 12px 16px;
+          background: white;
+          border: 2px solid #e2e8f0;
+          border-radius: 10px;
+          font-size: 14px;
+          font-weight: 500;
+          color: #64748b;
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+        
+        .role-toggle-btn:hover {
+          border-color: #8b5cf6;
+          background: #faf5ff;
+        }
+        
+        .role-toggle-btn.active {
+          background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+          border-color: #8b5cf6;
+          color: white;
+        }
+        
+        .settings-footer {
+          display: flex;
+          justify-content: flex-end;
+          gap: 12px;
+          padding: 20px 30px;
+          background: #f8fafc;
+          border-top: 1px solid #e2e8f0;
+        }
+        
+        .settings-loading {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 16px;
+          color: #64748b;
+        }
+        
+        .spinner {
+          width: 40px;
+          height: 40px;
+          border: 3px solid #e2e8f0;
+          border-top-color: #6366f1;
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+        }
+        
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+        
+        /* 폴더 계층 구조 선택 */
+        .hierarchy-options {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+        
+        .hierarchy-option {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          padding: 12px 14px;
+          background: white;
+          border: 2px solid #e2e8f0;
+          border-radius: 10px;
+          text-align: left;
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+        
+        .hierarchy-option:hover {
+          border-color: #8b5cf6;
+          background: #faf5ff;
+        }
+        
+        .hierarchy-option.selected {
+          border-color: #8b5cf6;
+          background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%);
+        }
+        
+        .hierarchy-option-header {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        
+        .hierarchy-icon {
+          font-size: 16px;
+        }
+        
+        .hierarchy-name {
+          font-size: 14px;
+          font-weight: 600;
+          color: #374151;
+        }
+        
+        .hierarchy-check {
+          margin-left: auto;
+          color: #8b5cf6;
+          font-weight: bold;
+        }
+        
+        .hierarchy-example {
+          font-size: 11px;
+          color: #94a3b8;
+          margin-left: 24px;
+        }
+        
+        .hierarchy-option.selected .hierarchy-name {
+          color: #7c3aed;
+        }
+        
+        .hierarchy-option.selected .hierarchy-example {
+          color: #a78bfa;
+        }
+        
+        /* 변경 사항 없음 상태의 버튼 */
+        .complete-btn.no-changes {
+          background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%);
+          cursor: default;
+        }
+        
+        .complete-btn.no-changes:hover {
+          transform: none;
+          box-shadow: none;
+        }
+      `}</style>
+    </div>
+  );
+}
+
+
+

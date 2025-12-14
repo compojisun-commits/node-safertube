@@ -710,40 +710,80 @@ export default function AnalysisResult({ requestId, directResult, progress, onRe
                         </div>
                       </div>
                       
-                      {/* 🆕 콘텐츠 깊이 분석 - 가로 나열 */}
-                      <div className="depth-analysis-row">
-                        {/* 추상화 레벨 */}
-                        <div className="depth-item">
-                          <span className="depth-label">🧠 추상화</span>
-                          <div className="depth-dots">
-                            {[1, 2, 3, 4, 5].map((level) => (
-                              <span 
-                                key={level}
-                                className={`depth-dot ${level <= (analysis.comprehensionAnalysis.abstractConceptLevel || 1) ? 'active' : ''}`}
-                              />
-                            ))}
+                      {/* 🆕 콘텐츠 깊이 분석 - Apple 스타일 카드 */}
+                      <div className="content-depth-card">
+                        <div className="depth-card-header">
+                          <span className="depth-card-title">콘텐츠 깊이</span>
+                        </div>
+                        
+                        <div className="depth-metrics">
+                          {/* 추상화 레벨 - 시각적 게이지 */}
+                          <div className="depth-metric-item">
+                            <div className="metric-icon-wrapper abstraction">
+                              <span className="metric-icon">🧠</span>
+                            </div>
+                            <div className="metric-content">
+                              <span className="metric-label">추상화 수준</span>
+                              <div className="abstraction-gauge">
+                                <div className="gauge-track">
+                                  <div 
+                                    className="gauge-fill"
+                                    style={{ 
+                                      width: `${((analysis.comprehensionAnalysis.abstractConceptLevel || 1) / 5) * 100}%` 
+                                    }}
+                                  />
+                                  <div 
+                                    className="gauge-indicator"
+                                    style={{ 
+                                      left: `${((analysis.comprehensionAnalysis.abstractConceptLevel || 1) / 5) * 100}%` 
+                                    }}
+                                  />
+                                </div>
+                                <div className="gauge-labels">
+                                  <span>구체적</span>
+                                  <span>추상적</span>
+                                </div>
+                              </div>
+                            </div>
+                            <span className={`metric-value-pill abstraction-level-${analysis.comprehensionAnalysis.abstractConceptLevel || 1}`}>
+                              {(analysis.comprehensionAnalysis.abstractConceptLevel || 1) <= 2 ? '구체적' :
+                               (analysis.comprehensionAnalysis.abstractConceptLevel || 1) <= 3 ? '경험적' : '추상적'}
+                            </span>
                           </div>
-                          <span className="depth-value">
-                            {(analysis.comprehensionAnalysis.abstractConceptLevel || 1) <= 2 ? '구체적' :
-                             (analysis.comprehensionAnalysis.abstractConceptLevel || 1) <= 3 ? '경험적' : '추상적'}
-                          </span>
-                        </div>
 
-                        {/* 어휘 밀도 */}
-                        <div className="depth-item">
-                          <span className="depth-label">📝 어휘밀도</span>
-                          <span className={`depth-badge depth-${(analysis.comprehensionAnalysis.lexicalDensity || 'Medium').toLowerCase()}`}>
-                            {analysis.comprehensionAnalysis.lexicalDensity === 'Low' ? '가벼움' :
-                             analysis.comprehensionAnalysis.lexicalDensity === 'High' ? '빽빽함' : '보통'}
-                          </span>
-                        </div>
+                          {/* 어휘 밀도 */}
+                          <div className="depth-metric-item">
+                            <div className="metric-icon-wrapper lexical">
+                              <span className="metric-icon">📝</span>
+                            </div>
+                            <div className="metric-content">
+                              <span className="metric-label">어휘 밀도</span>
+                              <span className="metric-desc">
+                                {analysis.comprehensionAnalysis.lexicalDensity === 'Low' ? '일상 어휘 위주' :
+                                 analysis.comprehensionAnalysis.lexicalDensity === 'High' ? '전문용어 다수' : '적절한 수준'}
+                              </span>
+                            </div>
+                            <span className={`metric-value-pill lexical-${(analysis.comprehensionAnalysis.lexicalDensity || 'Medium').toLowerCase()}`}>
+                              {analysis.comprehensionAnalysis.lexicalDensity === 'Low' ? '쉬움' :
+                               analysis.comprehensionAnalysis.lexicalDensity === 'High' ? '어려움' : '보통'}
+                            </span>
+                          </div>
 
-                        {/* 문장 복잡도 */}
-                        <div className="depth-item">
-                          <span className="depth-label">💬 문장</span>
-                          <span className={`depth-badge complexity-${(analysis.comprehensionAnalysis.sentenceComplexity || 'Simple').toLowerCase()}`}>
-                            {analysis.comprehensionAnalysis.sentenceComplexity === 'Complex' ? '복잡' : '단순'}
-                          </span>
+                          {/* 문장 복잡도 */}
+                          <div className="depth-metric-item">
+                            <div className="metric-icon-wrapper sentence">
+                              <span className="metric-icon">💬</span>
+                            </div>
+                            <div className="metric-content">
+                              <span className="metric-label">문장 구조</span>
+                              <span className="metric-desc">
+                                {analysis.comprehensionAnalysis.sentenceComplexity === 'Complex' ? '복문/수식어 다수' : '단문 위주'}
+                              </span>
+                            </div>
+                            <span className={`metric-value-pill sentence-${(analysis.comprehensionAnalysis.sentenceComplexity || 'Simple').toLowerCase()}`}>
+                              {analysis.comprehensionAnalysis.sentenceComplexity === 'Complex' ? '복잡' : '단순'}
+                            </span>
+                          </div>
                         </div>
                       </div>
 

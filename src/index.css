@@ -3978,3 +3978,292 @@ body {
     flex: 0 0 240px;
   }
 }
+
+/* ==========================================
+   🍎 Apple-Style Content Depth Analysis Card
+   ========================================== */
+
+.content-depth-card {
+  background: linear-gradient(135deg, 
+    rgba(255, 255, 255, 0.95) 0%, 
+    rgba(248, 250, 252, 0.9) 100%
+  );
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 
+    0 4px 24px rgba(0, 0, 0, 0.06),
+    0 1px 2px rgba(0, 0, 0, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  padding: 24px;
+  margin-top: 16px;
+  overflow: hidden;
+  position: relative;
+}
+
+.content-depth-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, 
+    transparent, 
+    rgba(255, 255, 255, 0.8), 
+    transparent
+  );
+}
+
+.depth-card-header {
+  margin-bottom: 20px;
+}
+
+.depth-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.depth-card-title::before {
+  content: '';
+  width: 4px;
+  height: 14px;
+  background: linear-gradient(180deg, #8b5cf6, #6366f1);
+  border-radius: 2px;
+}
+
+/* 메트릭 컨테이너 */
+.depth-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* 개별 메트릭 아이템 */
+.depth-metric-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.depth-metric-item:hover {
+  background: rgba(255, 255, 255, 0.9);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+/* 🧠 아이콘 래퍼 - 그라데이션 원형 배경 */
+.metric-icon-wrapper {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 
+    0 4px 12px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.metric-icon-wrapper::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.15;
+  background: radial-gradient(circle at 30% 30%, white 0%, transparent 60%);
+}
+
+.metric-icon-wrapper.abstraction {
+  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 50%, #6366f1 100%);
+}
+
+.metric-icon-wrapper.lexical {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 50%, #1d4ed8 100%);
+}
+
+.metric-icon-wrapper.sentence {
+  background: linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%);
+}
+
+.metric-icon {
+  font-size: 24px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+  position: relative;
+  z-index: 1;
+}
+
+/* 메트릭 콘텐츠 영역 */
+.metric-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.metric-label {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 4px;
+}
+
+.metric-desc {
+  display: block;
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+/* 추상화 게이지 */
+.abstraction-gauge {
+  margin-top: 8px;
+}
+
+.gauge-track {
+  height: 6px;
+  background: linear-gradient(90deg, 
+    #e0e7ff 0%, 
+    #c7d2fe 50%, 
+    #a5b4fc 100%
+  );
+  border-radius: 100px;
+  position: relative;
+  overflow: hidden;
+}
+
+.gauge-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: linear-gradient(90deg, #8b5cf6, #6366f1);
+  border-radius: 100px;
+  transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.gauge-indicator {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  background: white;
+  border: 3px solid #7c3aed;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.4);
+  transition: left 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.gauge-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+}
+
+.gauge-labels span {
+  font-size: 11px;
+  color: #9ca3af;
+  font-weight: 500;
+}
+
+/* 값 필 (오른쪽 배지) */
+.metric-value-pill {
+  padding: 6px 14px;
+  border-radius: 100px;
+  font-size: 13px;
+  font-weight: 600;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s ease;
+}
+
+/* 추상화 레벨별 색상 */
+.abstraction-level-1,
+.abstraction-level-2 {
+  background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+  color: #166534;
+}
+
+.abstraction-level-3 {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: #92400e;
+}
+
+.abstraction-level-4,
+.abstraction-level-5 {
+  background: linear-gradient(135deg, #ede9fe, #ddd6fe);
+  color: #5b21b6;
+}
+
+/* 어휘 밀도별 색상 */
+.lexical-low {
+  background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+  color: #166534;
+}
+
+.lexical-medium {
+  background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+  color: #1e40af;
+}
+
+.lexical-high {
+  background: linear-gradient(135deg, #fee2e2, #fecaca);
+  color: #991b1b;
+}
+
+/* 문장 복잡도별 색상 */
+.sentence-simple {
+  background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+  color: #065f46;
+}
+
+.sentence-complex {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: #92400e;
+}
+
+/* 반응형 */
+@media (max-width: 640px) {
+  .content-depth-card {
+    padding: 16px;
+    border-radius: 16px;
+  }
+  
+  .depth-metric-item {
+    padding: 12px;
+    gap: 12px;
+  }
+  
+  .metric-icon-wrapper {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+  }
+  
+  .metric-icon {
+    font-size: 20px;
+  }
+  
+  .metric-label {
+    font-size: 14px;
+  }
+  
+  .metric-value-pill {
+    padding: 5px 10px;
+    font-size: 12px;
+  }
+}
