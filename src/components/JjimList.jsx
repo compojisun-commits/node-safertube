@@ -599,8 +599,16 @@ export default function JjimList({ onBack }) {
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // 뷰 모드: 'list', 'grid', 'board'
-  const [viewMode, setViewMode] = useState('list');
+  // 뷰 모드: 'list', 'grid', 'board' - localStorage에서 읽기
+  const [viewMode, setViewMode] = useState(() => {
+    try {
+      const saved = localStorage.getItem('default_jjim_view');
+      if (saved === 'grid' || saved === 'board' || saved === 'list') return saved;
+      return 'list';
+    } catch {
+      return 'list';
+    }
+  });
   const [currentFolderId, setCurrentFolderId] = useState(null);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [searchQuery, setSearchQuery] = useState('');

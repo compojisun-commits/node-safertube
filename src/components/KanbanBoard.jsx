@@ -1271,7 +1271,10 @@ export default function KanbanBoard({
 
           {/* 서랍 토글 버튼 */}
           <button 
-            onClick={() => setIsDrawerOpen(!isDrawerOpen)}
+            onClick={() => {
+              console.log('🚀 서랍 토글 클릭! 현재 상태:', isDrawerOpen, '-> 변경:', !isDrawerOpen);
+              setIsDrawerOpen(!isDrawerOpen);
+            }}
             className={`kanban-drawer-toggle ${isDrawerOpen ? 'active' : ''}`}
           >
             {isDrawerOpen ? <IconChevronLeft /> : <IconChevronRight />}

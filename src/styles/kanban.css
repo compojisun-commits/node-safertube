@@ -174,17 +174,20 @@
 /* --- 자료 서랍 --- */
 .kanban-drawer {
   width: 0;
+  min-width: 0;
   background: white;
   border-right: 1px solid var(--gray-200, #e5e7eb);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
+  flex-shrink: 0;
 }
 
 .kanban-drawer.open {
   width: 320px;
+  min-width: 320px;
 }
 
 .kanban-drawer-header {
@@ -1718,6 +1721,7 @@
 
 .kanban-main-area .kanban-drawer.open {
   width: 360px;
+  min-width: 360px;
 }
 
 /* 서랍 하단 안내 */
