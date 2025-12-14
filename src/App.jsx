@@ -15,7 +15,18 @@ import NewSettingsModal from "./components/NewSettingsModal";
 
 function AppContent() {
   const { user } = useAuth();
-  const [mode, setMode] = useState("analyze");
+  // 🆕 localStorage에서 초기 화면 설정 읽기
+  const [mode, setMode] = useState(() => {
+    try {
+      const savedLanding = localStorage.getItem('default_landing_page');
+      // analyze, recommend, jjim 중 하나로 매핑
+      if (savedLanding === 'recommend') return 'recommend';
+      if (savedLanding === 'jjim') return 'jjim';
+      return 'analyze'; // 기본값
+    } catch {
+      return 'analyze';
+    }
+  });
   const [currentRequestId, setCurrentRequestId] = useState(null);
   const [currentResult, setCurrentResult] = useState(null);
   const [currentProgress, setCurrentProgress] = useState({

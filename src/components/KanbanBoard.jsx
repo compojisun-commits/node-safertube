@@ -1660,18 +1660,15 @@ export default function KanbanBoard({
                                   {folderName}
                                 </span>
                               )}
-                            </div>
-                            
-                            <div className="kanban-card-actions-v2">
+                              
+                              {/* 🆕 내보내기 버튼 - 폴더 라인과 같은 줄에 배치 */}
                               <button 
-                                className="kanban-action-btn analyze"
-                                onClick={() => onAnalyze?.(video)}
-                              >
-                                상세분석
-                              </button>
-                              <button 
-                                className="kanban-action-btn youtube"
-                                onClick={() => window.open(video.videoUrl, '_blank')}
+                                className="kanban-action-btn-inline youtube"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  window.open(video.videoUrl, '_blank');
+                                }}
+                                title="YouTube에서 열기"
                               >
                                 <IconExternalLink />
                               </button>
