@@ -433,8 +433,8 @@ export default function KanbanBoard({
   const [newVideoUrl, setNewVideoUrl] = useState('');
   const inputRef = useRef(null);
   
-  // 서랍 상태
-  const [isDrawerOpen, setIsDrawerOpen] = useState(true);
+  // 서랍 상태 (기본: 닫힘)
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [drawerSearch, setDrawerSearch] = useState('');
   const [expandedFolders, setExpandedFolders] = useState(new Set());
 
