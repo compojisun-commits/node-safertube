@@ -303,7 +303,7 @@ const ColumnEditModal = ({ column, onSave, onDelete, onClose, canDelete }) => {
 // ==========================================
 // 🆕 보드 선택 드롭다운
 // ==========================================
-const BoardSelector = ({ boards, currentBoardId, onSelect, onCreateNew }) => {
+const BoardSelector = ({ boards, currentBoardId, onSelect, onCreateNew, onDeleteBoard }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -318,6 +318,27 @@ const BoardSelector = ({ boards, currentBoardId, onSelect, onCreateNew }) => {
   }, []);
 
   const currentBoard = boards.find(b => b.id === currentBoardId);
+  
+  // 🆕 보드 삭제 핸들러
+  const handleDeleteBoard = async (e, boardId, boardName) => {
+    e.stopPropagation();
+    
+    const result = await Swal.fire({
+      title: '보드 삭제',
+      html: `<p>"<strong>${boardName}</strong>" 보드를 삭제하시겠습니까?</p>`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: '삭제',
+      cancelButtonText: '취소',
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#6b7280',
+    });
+    
+    if (result.isConfirmed) {
+      onDeleteBoard?.(boardId);
+      setIsOpen(false);
+    }
+  };
 
   return (
     <div className="kanban-board-selector" ref={dropdownRef}>
@@ -337,21 +358,41 @@ const BoardSelector = ({ boards, currentBoardId, onSelect, onCreateNew }) => {
           </div>
           
           <div className="kanban-board-dropdown-list">
-            {boards.map((board) => (
-              <button
-                key={board.id}
-                className={`kanban-board-option ${board.id === currentBoardId ? 'active' : ''}`}
-                onClick={() => {
-                  onSelect(board.id);
-                  setIsOpen(false);
-                }}
-              >
-                <span className="kanban-board-option-icon">{board.icon}</span>
-                <span className="kanban-board-option-name">{board.name}</span>
-                <span className="kanban-board-option-cols">{board.columns.length}개 섹션</span>
-                {board.id === currentBoardId && <IconCheck />}
-              </button>
-            ))}
+            {boards.map((board) => {
+              // 🆕 기본 보드(default)는 삭제 불가
+              const canDelete = board.id !== 'default';
+              
+              return (
+                <div 
+                  key={board.id}
+                  className={`kanban-board-option ${board.id === currentBoardId ? 'active' : ''}`}
+                >
+                  <button
+                    className="kanban-board-option-main"
+                    onClick={() => {
+                      onSelect(board.id);
+                      setIsOpen(false);
+                    }}
+                  >
+                    <span className="kanban-board-option-icon">{board.icon}</span>
+                    <span className="kanban-board-option-name">{board.name}</span>
+                    <span className="kanban-board-option-cols">{board.columns.length}개 섹션</span>
+                    {board.id === currentBoardId && <IconCheck />}
+                  </button>
+                  
+                  {/* 🆕 삭제 버튼 (기본 보드 제외) */}
+                  {canDelete && (
+                    <button
+                      className="kanban-board-option-delete"
+                      onClick={(e) => handleDeleteBoard(e, board.id, board.name)}
+                      title="보드 삭제"
+                    >
+                      <IconX />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           <div className="kanban-board-dropdown-footer">
@@ -1204,6 +1245,14 @@ export default function KanbanBoard({
             currentBoardId={currentBoardId}
             onSelect={handleSelectBoard}
             onCreateNew={handleCreateBoard}
+            onDeleteBoard={(boardId) => {
+              // 현재 보드가 삭제되면 다른 보드로 전환
+              if (currentBoardId === boardId) {
+                const otherBoard = boards.find(b => b.id !== boardId);
+                if (otherBoard) setCurrentBoardId(otherBoard.id);
+              }
+              setBoards(prev => prev.filter(b => b.id !== boardId));
+            }}
           />
           <span className="kanban-subtitle">폴더와 관계없이 모든 영상을 한눈에</span>
         </div>

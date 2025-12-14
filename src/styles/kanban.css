@@ -1842,9 +1842,9 @@
 .kanban-board-option {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 0;
   width: 100%;
-  padding: 12px 14px;
+  padding: 0;
   background: none;
   border: none;
   border-radius: 8px;
@@ -1887,6 +1887,54 @@
 
 .kanban-board-option svg {
   color: #7c3aed;
+}
+
+/* 🆕 보드 옵션 메인 버튼 */
+.kanban-board-option-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  padding: 12px 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.kanban-board-option-main:hover {
+  background: #f8fafc;
+}
+
+.kanban-board-option.active .kanban-board-option-main {
+  background: #f5f3ff;
+}
+
+/* 🆕 보드 삭제 버튼 */
+.kanban-board-option-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin-right: 8px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #94a3b8;
+  opacity: 0;
+  transition: all 0.15s;
+}
+
+.kanban-board-option:hover .kanban-board-option-delete {
+  opacity: 1;
+}
+
+.kanban-board-option-delete:hover {
+  background: #fee2e2;
+  color: #dc2626;
 }
 
 .kanban-board-dropdown-footer {
@@ -2111,7 +2159,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 2000;
+  z-index: 99999; /* 🆕 항상 최상위에 표시 */
   animation: overlayFadeIn 0.25s ease-out;
 }
 
