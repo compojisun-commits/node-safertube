@@ -51,28 +51,31 @@ const TRUSTED_CHANNELS = {
 
   // 안전교육
   안전교육: [
-    "UCbylW3LBcOLKL-3A6zIN32w", // 안전한tv
-    "UC6mmbwPsf3O4ANC9R2kDEeQ", // 경기도소방재난본부
     "UCZ5F_Q1jrp0sLAw3DwLjHLw", // 아이쿠tv
-    "UCzteSXznVjwESizsCcSKSWw", // 행정안전부
+    "UC6mmbwPsf3O4ANC9R2kDEeQ", // 경기도소방재난본부
+    "UCbylW3LBcOLKL-3A6zIN32w", // 안전한tv
+    "UCpHJkdmhK7ZJ1G4su8pSxeA", // 초등백과
     "UC0oWTzsS84bT3XaAhiDEw8w", // 서울소방
+    "UCdXB-xqrg37isIQwF0Z5-Dw", //케베스키즈
+    "UCLNhdQhyGlmdudmRGRdcYdQ", // 범죄예방365-법무부
     "UCj8Snyrs1y-wnBQiUmGrTjw", // 소방청tv
     "UCCW7N13hV53wZ3ufTFtkmhA", // 대한민국기상청
-    "UCpHJkdmhK7ZJ1G4su8pSxeA", // 초등백과
+    "UCx_dzPI6efSohgtOkAG43-A", // EBS키즈
   ],
 
   // 짜투리영상
   짜투리영상: [
-    "UCPlwvN0w4qFSP1FllALB92w", // 넘버블록스(한국)
+    "UC69Y0mcIX3SbDkVxSoLUUNA", // 안녕자두야
     "UC2qeJDvFWrnbHKHIpTbx6lA", // 핑크퐁
     "UCx_dzPI6efSohgtOkAG43-A", // EBS키즈
     "UCZ5F_Q1jrp0sLAw3DwLjHLw", // 아이쿠tv
     "UCs0P4GrXEumyYn-d8ASrGlA", // 네모아저씨
     "UCPuDvuUhgQffuLn8sYxIEqQ", // 신박과학
-    "UC69Y0mcIX3SbDkVxSoLUUNA", // 안녕자두야
+    "UCdXB-xqrg37isIQwF0Z5-Dw", //케베스키즈
     "UCP2WffAY2oqvy3zlsHQNatg", // 카툰버스
     "UC7F6UDq3gykPZHWRhrj_BDw", // 사물궁이잡학지식
     "UCaEApyPmXdkz3LXzFWv9FOA", //꼬꼬물퀴즈
+    "UCPlwvN0w4qFSP1FllALB92w", // 넘버블록스(한국)
     "UCwOmSshx4nypY7sE3Bbq9pA", //모둠상식
   ],
 };

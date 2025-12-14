@@ -1370,7 +1370,7 @@ exports.recommendVideos = onDocumentCreated(
       const selectedFilter =
         gradeFilters[gradeLevel] || gradeFilters["elementary-1-2"];
 
-      // Gemini로 최적의 검색어 생성
+      // Gemini로 최적의 검색어 생성 (학년 정보 포함)
       const searchKeywords = await generateSearchKeywords(
         subject,
         intention,
@@ -1380,7 +1380,8 @@ exports.recommendVideos = onDocumentCreated(
         availableTools,
         teacherInvolvement,
         duration,
-        studentLevel
+        studentLevel,
+        gradeLevel
       );
       console.log("Gemini 생성 검색어:", searchKeywords);
 
@@ -1403,23 +1404,59 @@ exports.recommendVideos = onDocumentCreated(
         };
       }
 
-      // YouTube 검색 (최대 10개, 필터 적용, 신뢰채널 필터)
-      const searchResults = await searchYouTubeVideos(
-        searchKeywords,
-        10,
-        appliedFilters,
-        subject // 과목을 전달하여 신뢰채널 필터 적용
-      );
+      // 짜투리영상, 안전교육은 신뢰채널 전용 검색
+      const isTrustedChannelOnly =
+        subject === "짜투리영상" || subject === "안전교육";
+
+      let searchResults;
+
+      if (isTrustedChannelOnly) {
+        // 신뢰채널 전용 검색 (학년별 맞춤 키워드 사용)
+        console.log(
+          `🔒 ${subject}: 신뢰채널 전용 검색 모드 (학년: ${gradeLevel})`
+        );
+        searchResults = await searchTrustedChannelVideos(
+          subject,
+          gradeLevel,
+          10,
+          appliedFilters
+        );
+      } else {
+        // 일반 YouTube 검색 (기존 로직)
+        searchResults = await searchYouTubeVideos(
+          searchKeywords,
+          10,
+          appliedFilters,
+          subject // 과목을 전달하여 신뢰채널 필터 적용
+        );
+      }
 
       if (!searchResults || searchResults.length === 0) {
-        throw new Error("관련 영상을 찾을 수 없습니다.");
+        throw new Error(
+          isTrustedChannelOnly
+            ? `${subject}에 적합한 영상을 신뢰채널에서 찾을 수 없습니다.`
+            : "관련 영상을 찾을 수 없습니다."
+        );
       }
 
       console.log(
-        `⚡ ${searchResults.length}개 영상 발견, 빠른 병렬 분석 시작...`
+        `⚡ ${searchResults.length}개 영상 발견, 실시간 스트리밍 분석 시작...`
       );
 
-      // 각 영상 분석 (전체 병렬 처리 - 간단한 분석이므로 10개 모두 동시 처리)
+      // 실시간 업데이트를 위한 recommendations 배열
+      let recommendations = [];
+      let completedCount = 0;
+      const totalCount = searchResults.length;
+
+      // 초기 상태 업데이트 (분석 시작, 총 개수 알림)
+      await db.collection("recommendationRequests").doc(docId).update({
+        status: "analyzing",
+        totalVideos: totalCount,
+        analyzedCount: 0,
+        recommendations: [],
+      });
+
+      // 각 영상 분석 (병렬 처리하되, 완료될 때마다 실시간 업데이트)
       const analysisPromises = searchResults.map((video) =>
         analyzeVideoForRecommendation(
           video.videoId,
@@ -1429,51 +1466,71 @@ exports.recommendVideos = onDocumentCreated(
           objective,
           subject
         )
-          .then((analysis) => ({
-            success: true,
-            video,
-            analysis,
-          }))
-          .catch((error) => ({
-            success: false,
-            video,
-            error: error.message,
-          }))
+          .then(async (analysis) => {
+            const filteredWarnings = filterDuplicateWarnings(
+              analysis.warnings || []
+            );
+            const recommendation = {
+              videoId: video.videoId,
+              videoUrl: video.videoUrl,
+              title: video.title,
+              duration: video.duration,
+              viewCount: video.viewCount || 0,
+              likeCount: video.likeCount || 0,
+              safetyScore: analysis.safetyScore,
+              safetyDescription: analysis.safetyDescription,
+              summary: analysis.summary || "",
+              warnings: filteredWarnings,
+              warningCount: filteredWarnings.length,
+              chapters: analysis.chapters || [],
+              flow: analysis.flow || [],
+            };
+
+            // 분석 완료된 영상을 recommendations에 추가
+            recommendations.push(recommendation);
+            completedCount++;
+
+            console.log(
+              `✓ [${completedCount}/${totalCount}] ${video.title} 분석 완료 (안전도: ${analysis.safetyScore})`
+            );
+
+            // 안전도 순으로 정렬 후 실시간 업데이트
+            const sortedRecommendations = [...recommendations].sort(
+              (a, b) => b.safetyScore - a.safetyScore
+            );
+
+            await db
+              .collection("recommendationRequests")
+              .doc(docId)
+              .update({
+                analyzedCount: completedCount,
+                recommendations: sortedRecommendations,
+              });
+
+            return { success: true, video, analysis };
+          })
+          .catch((error) => {
+            completedCount++;
+            console.error(`✗ [${completedCount}/${totalCount}] ${video.title} 분석 실패: ${error.message}`);
+
+            // 실패해도 진행 상황 업데이트
+            db.collection("recommendationRequests")
+              .doc(docId)
+              .update({
+                analyzedCount: completedCount,
+              });
+
+            return { success: false, video, error: error.message };
+          })
       );
 
-      console.log(`⏱️ ${searchResults.length}개 영상 동시 분석 중...`);
+      console.log(`⏱️ ${searchResults.length}개 영상 동시 분석 중 (실시간 업데이트)...`);
       const analysisResults = await Promise.all(analysisPromises);
 
       const successCount = analysisResults.filter((r) => r.success).length;
       console.log(
         `✅ 분석 완료: ${successCount}/${searchResults.length}개 성공`
       );
-
-      // 성공한 분석 결과만 추출
-      const recommendations = analysisResults
-        .filter((result) => result.success)
-        .map((result) => {
-          const { video, analysis } = result;
-          console.log(
-            `✓ ${video.title} 분석 완료 (안전도: ${analysis.safetyScore})`
-          );
-          const filteredWarnings = filterDuplicateWarnings(
-            analysis.warnings || []
-          );
-          return {
-            videoId: video.videoId,
-            videoUrl: video.videoUrl,
-            title: video.title,
-            duration: video.duration,
-            safetyScore: analysis.safetyScore,
-            safetyDescription: analysis.safetyDescription,
-            summary: analysis.summary || "",
-            warnings: filteredWarnings,
-            warningCount: filteredWarnings.length,
-            chapters: analysis.chapters || [],
-            flow: analysis.flow || [],
-          };
-        });
 
       // 실패한 분석 로그
       const failedAnalyses = analysisResults.filter(
@@ -1486,10 +1543,10 @@ exports.recommendVideos = onDocumentCreated(
         });
       }
 
-      // 안전도 점수 순으로 정렬 (높은 순)
+      // 최종 정렬 (안전도 점수 순)
       recommendations.sort((a, b) => b.safetyScore - a.safetyScore);
 
-      // 결과 저장
+      // 최종 결과 저장
       await db.collection("recommendationRequests").doc(docId).update({
         status: "completed",
         recommendations,
@@ -1540,7 +1597,8 @@ async function generateSearchKeywords(
   availableTools = null,
   teacherInvolvement = null,
   duration = null,
-  studentLevel = null
+  studentLevel = null,
+  gradeLevel = null
 ) {
   try {
     let prompt;
@@ -1597,18 +1655,64 @@ async function generateSearchKeywords(
 
 검색어만 출력:`;
     } else {
+      // 학년별 검색어 스타일 가이드 생성
+      const getGradeSearchGuide = (grade) => {
+        if (!grade) return { level: "초등학생", style: "기본 개념 중심", suffix: "" };
+
+        if (grade.includes("1학년") || grade.includes("2학년")) {
+          return {
+            level: "초등 저학년(1-2학년)",
+            style: "쉬운 표현, 기초 개념, 따라하기 쉬운 활동",
+            suffix: "쉬운, 기초, 따라하기",
+            avoid: "복잡한 용어, 전문적인 기법"
+          };
+        } else if (grade.includes("3학년") || grade.includes("4학년")) {
+          return {
+            level: "초등 중학년(3-4학년)",
+            style: "개념 이해 중심, 단계별 설명, 활동 위주",
+            suffix: "알기, 배우기, 익히기",
+            avoid: "너무 어려운 전문 용어"
+          };
+        } else if (grade.includes("5학년") || grade.includes("6학년")) {
+          return {
+            level: "초등 고학년(5-6학년)",
+            style: "개념 + 활용, 창의적 응용, 심화 내용 가능",
+            suffix: "활용하기, 응용하기, 개념알기",
+            avoid: "유치하거나 너무 쉬운 내용"
+          };
+        } else if (grade.includes("중학")) {
+          return {
+            level: "중학생",
+            style: "심화 개념, 전문적 기법, 프로젝트 기반",
+            suffix: "기법, 원리, 심화",
+            avoid: "초등학교 수준의 단순한 활동"
+          };
+        } else if (grade.includes("고등")) {
+          return {
+            level: "고등학생",
+            style: "전문적 내용, 고급 기법, 이론 연계",
+            suffix: "이론, 심화, 전문",
+            avoid: "초중등 수준의 기초 내용"
+          };
+        }
+        return { level: "초등학생", style: "기본 개념 중심", suffix: "", avoid: "" };
+      };
+
+      const gradeGuide = getGradeSearchGuide(gradeLevel);
+
       // 일반 수업 영상 검색 프롬프트
       // "미정" - 재미있고 의미있는 영상 추천
       if (subject === "미정") {
-        prompt = `초등학생/중학생에게 적합한 재미있고 교육적인 YouTube 영상을 찾기 위한 검색어 3-5개 생성 (쉼표 구분, 한국어):
+        prompt = `${gradeGuide.level}에게 적합한 재미있고 교육적인 YouTube 영상을 찾기 위한 검색어 3-5개 생성 (쉼표 구분, 한국어):
 
+**대상:** ${gradeGuide.level}
 **목표:** 학생들이 즐겁게 보면서 배울 수 있는 영상
 ${intention && intention.trim() ? `**수업 의도:** ${intention}` : ""}
 
 **조건:**
 - 재미있고 흥미로운 내용
 - 교육적 가치가 있는 내용
-- 학생 발달 단계에 적합
+- ${gradeGuide.level} 발달 단계에 적합
 - 긍정적인 메시지 전달
 - 창의성, 사고력, 감성 발달에 도움
 
@@ -1622,33 +1726,51 @@ ${intention && intention.trim() ? `**수업 의도:** ${intention}` : ""}
 검색어만 출력:`;
       } else if (intention && intention.trim()) {
         // 수업 의도가 있으면 과목과 연계하여 구체적인 검색어 생성
-        prompt = `${subject} 수업을 위한 YouTube 검색어 3-5개 생성 (쉼표 구분, 한국어):
+        prompt = `${gradeGuide.level} ${subject} 수업을 위한 YouTube 검색어 3-5개 생성 (쉼표 구분, 한국어):
 
+**대상 학년:** ${gradeLevel || "초등학생"}
 **과목:** ${subject}
 **수업 의도 및 준비물:** ${intention}
 ${objective ? `**목표:** ${objective}` : ""}
 
+**핵심: 학년 수준에 맞는 검색어 생성**
+- 대상: ${gradeGuide.level}
+- 적합한 스타일: ${gradeGuide.style}
+- 권장 검색어 패턴: "핵심키워드 + ${gradeGuide.suffix || "배우기, 알기, 활용"}"
+${gradeGuide.avoid ? `- 피해야 할 것: ${gradeGuide.avoid}` : ""}
+
 **검색어 생성 규칙:**
-1. 과목(${subject})과 수업 의도를 반드시 연계하여 검색어를 만드세요
-2. 수업 의도에서 핵심 키워드를 추출하고, 그것을 ${subject} 활동으로 연결하세요
-3. 구체적이고 실행 가능한 활동 중심으로 검색어를 생성하세요
+1. 수업 의도에서 핵심 키워드만 추출하세요 (예: "색상환 이용한 디자인하기" → "색상환")
+2. 핵심 키워드에 학년 수준에 맞는 접미어를 붙이세요
+3. 절대 수업 의도 전체를 그대로 검색어로 사용하지 마세요
+4. YouTube에서 실제로 검색되는 짧고 명확한 검색어를 만드세요
 
-**예시:**
-- 수업 의도: "색상환" → 검색어: "색상환 그리기", "색상환 활용 그림", "색상환 만들기"
-- 수업 의도: "크리스마스 트리 만들기" → 검색어: "크리스마스 트리 만들기", "크리스마스 트리 미술", "트리 꾸미기"
-- 수업 의도: "줄넘기" → 검색어: "줄넘기 기초", "줄넘기 연속뛰기", "줄넘기 수업"
+**좋은 검색어 예시 (${gradeGuide.level} 기준):**
+- 수업 의도: "색상환 이용한 디자인하기"
+  → 좋음: "색상환의 개념알기", "색상환 활용하기", "색상환 그리기"
+  → 나쁨: "색상환 이용한 디자인하기" (너무 구체적, 검색 결과 없음)
+- 수업 의도: "크리스마스 트리 만들기"
+  → 좋음: "크리스마스 트리 만들기", "트리 꾸미기 미술"
+- 수업 의도: "줄넘기 수업"
+  → 좋음: "줄넘기 기초", "줄넘기 배우기"
 
-검색어만 출력 (쉼표로 구분):`;
+검색어만 출력 (쉼표로 구분, 각 검색어는 2-5단어):`;
       } else {
         // 수업 의도가 없을 때는 과목에 맞는 일반적인 검색어
-        prompt = `${subject} 수업을 위한 YouTube 검색어 3-5개 생성 (쉼표 구분, 한국어):
+        prompt = `${gradeGuide.level} ${subject} 수업을 위한 YouTube 검색어 3-5개 생성 (쉼표 구분, 한국어):
 
+**대상 학년:** ${gradeLevel || "초등학생"}
 **과목:** ${subject}
 ${objective ? `**목표:** ${objective}` : ""}
 
+**학년 수준 고려사항:**
+- 대상: ${gradeGuide.level}
+- 적합한 스타일: ${gradeGuide.style}
+${gradeGuide.avoid ? `- 피해야 할 것: ${gradeGuide.avoid}` : ""}
+
 **조건:**
 - ${subject} 수업에 활용할 수 있는 영상
-- 초등학생/중학생이 보기 적합한 내용
+- ${gradeGuide.level}이 보기 적합한 내용
 - 교육적이고 실용적인 내용
 
 검색어만 출력 (쉼표로 구분):`;
@@ -1922,6 +2044,269 @@ function parseDuration(duration) {
   const seconds = parseInt(match[3] || 0);
 
   return hours * 3600 + minutes * 60 + seconds;
+}
+
+// 신뢰채널 전용 검색 (짜투리영상, 안전교육용)
+async function searchTrustedChannelVideos(
+  subject,
+  gradeLevel,
+  maxResults = 10,
+  filters = {},
+  _retryCount = 0
+) {
+  try {
+    const youtubeApiKey = getCurrentYouTubeApiKey();
+    const trustedChannelIds = getTrustedChannelIds(subject);
+
+    if (trustedChannelIds.length === 0) {
+      console.log(`⚠️ ${subject}에 대한 신뢰채널이 없습니다.`);
+      return [];
+    }
+
+    console.log(
+      `🔒 신뢰채널 전용 검색: ${subject} (${trustedChannelIds.length}개 채널)`
+    );
+
+    // 학년별 검색 키워드 설정
+    const gradeKeywords = getGradeKeywordsForSubject(subject, gradeLevel);
+    console.log(`📚 학년별 검색어: ${gradeKeywords.join(", ")}`);
+
+    let allVideos = [];
+    const seenVideoIds = new Set();
+
+    // 필터 파라미터 생성
+    let filterParams = "";
+    if (filters.preferredMaxDuration) {
+      const preferredMinutes = filters.preferredMaxDuration / 60;
+      if (preferredMinutes <= 4) {
+        filterParams += "&videoDuration=short";
+      } else if (preferredMinutes <= 20) {
+        filterParams += "&videoDuration=medium";
+      } else {
+        filterParams += "&videoDuration=long";
+      }
+    }
+
+    // 각 신뢰채널에서 영상 검색
+    for (const channelId of trustedChannelIds) {
+      // 채널별로 학년 맞춤 키워드로 검색
+      for (const keyword of gradeKeywords) {
+        const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&q=${encodeURIComponent(
+          keyword
+        )}&type=video&maxResults=5&order=viewCount&safeSearch=strict${filterParams}&key=${youtubeApiKey}`;
+
+        try {
+          const searchResponse = await fetch(searchUrl);
+
+          if (!searchResponse.ok) {
+            if (
+              searchResponse.status === 403 &&
+              _retryCount < YOUTUBE_API_KEYS.length - 1
+            ) {
+              console.warn(`⚠️ YouTube API 키 할당량 초과. 다음 키로 전환...`);
+              switchToNextYouTubeKey();
+              return searchTrustedChannelVideos(
+                subject,
+                gradeLevel,
+                maxResults,
+                filters,
+                _retryCount + 1
+              );
+            }
+            continue;
+          }
+
+          const searchData = await searchResponse.json();
+
+          if (searchData.items && searchData.items.length > 0) {
+            searchData.items.forEach((item) => {
+              if (!seenVideoIds.has(item.id.videoId)) {
+                seenVideoIds.add(item.id.videoId);
+                allVideos.push(item);
+              }
+            });
+          }
+        } catch (err) {
+          console.error(`채널 ${channelId} 검색 오류:`, err.message);
+        }
+      }
+
+      // 충분한 영상 확보시 중단
+      if (allVideos.length >= maxResults * 2) {
+        break;
+      }
+    }
+
+    if (allVideos.length === 0) {
+      console.log("신뢰채널에서 영상을 찾지 못했습니다.");
+      return [];
+    }
+
+    // 비디오 상세 정보 가져오기
+    const videoIds = allVideos.map((item) => item.id.videoId);
+    const detailsUrl = `https://www.googleapis.com/youtube/v3/videos?part=contentDetails,snippet,statistics&id=${videoIds.join(
+      ","
+    )}&key=${youtubeApiKey}`;
+    const detailsResponse = await fetch(detailsUrl);
+
+    if (!detailsResponse.ok) {
+      if (
+        detailsResponse.status === 403 &&
+        _retryCount < YOUTUBE_API_KEYS.length - 1
+      ) {
+        switchToNextYouTubeKey();
+        return searchTrustedChannelVideos(
+          subject,
+          gradeLevel,
+          maxResults,
+          filters,
+          _retryCount + 1
+        );
+      }
+      throw new Error(`YouTube details failed: ${detailsResponse.status}`);
+    }
+
+    const detailsData = await detailsResponse.json();
+
+    // 결과 파싱
+    let videos = detailsData.items.map((item) => {
+      const duration = parseDuration(item.contentDetails.duration);
+      return {
+        videoId: item.id,
+        videoUrl: `https://www.youtube.com/watch?v=${item.id}`,
+        title: item.snippet.title,
+        channelId: item.snippet.channelId,
+        channelTitle: item.snippet.channelTitle,
+        duration,
+        viewCount: parseInt(item.statistics?.viewCount || "0"),
+        likeCount: parseInt(item.statistics?.likeCount || "0"),
+      };
+    });
+
+    // 선호 길이 필터 적용
+    if (filters.preferredMaxDuration) {
+      const minPreferred = filters.preferredMaxDuration * 0.5;
+      const maxPreferred = filters.preferredMaxDuration;
+
+      const idealVideos = videos.filter(
+        (v) => v.duration >= minPreferred && v.duration <= maxPreferred
+      );
+      const shorterVideos = videos.filter((v) => v.duration < minPreferred);
+      const longerVideos = videos.filter((v) => v.duration > maxPreferred);
+
+      videos = [...idealVideos, ...shorterVideos, ...longerVideos];
+    }
+
+    // 조회수 순 정렬 후 상위 선택
+    videos.sort((a, b) => b.viewCount - a.viewCount);
+    videos = videos.slice(0, maxResults);
+
+    console.log(
+      `✅ 신뢰채널 검색 완료: ${videos.length}개 영상 (${subject})`
+    );
+    return videos;
+  } catch (error) {
+    console.error("신뢰채널 검색 실패:", error.message);
+    throw error;
+  }
+}
+
+// 학년별 과목 맞춤 검색 키워드 생성
+function getGradeKeywordsForSubject(subject, gradeLevel) {
+  // 학년 파싱
+  const isLowerElementary =
+    gradeLevel?.includes("1학년") || gradeLevel?.includes("2학년");
+  const isMiddleElementary =
+    gradeLevel?.includes("3학년") || gradeLevel?.includes("4학년");
+  const isUpperElementary =
+    gradeLevel?.includes("5학년") || gradeLevel?.includes("6학년");
+  const isMiddleSchool = gradeLevel?.includes("중학");
+  const isHighSchool = gradeLevel?.includes("고등");
+
+  if (subject === "짜투리영상") {
+    if (isLowerElementary) {
+      return [
+        "어린이 애니메이션",
+        "동요",
+        "숫자 놀이",
+        "색깔 배우기",
+        "쉬운 과학",
+        "재미있는 이야기",
+      ];
+    } else if (isMiddleElementary) {
+      return [
+        "과학 실험",
+        "재미있는 상식",
+        "퀴즈",
+        "신기한 이야기",
+        "동물",
+        "우주",
+      ];
+    } else if (isUpperElementary) {
+      return [
+        "과학 다큐",
+        "역사 이야기",
+        "신기한 과학",
+        "잡학 상식",
+        "세계 여행",
+        "미스터리",
+      ];
+    } else if (isMiddleSchool || isHighSchool) {
+      return [
+        "과학 다큐멘터리",
+        "역사",
+        "사회 이슈",
+        "심리학",
+        "우주",
+        "기술",
+      ];
+    }
+    // 기본값
+    return ["재미있는 영상", "교육 영상", "어린이 영상"];
+  }
+
+  if (subject === "안전교육") {
+    if (isLowerElementary) {
+      return [
+        "어린이 안전",
+        "교통안전 동요",
+        "안전 애니메이션",
+        "위험 조심",
+        "안전 수칙",
+      ];
+    } else if (isMiddleElementary) {
+      return [
+        "안전 교육",
+        "화재 대피",
+        "교통 안전",
+        "지진 대피",
+        "학교 안전",
+        "생활 안전",
+      ];
+    } else if (isUpperElementary) {
+      return [
+        "재난 대비",
+        "응급 처치",
+        "안전 수칙",
+        "사이버 안전",
+        "소방 안전",
+        "자연재해",
+      ];
+    } else if (isMiddleSchool || isHighSchool) {
+      return [
+        "재난 안전",
+        "응급 처치법",
+        "심폐소생술",
+        "사이버 보안",
+        "안전 교육",
+        "위기 대응",
+      ];
+    }
+    // 기본값
+    return ["안전 교육", "안전 수칙", "재난 대비"];
+  }
+
+  return ["교육 영상"];
 }
 
 // 빠른 영상 분석 (추천용 - 간단한 점수만)

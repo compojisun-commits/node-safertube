@@ -11,7 +11,7 @@ export default function VideoRecommendation({ onBack }) {
   const [requestId, setRequestId] = useState(null);
 
   // 폼 상태
-  const [gradeLevel, setGradeLevel] = useState("초등 6학년");
+  const [gradeLevel, setGradeLevel] = useState("초등 고학년");
   const [subject, setSubject] = useState("미술");
   const [intention, setIntention] = useState(""); // 수업 의도
   const [preferredDuration, setPreferredDuration] = useState(""); // 선호 영상 길이
@@ -165,7 +165,7 @@ export default function VideoRecommendation({ onBack }) {
 
   const handleReset = () => {
     setRequestId(null);
-    setGradeLevel("초등 6학년");
+    setGradeLevel("초등 고학년");
     setSubject("미술");
     setIntention("");
     setPreferredDuration("");
@@ -220,68 +220,38 @@ export default function VideoRecommendation({ onBack }) {
           </label>
           <div className="flex flex-wrap gap-1.5 sm:gap-2">
             {[
-              // { value: "5세", label: "5세" }, // 나중에 사용 고민
-              // { value: "6세", label: "6세" }, // 나중에 사용 고민
-              // { value: "7세", label: "7세" }, // 나중에 사용 고민
               {
-                value: "초등 1학년",
+                value: "초등 저학년",
                 label: (
                   <span>
                     초등
                     <br />
-                    1학년
+                    저학년
                   </span>
                 ),
+                sub: "1-2학년",
               },
               {
-                value: "초등 2학년",
+                value: "초등 중학년",
                 label: (
                   <span>
                     초등
                     <br />
-                    2학년
+                    중학년
                   </span>
                 ),
+                sub: "3-4학년",
               },
               {
-                value: "초등 3학년",
+                value: "초등 고학년",
                 label: (
                   <span>
                     초등
                     <br />
-                    3학년
+                    고학년
                   </span>
                 ),
-              },
-              {
-                value: "초등 4학년",
-                label: (
-                  <span>
-                    초등
-                    <br />
-                    4학년
-                  </span>
-                ),
-              },
-              {
-                value: "초등 5학년",
-                label: (
-                  <span>
-                    초등
-                    <br />
-                    5학년
-                  </span>
-                ),
-              },
-              {
-                value: "초등 6학년",
-                label: (
-                  <span>
-                    초등
-                    <br />
-                    6학년
-                  </span>
-                ),
+                sub: "5-6학년",
               },
               {
                 value: "중학생",
@@ -296,13 +266,20 @@ export default function VideoRecommendation({ onBack }) {
                 key={grade.value}
                 type="button"
                 onClick={() => setGradeLevel(grade.value)}
-                className={`p-2 sm:p-4 rounded-lg sm:rounded-xl border-2 text-xs sm:text-sm font-medium transition-all flex flex-col items-center justify-center min-w-[60px] sm:min-w-[70px] min-h-[50px] sm:min-h-[60px] ${
+                className={`p-2 sm:p-4 rounded-lg sm:rounded-xl border-2 text-xs sm:text-sm font-medium transition-all flex flex-col items-center justify-center min-w-[70px] sm:min-w-[80px] min-h-[55px] sm:min-h-[65px] ${
                   gradeLevel === grade.value
                     ? "bg-blue-600 text-white border-blue-600 shadow-lg"
                     : "bg-white text-gray-700 border-gray-300 hover:bg-blue-50 hover:border-blue-400"
                 }`}
               >
                 <div className="leading-tight text-center">{grade.label}</div>
+                {grade.sub && (
+                  <div className={`text-[10px] sm:text-xs mt-0.5 ${
+                    gradeLevel === grade.value ? "text-blue-200" : "text-gray-400"
+                  }`}>
+                    {grade.sub}
+                  </div>
+                )}
               </button>
             ))}
           </div>
