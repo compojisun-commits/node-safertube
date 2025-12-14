@@ -603,6 +603,9 @@ export default function JjimList({ onBack }) {
   const [viewMode, setViewMode] = useState(() => {
     try {
       const saved = localStorage.getItem('default_jjim_view');
+      // 설정에서 'kanban' → 'board', 'folder' → 'list'로 매핑
+      if (saved === 'kanban') return 'board';
+      if (saved === 'folder') return 'list';
       if (saved === 'grid' || saved === 'board' || saved === 'list') return saved;
       return 'list';
     } catch {

@@ -837,17 +837,114 @@ ${allWarnings.length > 50 ? `(외 ${allWarnings.length - 50}건 더 있음 - 유
 }
 
 /**
- * JSON 파싱 헬퍼 함수 - 최소한의 파싱만 수행
+ * 잘린 JSON 복구 시도
+ */
+function repairTruncatedJSON(text) {
+  if (!text || text.trim() === '') return null;
+  
+  let json = text.trim();
+  
+  // 이미 완전한 JSON인지 확인
+  try {
+    return JSON.parse(json);
+  } catch (e) {
+    // 복구 시도
+  }
+
+  // 잘린 문자열 복구: 마지막 열린 따옴표 닫기
+  const lastQuote = json.lastIndexOf('"');
+  if (lastQuote > 0) {
+    const beforeQuote = json.substring(0, lastQuote);
+    const quoteCount = (beforeQuote.match(/(?<!\\)"/g) || []).length;
+    if (quoteCount % 2 === 0) {
+      // 열린 따옴표가 있으면 닫기
+      json = json + '"';
+    }
+  }
+
+  // 열린 괄호들 닫기
+  const openBraces = (json.match(/{/g) || []).length;
+  const closeBraces = (json.match(/}/g) || []).length;
+  const openBrackets = (json.match(/\[/g) || []).length;
+  const closeBrackets = (json.match(/\]/g) || []).length;
+
+  // 마지막 콤마 제거 (잘린 경우 자주 발생)
+  json = json.replace(/,\s*$/, '');
+  json = json.replace(/,\s*}/, '}');
+  json = json.replace(/,\s*\]/, ']');
+
+  // 누락된 닫는 괄호 추가
+  for (let i = 0; i < openBrackets - closeBrackets; i++) {
+    json += ']';
+  }
+  for (let i = 0; i < openBraces - closeBraces; i++) {
+    json += '}';
+  }
+
+  try {
+    return JSON.parse(json);
+  } catch (e) {
+    // 최후의 수단: warnings와 flow 배열만 추출
+    try {
+      const warningsMatch = json.match(/"warnings"\s*:\s*\[([\s\S]*?)(?:\]|$)/);
+      const flowMatch = json.match(/"flow"\s*:\s*\[([\s\S]*?)(?:\]|$)/);
+      
+      const result = { warnings: [], flow: [] };
+      
+      if (warningsMatch) {
+        try {
+          // 개별 경고 객체 추출
+          const warningsStr = '[' + warningsMatch[1].replace(/,\s*$/, '') + ']';
+          // 잘린 객체 제거
+          const cleanWarnings = warningsStr.replace(/,?\s*{[^}]*$/, '');
+          result.warnings = JSON.parse(cleanWarnings.endsWith(']') ? cleanWarnings : cleanWarnings + ']') || [];
+        } catch (e2) {
+          console.log('경고 추출 실패:', e2.message);
+        }
+      }
+      
+      if (flowMatch) {
+        try {
+          const flowStr = '[' + flowMatch[1].replace(/,\s*$/, '') + ']';
+          const cleanFlow = flowStr.replace(/,?\s*{[^}]*$/, '');
+          result.flow = JSON.parse(cleanFlow.endsWith(']') ? cleanFlow : cleanFlow + ']') || [];
+        } catch (e2) {
+          console.log('플로우 추출 실패:', e2.message);
+        }
+      }
+      
+      if (result.warnings.length > 0 || result.flow.length > 0) {
+        console.log('🔧 잘린 JSON 부분 복구 성공:', { warnings: result.warnings.length, flow: result.flow.length });
+        return result;
+      }
+    } catch (e3) {
+      console.log('부분 추출도 실패:', e3.message);
+    }
+    
+    return null;
+  }
+}
+
+/**
+ * JSON 파싱 헬퍼 함수 - 잘린 JSON 복구 포함
  */
 function parseJSON(text) {
   try {
     // JSON 모드에서는 순수 JSON만 반환되므로 직접 파싱
     return JSON.parse(text);
   } catch (error) {
-    console.warn("⚠️ JSON 파싱 실패 - 빈 결과 반환:", error.message);
+    console.warn("⚠️ JSON 파싱 실패, 복구 시도 중:", error.message);
     console.log("문제가 된 텍스트 앞부분:", text.substring(0, 200));
 
+    // 잘린 JSON 복구 시도
+    const repaired = repairTruncatedJSON(text);
+    if (repaired) {
+      console.log("✅ JSON 복구 성공");
+      return repaired;
+    }
+
     // 파싱 실패 시 안전한 기본값 반환 (크래시 방지)
+    console.warn("❌ JSON 복구 실패 - 기본값 반환");
     return {
       warnings: [],
       flow: [],

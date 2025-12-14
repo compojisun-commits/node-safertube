@@ -171,23 +171,42 @@
   overflow: hidden;
 }
 
-/* --- 자료 서랍 --- */
+/* ============================================================
+   🚪 서랍 & 레이아웃 (Push & Squeeze Mode)
+   서랍이 열리면 메인 보드가 좁아지며 자리를 비켜줍니다.
+   ============================================================ */
+
+/* 서랍 영역 */
 .kanban-drawer {
-  width: 0;
-  min-width: 0;
-  background: white;
-  border-right: 1px solid var(--gray-200, #e5e7eb);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
-  flex-shrink: 0;
+  position: relative !important;
+  height: 100% !important;
+  width: 320px !important;
+  flex-shrink: 0 !important;
+  background: linear-gradient(180deg, #ffffff 0%, #fafbfc 100%) !important;
+  border-left: 1px solid #e2e8f0 !important;
+  z-index: 50 !important;
+  transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  box-shadow: 4px 0 20px rgba(0,0,0,0.06) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
 }
 
+/* 서랍 닫힘: 왼쪽 화면 밖으로 숨김 */
+.kanban-drawer:not(.open) {
+  margin-left: -320px !important;
+  visibility: hidden !important;
+}
+
+/* 서랍 열림: 제자리로 옴 */
 .kanban-drawer.open {
-  width: 320px;
-  min-width: 320px;
+  margin-left: 0 !important;
+  visibility: visible !important;
+  overflow-y: auto !important;
+}
+
+.kanban-drawer.open .kanban-drawer-content {
+  overflow-y: auto;
 }
 
 .kanban-drawer-header {
@@ -577,6 +596,7 @@
   line-height: 1.4;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   margin-bottom: 10px;
@@ -678,22 +698,40 @@
 .kanban-global-container {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 120px);  /* 전체 화면 높이 활용 */
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  height: calc(100vh - 120px);
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 50%, #e8ecf2 100%);
   padding: 0;
-  margin: -32px -24px;  /* 부모 패딩 상쇄 */
-  width: calc(100% + 48px);  /* 전체 폭 사용 */
+  margin: -32px -24px;
+  width: calc(100% + 48px);
+  position: relative;
+  overflow: visible;
 }
 
-/* --- 글로벌 헤더 --- */
+/* 배경 그라디언트 오버레이 */
+.kanban-global-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 200px;
+  background: linear-gradient(180deg, rgba(139, 92, 246, 0.03) 0%, transparent 100%);
+  pointer-events: none;
+}
+
+/* --- 글로벌 헤더 - Premium Design --- */
 .kanban-global-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 24px;
-  background: white;
-  border-bottom: 1px solid #e2e8f0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  padding: 18px 28px;
+  background: linear-gradient(180deg, #ffffff 0%, #fafbfc 100%);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03), 0 4px 12px rgba(0, 0, 0, 0.02);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  backdrop-filter: blur(12px);
 }
 
 .kanban-global-title {
@@ -764,46 +802,39 @@
   border-radius: 3px;
 }
 
-/* 🆕 컬럼 자동 너비 조절 - Notion/Trello 스타일 */
+/* 🆕 컬럼 - Premium Notion/Trello 스타일 */
 .kanban-global-column {
   flex: 1 1 0;
-  min-width: 220px;
+  min-width: 280px;
   max-width: 100%;
-  background: white;
-  border-radius: var(--radius-lg, 16px);
-  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.1));
+  max-height: 100%;
+  background: linear-gradient(180deg, #ffffff 0%, #fafbfc 100%);
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.03);
   display: flex;
   flex-direction: column;
-  /* ✅ 드래그 충돌 방지: transform 제외, box-shadow/opacity만 transition */
-  transition: box-shadow 200ms ease, opacity 200ms ease;
-  animation: columnAppear 0.25s ease-out;
+  transition: box-shadow 200ms ease, 
+              border-color 200ms ease;
   position: relative;
+  overflow: hidden;
 }
 
-@keyframes columnAppear {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
 
 .kanban-global-column:hover {
-  box-shadow: var(--shadow-md, 0 4px 6px rgba(0, 0, 0, 0.1));
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 8px 24px rgba(0, 0, 0, 0.06);
+  border-color: rgba(139, 92, 246, 0.2);
 }
 
-/* 🆕 컬럼 컨테이너에 레이아웃 애니메이션 */
+/* 🆕 컬럼 컨테이너 - 스크롤 적용 */
 .kanban-global-columns {
   display: flex;
   gap: 16px;
   flex: 1;
   overflow-x: auto;
+  overflow-y: auto;
   padding: 20px;
-  /* 섹션 순서 변경 시 부드러운 전환 */
-  transition: all 200ms ease;
+  min-height: 0;
 }
 
 /* 5개 이하일 때 스크롤 없이 화면에 맞춤 */
@@ -817,21 +848,41 @@
   min-width: 260px;
 }
 
-/* 🆕 카드 드롭 타겟 (영상 드래그 시) */
+/* 🆕 카드 드롭 타겟 - Premium 스타일 */
 .kanban-global-column.drop-target {
-  box-shadow: 0 0 0 2px var(--primary-400, #a78bfa), var(--shadow-md);
+  background: linear-gradient(180deg, rgba(139, 92, 246, 0.04) 0%, rgba(139, 92, 246, 0.08) 100%);
+  border-color: #a78bfa;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15), 
+              0 8px 24px rgba(139, 92, 246, 0.12);
+  transform: scale(1.01);
 }
 
-/* 🆕 섹션 드래그 스타일 - Notion/Trello 스타일 */
+.kanban-global-column.drop-target::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 0%, rgba(139, 92, 246, 0.05) 100%);
+  pointer-events: none;
+  border-radius: 16px;
+  animation: dropPulse 1s ease-in-out infinite;
+}
+
+@keyframes dropPulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+/* 🆕 섹션 드래그 스타일 - Premium */
 .kanban-global-column.column-dragging {
-  opacity: 0.6;
-  transform: scale(0.98);
-  box-shadow: var(--shadow-2xl, 0 25px 50px rgba(0, 0, 0, 0.25));
+  opacity: 0.85;
+  transform: scale(0.98) rotate(1deg);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2), 
+              0 0 0 2px rgba(139, 92, 246, 0.3);
   z-index: 1000;
-  /* ✅ pointer-events: none 제거 - 드롭 타겟 감지 허용 */
+  cursor: grabbing;
 }
 
-/* 섹션 드롭 타겟 - 왼쪽에만 보라색 바 표시 */
+/* 섹션 드롭 타겟 - 보라색 인디케이터 */
 .kanban-global-column.column-drop-target {
   position: relative;
 }
@@ -839,19 +890,20 @@
 .kanban-global-column.column-drop-target::before {
   content: '';
   position: absolute;
-  left: -6px;
-  top: 0;
-  bottom: 0;
+  left: -10px;
+  top: 8px;
+  bottom: 8px;
   width: 4px;
-  background: var(--primary-500, #8b5cf6);
+  background: linear-gradient(180deg, #8b5cf6 0%, #7c3aed 100%);
   border-radius: 4px;
-  animation: dropIndicator 0.3s ease-out forwards;
+  box-shadow: 0 0 12px rgba(139, 92, 246, 0.5);
+  animation: dropIndicator 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 
 @keyframes dropIndicator {
   from { 
     opacity: 0; 
-    transform: scaleY(0.5);
+    transform: scaleY(0.3);
   }
   to { 
     opacity: 1; 
@@ -868,24 +920,26 @@
   display: none;
 }
 
-/* 헤더 드래그 커서 & 인터랙션 */
+/* 헤더 - Premium 인터랙션 */
 .kanban-column-header-v2 {
   cursor: grab;
   position: relative;
   user-select: none;
-  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 12px;
+  padding: 16px 14px;
+  backdrop-filter: blur(8px);
 }
 
 .kanban-column-header-v2:hover {
-  filter: brightness(0.97);
+  filter: brightness(0.98);
 }
 
 .kanban-column-header-v2:active {
   cursor: grabbing;
+  transform: scale(0.99);
 }
 
 /* 🆕 Notion 스타일: 더보기 메뉴 래퍼 (호버 시만 표시) */
@@ -1087,31 +1141,166 @@
   background: rgba(255, 255, 255, 0.5);
 }
 
-/* 🆕 컴팩트 섹션 추가 버튼 (항상 표시) */
+/* 🆕 컴팩트 섹션 추가 버튼 - Premium */
 .kanban-add-column-btn-compact {
-  width: 48px;
+  width: 56px;
   height: 100%;
   min-height: 200px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.5);
-  border: 2px dashed #e2e8f0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0.6) 100%);
+  border: 2px dashed rgba(139, 92, 246, 0.2);
   border-radius: 16px;
-  color: #94a3b8;
+  color: #a78bfa;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(4px);
 }
 
 .kanban-add-column-btn-compact:hover {
-  background: #f5f3ff;
-  border-color: #c4b5fd;
+  background: linear-gradient(180deg, rgba(139, 92, 246, 0.08) 0%, rgba(139, 92, 246, 0.12) 100%);
+  border-color: #8b5cf6;
   color: #7c3aed;
+  transform: scale(1.03);
+  box-shadow: 0 4px 16px rgba(139, 92, 246, 0.15);
+}
+
+.kanban-add-column-btn-compact:active {
+  transform: scale(0.98);
 }
 
 .kanban-add-column-btn-compact svg {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
+  transition: transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.kanban-add-column-btn-compact:hover svg {
+  transform: rotate(90deg);
+}
+
+/* ======================================== */
+/* 🆕 컬럼 액션 바 (전체선택 + 뷰 토글) */
+/* ======================================== */
+.kanban-column-action-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+  border-radius: 0 0 16px 16px;
+  margin-top: auto;
+}
+
+.kanban-action-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.kanban-action-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 전체 선택 체크박스 */
+.kanban-select-all-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 8px;
+  transition: all 200ms ease;
+}
+
+.kanban-select-all-checkbox:hover {
+  background: rgba(139, 92, 246, 0.08);
+}
+
+.kanban-select-all-checkbox input {
+  display: none;
+}
+
+.kanban-select-all-checkbox .kanban-checkbox-custom {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border: 2px solid #d1d5db;
+  border-radius: 4px;
+  transition: all 150ms ease;
+}
+
+.kanban-select-all-checkbox input:checked + .kanban-checkbox-custom {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  border-color: #7c3aed;
+}
+
+.kanban-select-all-checkbox input:checked + .kanban-checkbox-custom::after {
+  content: '✓';
+  color: white;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.kanban-select-all-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.kanban-selected-count {
+  font-size: 11px;
+  font-weight: 700;
+  color: #7c3aed;
+  background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+  padding: 4px 10px;
+  border-radius: 12px;
+}
+
+/* 뷰 토글 버튼 */
+.kanban-view-toggle {
+  display: flex;
+  align-items: center;
+  background: white;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.kanban-view-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 28px;
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.kanban-view-toggle-btn:hover {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.kanban-view-toggle-btn.active {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  color: white;
+}
+
+.kanban-view-toggle-btn svg {
+  width: 14px;
+  height: 14px;
 }
 
 /* 카드 리스트 v2 */
@@ -1122,35 +1311,46 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  min-height: 0;
 }
 
 .kanban-empty-column {
   flex: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
   color: #94a3b8;
   font-size: 13px;
   line-height: 1.6;
-  padding: 40px 20px;
-  border: 2px dashed #e2e8f0;
+  padding: 48px 24px;
+  background: linear-gradient(180deg, rgba(139, 92, 246, 0.02) 0%, rgba(139, 92, 246, 0.04) 100%);
+  border: 2px dashed rgba(139, 92, 246, 0.2);
   border-radius: 12px;
   margin-bottom: 12px;
+  transition: all 250ms ease;
 }
 
-/* 카드 v2 - Material Design 3.0 */
+.kanban-empty-column:hover {
+  background: linear-gradient(180deg, rgba(139, 92, 246, 0.04) 0%, rgba(139, 92, 246, 0.08) 100%);
+  border-color: rgba(139, 92, 246, 0.4);
+}
+
+/* 카드 v2 - Premium Notion/Trello 스타일 */
 .kanban-card-v2 {
   background: white;
-  border-radius: var(--radius-md, 12px);
-  border: 1px solid var(--gray-200, #e2e8f0);
-  overflow: visible; /* 🆕 메뉴가 밖으로 나올 수 있게 */
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  overflow: visible;
   cursor: grab;
-  transition: all 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
-  animation: slideIn 0.3s ease-out;
-  animation-fill-mode: backwards;
+  transition: box-shadow 200ms ease, 
+              border-color 200ms ease,
+              transform 150ms ease;
   position: relative;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
+
 
 /* 🆕 Notion 스타일 카드 더보기 메뉴 */
 .kanban-card-menu-wrapper {
@@ -1297,36 +1497,38 @@
 }
 
 /* ========================================
-   🆕 Floating Action Bar
+   🆕 Floating Action Bar - Premium Design
    ======================================== */
 .kanban-floating-bar {
   position: fixed;
-  bottom: 24px;
+  bottom: 32px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 1000;
-  animation: floatUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: floatUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 @keyframes floatUp {
   from {
     opacity: 0;
-    transform: translateX(-50%) translateY(20px);
+    transform: translateX(-50%) translateY(30px) scale(0.9);
   }
   to {
     opacity: 1;
-    transform: translateX(-50%) translateY(0);
+    transform: translateX(-50%) translateY(0) scale(1);
   }
 }
 
 .kanban-floating-bar-content {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 12px 20px;
-  background: var(--gray-900, #1f2937);
-  border-radius: 16px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  gap: 20px;
+  padding: 14px 24px;
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  border-radius: 20px;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.4),
+              0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+  backdrop-filter: blur(12px);
 }
 
 .kanban-floating-count {
@@ -1379,29 +1581,54 @@
   height: 16px;
 }
 
-/* 스태거드 애니메이션 */
+/* 스태거드 애니메이션 - Smooth cascade */
 .kanban-card-v2:nth-child(1) { animation-delay: 0ms; }
-.kanban-card-v2:nth-child(2) { animation-delay: 50ms; }
-.kanban-card-v2:nth-child(3) { animation-delay: 100ms; }
-.kanban-card-v2:nth-child(4) { animation-delay: 150ms; }
-.kanban-card-v2:nth-child(5) { animation-delay: 200ms; }
+.kanban-card-v2:nth-child(2) { animation-delay: 40ms; }
+.kanban-card-v2:nth-child(3) { animation-delay: 80ms; }
+.kanban-card-v2:nth-child(4) { animation-delay: 120ms; }
+.kanban-card-v2:nth-child(5) { animation-delay: 160ms; }
+.kanban-card-v2:nth-child(6) { animation-delay: 200ms; }
 
+/* 호버 - Premium 반응 */
 .kanban-card-v2:hover {
-  border-color: var(--primary-200, #ddd6fe);
-  box-shadow: var(--shadow-lg, 0 10px 15px rgba(0, 0, 0, 0.1));
-  transform: translateY(-4px) scale(1.01);
+  border-color: rgba(139, 92, 246, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 
+              0 8px 24px rgba(139, 92, 246, 0.08);
+  transform: translateY(-3px);
 }
 
 .kanban-card-v2:active {
-  transform: scale(0.98);
-  box-shadow: var(--shadow-sm);
+  transform: scale(0.98) translateY(0);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  transition-duration: 100ms;
 }
 
+/* 드래그 중 - 고급 floating 효과 */
 .kanban-card-v2.dragging {
-  opacity: 0.8;
-  transform: rotate(4deg) scale(1.05);
-  box-shadow: var(--shadow-2xl);
+  opacity: 0.95;
+  transform: rotate(2deg) scale(1.03);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15), 
+              0 8px 16px rgba(139, 92, 246, 0.1),
+              0 0 0 2px rgba(139, 92, 246, 0.2);
   z-index: 1000;
+  cursor: grabbing;
+}
+
+/* 드래그 가능 표시 - 왼쪽 그립 */
+.kanban-card-v2::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: transparent;
+  border-radius: 12px 0 0 12px;
+  transition: background 200ms ease;
+}
+
+.kanban-card-v2:hover::before {
+  background: linear-gradient(180deg, #8b5cf6 0%, #7c3aed 100%);
 }
 
 .kanban-card-thumb-v2 {
@@ -1469,6 +1696,7 @@
   margin: 0 0 10px 0;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   cursor: pointer;
@@ -1583,12 +1811,256 @@
   color: #475569;
 }
 
-/* meta-v2에 내보내기 버튼 배치 */
+/* meta-v2 - 한 줄 레이아웃 */
 .kanban-card-meta-v2 {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: nowrap;
+  margin-bottom: 0;
+}
+
+/* 🆕 링크 타입 뱃지 - 아이콘만 표시 */
+.kanban-link-type-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid;
+  flex-shrink: 0;
+  transition: all 150ms ease;
+}
+
+.kanban-link-type-badge:hover {
+  transform: scale(1.1);
+}
+
+.kanban-link-type-badge svg {
+  width: 14px;
+  height: 14px;
+}
+
+.kanban-link-type-badge span {
+  display: none; /* 라벨 숨김 - 아이콘만 표시 */
+}
+
+/* 폴더 뱃지 - 컴팩트 */
+.kanban-folder-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 4px 8px;
+  border-radius: 6px;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 내보내기 버튼 - 맨 우측 */
+.kanban-card-actions-v2 {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+}
+
+.kanban-action-btn.youtube {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f1f5f9;
+  border: none;
+  border-radius: 6px;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.kanban-action-btn.youtube:hover {
+  background: #e2e8f0;
+  color: #374151;
+}
+
+/* ======================================== */
+/* 🆕 링크추가 + 메모 버튼 한 줄 */
+/* ======================================== */
+.kanban-add-buttons-row {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+.kanban-add-buttons-row .kanban-add-card-btn {
+  flex: 1;
+  padding: 10px 12px;
+  font-size: 12px;
+}
+
+.kanban-add-buttons-row .kanban-add-card-btn.video {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border: 1px dashed #38bdf8;
+  color: #0284c7;
+}
+
+.kanban-add-buttons-row .kanban-add-card-btn.video:hover {
+  background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+  border-color: #0ea5e9;
+}
+
+.kanban-add-buttons-row .kanban-add-card-btn.memo {
+  background: linear-gradient(135deg, #fefce8 0%, #fef9c3 100%);
+  border: 1px dashed #facc15;
+  color: #ca8a04;
+}
+
+.kanban-add-buttons-row .kanban-add-card-btn.memo:hover {
+  background: linear-gradient(135deg, #fef9c3 0%, #fde68a 100%);
+  border-color: #eab308;
+}
+
+/* ======================================== */
+/* 🆕 와이드 뷰 토글 버튼 */
+/* ======================================== */
+.kanban-wide-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: white;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 200ms ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.kanban-wide-toggle:hover {
+  background: #f8fafc;
+  border-color: rgba(139, 92, 246, 0.3);
+  color: #7c3aed;
+}
+
+.kanban-wide-toggle.active {
+  background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+  border-color: #8b5cf6;
+  color: #7c3aed;
+}
+
+/* 와이드 뷰 컨테이너 */
+.kanban-global-container.wide-view {
+  margin: -32px -48px;
+  width: calc(100% + 96px);
+}
+
+.kanban-global-container.wide-view .kanban-global-column {
+  min-width: 320px;
+}
+
+.kanban-global-container.wide-view .kanban-card-thumb-v2 {
+  aspect-ratio: 16/10;
+}
+
+/* ======================================== */
+/* 🆕 갤러리 뷰 vs 리스트 뷰 */
+/* ======================================== */
+
+/* 갤러리 뷰 (기본) */
+.kanban-column-cards-v2.gallery-view {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.kanban-column-cards-v2.gallery-view .kanban-card-v2 {
+  /* 기본 카드 스타일 유지 */
+  display: block;
+}
+
+/* 리스트 뷰 */
+.kanban-column-cards-v2.list-view {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.kanban-column-cards-v2.list-view .kanban-card-v2 {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 8px 12px;
+  gap: 12px;
+  border-radius: 10px;
+}
+
+.kanban-column-cards-v2.list-view .kanban-card-thumb-v2 {
+  width: 60px;
+  height: 40px;
+  aspect-ratio: auto;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.kanban-column-cards-v2.list-view .kanban-card-content-v2 {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.kanban-column-cards-v2.list-view .kanban-card-title-v2 {
+  flex: 1;
+  margin: 0;
+  font-size: 12px;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+}
+
+.kanban-column-cards-v2.list-view .kanban-card-meta-v2 {
+  margin: 0;
+  flex-shrink: 0;
+}
+
+/* 리스트뷰에서 폴더 숨김 */
+.kanban-column-cards-v2.list-view .kanban-folder-badge,
+.kanban-column-cards-v2.list-view .kanban-unorganized-badge {
+  display: none;
+}
+
+.kanban-column-cards-v2.list-view .kanban-card-checkbox {
+  position: static;
+  opacity: 1;
+}
+
+.kanban-column-cards-v2.list-view .kanban-card-menu-wrapper {
+  position: static;
+  opacity: 1;
+}
+
+.kanban-column-cards-v2.list-view .kanban-safety-badge {
+  position: static;
+}
+
+/* 리스트 뷰 호버 효과 */
+.kanban-column-cards-v2.list-view .kanban-card-v2:hover {
+  transform: translateX(4px);
+}
+
+.kanban-column-cards-v2.list-view .kanban-card-v2::before {
+  display: none;
 }
 
 /* 🆕 영상 추가 버튼 */
@@ -1679,9 +2151,13 @@
 
 /* --- 메인 영역 (서랍 + 컬럼) --- */
 .kanban-main-area {
-  display: flex;
-  flex: 1;
-  overflow: hidden;
+  display: flex !important;
+  flex-direction: row !important;
+  flex: 1 !important;
+  overflow: hidden !important;
+  position: relative !important;
+  min-height: 0 !important;
+  width: 100% !important;
 }
 
 .kanban-header-actions {
@@ -1690,38 +2166,39 @@
   gap: 12px;
 }
 
-/* Global Kanban 서랍 토글 버튼 */
+/* Global Kanban 서랍 토글 버튼 - Premium */
 .kanban-global-header .kanban-drawer-toggle {
-  padding: 10px 16px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  padding: 10px 18px;
+  background: white;
+  border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 10px;
-  color: #64748b;
+  color: #475569;
   font-size: 13px;
   font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .kanban-global-header .kanban-drawer-toggle:hover {
-  background: #f1f5f9;
-  border-color: #cbd5e1;
+  background: #f8fafc;
+  border-color: rgba(139, 92, 246, 0.3);
+  color: #7c3aed;
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.1);
+  transform: translateY(-1px);
 }
 
 .kanban-global-header .kanban-drawer-toggle.active {
-  background: #f5f3ff;
+  background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
   border-color: #8b5cf6;
   color: #7c3aed;
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.15);
 }
 
-/* Global Kanban 서랍 */
-.kanban-main-area .kanban-drawer {
-  background: white;
-  border-right: 1px solid #e2e8f0;
-  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.04);
-}
-
-.kanban-main-area .kanban-drawer.open {
-  width: 360px;
-  min-width: 360px;
+/* 컬럼 컨테이너 - 서랍에 밀려서 줄어드는 영역 */
+.kanban-global-columns {
+  flex: 1 !important;
+  min-width: 0 !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
 /* 서랍 하단 안내 */
@@ -2403,6 +2880,1122 @@
 
 .kanban-modal-btn.delete:hover {
   background: #fee2e2;
+}
+
+/* ======================================== */
+/* 📅 미니 캘린더 팝업 */
+/* ======================================== */
+.mini-calendar-popup {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15), 0 0 1px rgba(0, 0, 0, 0.1);
+  padding: 16px;
+  z-index: 10000;
+  min-width: 280px;
+  animation: calendarSlideIn 0.2s ease-out;
+}
+
+@keyframes calendarSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.mini-calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.mini-calendar-header h4 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+}
+
+.mini-calendar-nav {
+  display: flex;
+  gap: 4px;
+}
+
+.mini-calendar-nav button {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f1f5f9;
+  border: none;
+  border-radius: 6px;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.mini-calendar-nav button:hover {
+  background: #e2e8f0;
+  color: #374151;
+}
+
+.mini-calendar-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.mini-calendar-weekdays span {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: #94a3b8;
+  padding: 4px 0;
+}
+
+.mini-calendar-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.mini-calendar-day {
+  width: 100%;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  background: none;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.mini-calendar-day:hover {
+  background: #f1f5f9;
+}
+
+.mini-calendar-day.other-month {
+  color: #cbd5e1;
+}
+
+.mini-calendar-day.today {
+  background: #f0f9ff;
+  color: #0ea5e9;
+  font-weight: 700;
+}
+
+.mini-calendar-day.selected {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  color: white;
+  font-weight: 700;
+}
+
+.mini-calendar-day.selected:hover {
+  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+}
+
+.mini-calendar-footer {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.mini-calendar-footer button {
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.mini-calendar-footer .btn-clear {
+  background: #fef2f2;
+  border: none;
+  color: #dc2626;
+}
+
+.mini-calendar-footer .btn-clear:hover {
+  background: #fee2e2;
+}
+
+.mini-calendar-footer .btn-today {
+  background: #f0f9ff;
+  border: none;
+  color: #0ea5e9;
+}
+
+.mini-calendar-footer .btn-today:hover {
+  background: #e0f2fe;
+}
+
+/* ======================================== */
+/* 📝 메모 카드 스타일 */
+/* ======================================== */
+.kanban-memo-card {
+  position: relative;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  cursor: grab;
+  transition: all 0.2s ease;
+  min-height: 100px;
+}
+
+.kanban-memo-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+
+.kanban-memo-card.selected {
+  box-shadow: 0 0 0 2px #8b5cf6, 0 4px 12px rgba(139, 92, 246, 0.2);
+}
+
+.kanban-memo-card.dragging {
+  opacity: 0.7;
+  transform: rotate(3deg) scale(1.02);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+}
+
+.kanban-memo-card.has-date {
+  padding-top: 40px;
+}
+
+/* 메모 체크박스 */
+.kanban-memo-checkbox {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 10;
+  opacity: 0;
+  transition: opacity 0.15s;
+  cursor: pointer;
+}
+
+.kanban-memo-card:hover .kanban-memo-checkbox,
+.kanban-memo-card.selected .kanban-memo-checkbox {
+  opacity: 1;
+}
+
+.kanban-memo-checkbox input {
+  display: none;
+}
+
+.kanban-memo-checkbox .kanban-checkbox-custom {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  background: white;
+  border: 2px solid #d1d5db;
+  border-radius: 4px;
+  transition: all 0.15s;
+}
+
+.kanban-memo-checkbox input:checked + .kanban-checkbox-custom {
+  background: #8b5cf6;
+  border-color: #8b5cf6;
+}
+
+.kanban-memo-checkbox input:checked + .kanban-checkbox-custom::after {
+  content: '✓';
+  color: white;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+/* 메모 날짜 배지 */
+.kanban-memo-date-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.kanban-memo-date-badge:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.kanban-memo-date-badge.overdue {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #dc2626;
+}
+
+.kanban-memo-date-badge.today {
+  background: #fef3c7;
+  border-color: #fde68a;
+  color: #d97706;
+}
+
+.kanban-memo-date-badge.upcoming {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #16a34a;
+}
+
+/* 메모 내용 */
+.kanban-memo-content {
+  font-size: 14px;
+  line-height: 1.6;
+  min-height: 60px;
+  word-break: break-word;
+  cursor: text;
+}
+
+.kanban-memo-placeholder {
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.kanban-memo-textarea {
+  width: 100%;
+  min-height: 80px;
+  padding: 8px;
+  font-size: 14px;
+  line-height: 1.6;
+  background: transparent;
+  border: none;
+  outline: none;
+  resize: none;
+  font-family: inherit;
+}
+
+/* 메모 툴바 */
+.kanban-memo-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.kanban-memo-card:hover .kanban-memo-toolbar {
+  opacity: 1;
+}
+
+.kanban-memo-created {
+  font-size: 10px;
+  color: #94a3b8;
+}
+
+.kanban-memo-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.kanban-memo-action-btn {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.04);
+  border: none;
+  border-radius: 6px;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.kanban-memo-action-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: #374151;
+}
+
+.kanban-memo-action-btn.delete:hover {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+/* 색상 선택 팝업 */
+.kanban-color-picker-wrapper {
+  position: relative;
+}
+
+.kanban-color-picker-popup {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  display: flex;
+  gap: 6px;
+  padding: 8px;
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+  animation: popupFadeIn 0.15s ease-out;
+}
+
+@keyframes popupFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.kanban-color-option {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.kanban-color-option:hover {
+  transform: scale(1.15);
+}
+
+.kanban-color-option.active {
+  border-color: #374151;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
+}
+
+/* 색상 선택 드롭다운 */
+.kanban-color-picker-dropdown {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  display: flex;
+  gap: 6px;
+  padding: 10px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+  animation: popupFadeIn 0.15s ease-out;
+}
+
+/* 메모 추가 버튼 */
+.kanban-add-memo-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 12px;
+  background: linear-gradient(135deg, #fef9c3 0%, #fef3c7 100%);
+  border: 2px dashed #fde047;
+  border-radius: 10px;
+  color: #ca8a04;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.kanban-add-memo-btn:hover {
+  background: linear-gradient(135deg, #fef08a 0%, #fde68a 100%);
+  border-color: #facc15;
+}
+
+/* ======================================== */
+/* 🔗 링크 추가 모달 */
+/* ======================================== */
+.add-link-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: overlayFadeIn 0.2s ease-out;
+}
+
+.add-link-modal {
+  width: 100%;
+  max-width: 480px;
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+  animation: modalSpring 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  overflow: hidden;
+}
+
+.add-link-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.add-link-modal-header h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+}
+
+.add-link-modal-close {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f1f5f9;
+  border: none;
+  border-radius: 10px;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.add-link-modal-close:hover {
+  background: #e2e8f0;
+  color: #374151;
+}
+
+.add-link-modal-content {
+  padding: 24px;
+}
+
+.add-link-field {
+  margin-bottom: 20px;
+}
+
+.add-link-field:last-child {
+  margin-bottom: 0;
+}
+
+.add-link-field label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 8px;
+}
+
+.add-link-url-input-wrapper,
+.add-link-title-input-wrapper {
+  position: relative;
+}
+
+.add-link-url-input-wrapper input,
+.add-link-title-input-wrapper input {
+  width: 100%;
+  padding: 14px 16px;
+  padding-right: 100px;
+  font-size: 14px;
+  background: #f8fafc;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.add-link-url-input-wrapper input:focus,
+.add-link-title-input-wrapper input:focus {
+  background: white;
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.1);
+}
+
+.add-link-type-indicator {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  background: #f1f5f9;
+  border-radius: 6px;
+}
+
+.add-link-loading {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.add-link-field-hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.add-link-preview {
+  margin-top: 16px;
+  padding: 16px;
+  background: #f8fafc;
+  border-radius: 12px;
+}
+
+.add-link-preview-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.add-link-preview-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: white;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+}
+
+.add-link-preview-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f1f5f9;
+  border-radius: 10px;
+}
+
+.add-link-preview-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.add-link-preview-title {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.add-link-preview-url {
+  display: block;
+  font-size: 11px;
+  color: #94a3b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+.add-link-modal-footer {
+  display: flex;
+  gap: 10px;
+  padding: 16px 24px;
+  background: #f8fafc;
+  border-top: 1px solid #f1f5f9;
+}
+
+.add-link-btn {
+  flex: 1;
+  padding: 14px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.add-link-btn.cancel {
+  background: white;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
+}
+
+.add-link-btn.cancel:hover {
+  background: #f1f5f9;
+}
+
+.add-link-btn.submit {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  border: none;
+  color: white;
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+}
+
+.add-link-btn.submit:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(139, 92, 246, 0.4);
+}
+
+.add-link-btn.submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ======================================== */
+/* 🎬 YouTube 플레이어 모달 */
+/* ======================================== */
+.youtube-player-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: overlayFadeIn 0.2s ease-out;
+}
+
+.youtube-player-modal {
+  width: 100%;
+  max-width: 900px;
+  background: #000;
+  border-radius: 16px;
+  overflow: hidden;
+  animation: modalSpring 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.youtube-player-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: #1a1a1a;
+}
+
+.youtube-player-header h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: white;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.youtube-player-close {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.youtube-player-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.youtube-player-container {
+  position: relative;
+  padding-top: 56.25%;
+}
+
+.youtube-player-container iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* ======================================== */
+/* 🔲 Smart Embed 카드 */
+/* ======================================== */
+.smart-embed-card {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+  transition: all 0.2s;
+}
+
+.smart-embed-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.smart-embed-card.youtube {
+  border-color: #fecaca;
+}
+
+.smart-embed-card.twitter,
+.smart-embed-card.twitter-embed {
+  border-color: #bfdbfe;
+}
+
+.smart-embed-card.brand-card {
+  border-left: 4px solid;
+}
+
+.smart-embed-thumb {
+  position: relative;
+  aspect-ratio: 16/9;
+  background: #f1f5f9;
+  cursor: pointer;
+}
+
+.smart-embed-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.smart-embed-play-btn {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 50%;
+  color: white;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.smart-embed-thumb:hover .smart-embed-play-btn {
+  opacity: 1;
+}
+
+.smart-embed-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 6px;
+}
+
+.smart-embed-badge.youtube {
+  background: #dc2626;
+  color: white;
+}
+
+.smart-embed-badge.twitter {
+  background: #1d9bf0;
+  color: white;
+}
+
+.smart-embed-content {
+  padding: 14px;
+}
+
+.smart-embed-twitter-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.smart-embed-tweet-container {
+  padding: 14px;
+}
+
+.smart-embed-tweet-skeleton {
+  display: flex;
+  gap: 12px;
+}
+
+.skeleton-avatar {
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 50%;
+}
+
+.skeleton-content {
+  flex: 1;
+}
+
+.skeleton-line {
+  height: 12px;
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+.skeleton-line.short {
+  width: 40%;
+}
+
+.skeleton-line.medium {
+  width: 70%;
+}
+
+.smart-embed-twitter-content {
+  padding: 14px;
+}
+
+.smart-embed-twitter-text {
+  font-size: 14px;
+  color: #1e293b;
+  margin: 0 0 12px 0;
+}
+
+.smart-embed-twitter-link,
+.smart-embed-external-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1d9bf0;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.smart-embed-twitter-link:hover,
+.smart-embed-external-link:hover {
+  color: #0c7abf;
+}
+
+.smart-embed-brand-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.smart-embed-brand-icon {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f1f5f9;
+  border-radius: 8px;
+}
+
+.smart-embed-brand-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.smart-embed-brand-content {
+  padding: 14px;
+}
+
+.smart-embed-brand-content h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 6px 0;
+}
+
+.smart-embed-brand-url {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+/* ======================================== */
+/* 📅 캘린더 대체 스타일 (cal-*) */
+/* ======================================== */
+.cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.cal-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.cal-nav {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f1f5f9;
+  border: none;
+  border-radius: 8px;
+  font-size: 18px;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.cal-nav:hover {
+  background: #e2e8f0;
+  color: #374151;
+}
+
+.cal-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.cal-weekday {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: #94a3b8;
+  padding: 4px 0;
+}
+
+.cal-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.cal-day {
+  width: 100%;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  background: none;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.cal-day:hover:not(.empty) {
+  background: #f1f5f9;
+}
+
+.cal-day.empty {
+  cursor: default;
+}
+
+.cal-day.today {
+  background: #f0f9ff;
+  color: #0ea5e9;
+  font-weight: 700;
+}
+
+.cal-day.selected {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  color: white;
+  font-weight: 700;
+}
+
+.cal-day.selected:hover {
+  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+}
+
+.cal-footer {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.cal-today-btn,
+.cal-clear-btn {
+  flex: 1;
+  padding: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.cal-today-btn {
+  background: #f0f9ff;
+  color: #0ea5e9;
+}
+
+.cal-today-btn:hover {
+  background: #e0f2fe;
+}
+
+.cal-clear-btn {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.cal-clear-btn:hover {
+  background: #fee2e2;
+}
+
+/* 스피너 애니메이션 */
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* 반응형 */
