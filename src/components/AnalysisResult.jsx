@@ -787,35 +787,38 @@ export default function AnalysisResult({ requestId, directResult, progress, onRe
                         </div>
                       </div>
 
-                      {/* 🎬 KMRB 등급 결과 - Google Material 스타일 */}
+                      {/* 🎬 KMRB 등급 결과 */}
                       {analysis.ratingResult && (
-                        <div className={`kmrb-rating-card ${analysis.ratingResult.isClassroomSafe ? 'safe' : 'unsafe'}`}>
-                          {/* 상단: 등급 배지 + 상태 */}
-                          <div className="kmrb-header">
-                            <div className={`kmrb-badge ${
-                              analysis.ratingResult.finalRating?.includes('전체') ? 'all' :
-                              analysis.ratingResult.finalRating?.includes('12세') ? 'age12' :
-                              analysis.ratingResult.finalRating?.includes('15세') ? 'age15' : 'adult'
-                            }`}>
-                              {analysis.ratingResult.finalRating?.replace('관람가', '') || '전체'}
-                            </div>
-                            <div className="kmrb-status">
-                              <span className={`kmrb-status-dot ${analysis.ratingResult.isClassroomSafe ? 'safe' : 'unsafe'}`}></span>
-                              <span className="kmrb-status-text">
-                                {analysis.ratingResult.isClassroomSafe ? '교실 상영 가능' : '상영 주의'}
+                        <div className={`comprehension-card rating-result-card ${analysis.ratingResult.isClassroomSafe ? 'classroom-safe' : 'classroom-unsafe'}`}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                            <div>
+                              <h5 className="metrics-title" style={{ marginBottom: '8px' }}>🎬 영상등급위원회 판정</h5>
+                              <span className={`rating-badge ${
+                                analysis.ratingResult.finalRating?.includes('전체') ? 'all' :
+                                analysis.ratingResult.finalRating?.includes('12세') ? 'age12' :
+                                analysis.ratingResult.finalRating?.includes('15세') ? 'age15' : 'adult'
+                              }`}>
+                                {analysis.ratingResult.finalRating || '전체관람가'}
                               </span>
                             </div>
+                            <div style={{ textAlign: 'right' }}>
+                              <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>교실 상영 점수</div>
+                              <div style={{ fontSize: '24px', fontWeight: '800', color: analysis.ratingResult.isClassroomSafe ? '#16a34a' : '#dc2626' }}>
+                                {analysis.ratingResult.schoolSafetyScore || '-'}점
+                              </div>
+                            </div>
                           </div>
-                          
-                          {/* 주의 키워드 (있을 경우만) */}
+                          <div style={{ marginTop: '12px', padding: '10px', background: 'rgba(255,255,255,0.5)', borderRadius: '8px' }}>
+                            <span style={{ fontSize: '12px', fontWeight: '600', color: analysis.ratingResult.isClassroomSafe ? '#166534' : '#991b1b' }}>
+                              {analysis.ratingResult.isClassroomSafe ? '✅ 초등 교실 상영 가능' : '⚠️ 초등 교실 상영 주의 필요'}
+                            </span>
+                          </div>
                           {analysis.ratingResult.warningKeywords?.length > 0 && (
-                            <div className="kmrb-warnings">
-                              {analysis.ratingResult.warningKeywords.slice(0, 4).map((keyword, idx) => (
-                                <span key={idx} className="kmrb-warning-tag">{keyword}</span>
+                            <div className="warning-keywords">
+                              <span style={{ fontSize: '11px', color: '#64748b', marginRight: '6px' }}>⚠️ 주의 표현:</span>
+                              {analysis.ratingResult.warningKeywords.map((keyword, idx) => (
+                                <span key={idx} className="warning-keyword">{keyword}</span>
                               ))}
-                              {analysis.ratingResult.warningKeywords.length > 4 && (
-                                <span className="kmrb-warning-more">+{analysis.ratingResult.warningKeywords.length - 4}</span>
-                              )}
                             </div>
                           )}
                         </div>
