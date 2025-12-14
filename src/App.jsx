@@ -11,7 +11,7 @@ import Header from "./components/Header";
 import Footer from "./components/Footer";
 import Terms from "./components/Terms";
 import Privacy from "./components/Privacy";
-import SettingsModal from "./components/SettingsModal";
+import NewSettingsModal from "./components/NewSettingsModal";
 
 function AppContent() {
   const { user } = useAuth();
@@ -138,9 +138,10 @@ function AppContent() {
         <Footer onNavigate={handleFooterNavigate} />
 
         {/* 설정 모달 */}
-        {showSettings && (
-          <SettingsModal onClose={() => setShowSettings(false)} />
-        )}
+        <NewSettingsModal 
+          isOpen={showSettings} 
+          onClose={() => setShowSettings(false)} 
+        />
     </div>
   );
 }

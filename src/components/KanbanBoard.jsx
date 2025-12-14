@@ -346,8 +346,7 @@ const BoardSelector = ({ boards, currentBoardId, onSelect, onCreateNew, onDelete
         className="kanban-board-selector-btn"
         onClick={() => setIsOpen(!isOpen)}
       >
-        <span className="kanban-board-icon">{currentBoard?.icon || '📋'}</span>
-        <span className="kanban-board-name">{currentBoard?.name || '보드 선택'}</span>
+        <span className="kanban-board-name">{currentBoard?.name || '📋 보드 선택'}</span>
         <IconChevronDown />
       </button>
 
@@ -374,7 +373,6 @@ const BoardSelector = ({ boards, currentBoardId, onSelect, onCreateNew, onDelete
                       setIsOpen(false);
                     }}
                   >
-                    <span className="kanban-board-option-icon">{board.icon}</span>
                     <span className="kanban-board-option-name">{board.name}</span>
                     <span className="kanban-board-option-cols">{board.columns.length}개 섹션</span>
                     {board.id === currentBoardId && <IconCheck />}
