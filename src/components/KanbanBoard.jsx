@@ -168,7 +168,7 @@ const SafetyBadge = ({ score }) => {
 const BOARD_TEMPLATES = {
   default: {
     id: 'default',
-    name: '📋 수업 준비',
+    name: '수업 준비',
     icon: '📋',
     columns: [
       { id: 'inbox', title: '📥 찜한 영상', color: '#FEF2F2' },
@@ -178,7 +178,7 @@ const BOARD_TEMPLATES = {
   },
   weekly: {
     id: 'weekly',
-    name: '📅 요일별 계획',
+    name: '요일별 계획',
     icon: '📅',
     columns: [
       { id: 'mon', title: '🔴 월요일', color: '#FEF2F2' },
@@ -190,7 +190,7 @@ const BOARD_TEMPLATES = {
   },
   progress: {
     id: 'progress',
-    name: '📊 진행 상태',
+    name: '진행 상태',
     icon: '📊',
     columns: [
       { id: 'todo', title: '📝 할 일', color: '#F8FAFC' },
