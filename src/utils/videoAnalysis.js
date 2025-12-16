@@ -535,18 +535,18 @@ export async function analyzeLongVideo(
     const selectedFilter =
       gradeFilters[gradeLevel] || gradeFilters["elementary-5-6"];
 
-    // 각 청크 분석 (병렬) - 단순 분할
-    const chunkPromises = [];
+    // 🆕 각 청크 분석을 순차적으로 처리 (키 로테이션 제대로 작동하도록)
     const chunkResults = [];
 
-    for (let i = 0; i < numChunks; i++) {
+    // 단일 청크 분석 함수 (재시도 로직 포함)
+    const analyzeChunk = async (i, chunkRetryCount = 0) => {
       const startTime = i * CHUNK_DURATION;
       const endTime = Math.min((i + 1) * CHUNK_DURATION, videoDuration);
       const startMin = Math.floor(startTime / 60);
       const endMin = Math.floor(endTime / 60);
 
       const apiKey = getCurrentApiKey();
-      const promise = fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+      const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -619,77 +619,79 @@ ${transcript
             thinkingConfig: { thinkingBudget: 0 },
           },
         }),
-      })
-        .then((res) => res.json())
-        .then((data) => {
-          const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
-          const parsed = parseJSON(text);
-          let normalized = normalizeAnalysis(parsed, startTime, endTime);
-          if (transcript.length > 0) {
-            normalized = alignFlowWithTranscript(
-              normalized,
-              transcript,
-              startTime,
-              endTime
-            );
-          }
+      });
 
-          // 🆕 "부분 편집자" 방식: 청크별 flow 보정
-          let chunkFlow = normalized.flow || [];
-          
-          // 🆕 앞부분 무시 원칙 (Start Buffer Zone)
-          // 두 번째 청크부터: 시작 30초 이내의 flow는 이전 청크 연속일 가능성 높으므로 제거
-          const BUFFER_SEC = 30; // 30초 버퍼
-          const bufferZone = i > 0 ? BUFFER_SEC : 0; // 첫 청크는 버퍼 없음
-          
-          chunkFlow = chunkFlow.filter((f) => {
-            const t = parseTimestamp(f.timestamp);
-            // 청크 범위 내 + 버퍼존 이후만 허용
-            return t >= (startTime + bufferZone) && t < endTime;
-          });
-          
-          console.log(`[청크 ${i + 1}] 범위: ${startMin}:00~${endMin}:00, 버퍼: ${bufferZone}초, flow 수: ${chunkFlow.length}`);
+      // 429 에러 처리
+      if (!response.ok) {
+        if (response.status === 429 && chunkRetryCount < GEMINI_API_KEYS.length - 1) {
+          console.warn(`⚠️ 청크 ${i + 1} API 할당량 초과. 다음 키로 전환...`);
+          switchToNextKey();
+          return analyzeChunk(i, chunkRetryCount + 1);
+        }
+        throw new Error(`Gemini API error for chunk ${i + 1}: ${response.status}`);
+      }
 
-          return {
-            chunkIndex: i,
-            startTime,
-            endTime,
-            warnings: normalized.warnings || [],
-            flow: chunkFlow,
-          };
-        })
-        .then((result) => {
-          chunkResults[i] = result;
+      const data = await response.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+      const parsed = parseJSON(text);
+      let normalized = normalizeAnalysis(parsed, startTime, endTime);
 
-          // 완료된 청크 수 계산
-          const completed = chunkResults.filter((r) => r).length;
+      if (transcript.length > 0) {
+        normalized = alignFlowWithTranscript(
+          normalized,
+          transcript,
+          startTime,
+          endTime
+        );
+      }
 
-          onProgress?.({
-            status: "analyzing",
-            message: `청크 분석 중... (${completed}/${numChunks})`,
-            totalChunks: numChunks,
-            completedChunks: completed,
-            partialResults: chunkResults.filter((r) => r),
-          });
+      // 🆕 "부분 편집자" 방식: 청크별 flow 보정
+      let chunkFlow = normalized.flow || [];
 
-          return result;
-        })
-        .catch((error) => {
-          console.error(`청크 ${i + 1} 분석 실패:`, error);
-          return {
-            chunkIndex: i,
-            startTime,
-            endTime,
-            warnings: [],
-            flow: [],
-          };
+      // 🆕 앞부분 무시 원칙 (Start Buffer Zone)
+      const BUFFER_SEC = 30;
+      const bufferZone = i > 0 ? BUFFER_SEC : 0;
+
+      chunkFlow = chunkFlow.filter((f) => {
+        const t = parseTimestamp(f.timestamp);
+        return t >= (startTime + bufferZone) && t < endTime;
+      });
+
+      console.log(`[청크 ${i + 1}] 범위: ${startMin}:00~${endMin}:00, 버퍼: ${bufferZone}초, flow 수: ${chunkFlow.length}`);
+
+      return {
+        chunkIndex: i,
+        startTime,
+        endTime,
+        warnings: normalized.warnings || [],
+        flow: chunkFlow,
+      };
+    };
+
+    // 순차적으로 각 청크 분석
+    for (let i = 0; i < numChunks; i++) {
+      try {
+        const result = await analyzeChunk(i);
+        chunkResults.push(result);
+
+        onProgress?.({
+          status: "analyzing",
+          message: `청크 분석 중... (${i + 1}/${numChunks})`,
+          totalChunks: numChunks,
+          completedChunks: i + 1,
+          partialResults: chunkResults,
         });
-
-      chunkPromises.push(promise);
+      } catch (error) {
+        console.error(`청크 ${i + 1} 분석 실패:`, error);
+        chunkResults.push({
+          chunkIndex: i,
+          startTime: i * CHUNK_DURATION,
+          endTime: Math.min((i + 1) * CHUNK_DURATION, videoDuration),
+          warnings: [],
+          flow: [],
+        });
+      }
     }
-
-    // 모든 청크 완료 대기
-    await Promise.all(chunkPromises);
 
     // 결과 병합
     const allWarnings = [];
