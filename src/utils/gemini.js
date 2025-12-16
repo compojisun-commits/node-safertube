@@ -10,6 +10,10 @@ const GEMINI_API_KEYS = [
 const GEMINI_API_URL =
   "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 
+// 가벼운 작업용 (검색어 생성 등) - 토큰 소비 적음
+const GEMINI_LITE_API_URL =
+  "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
+
 // Rate Limiting: API 호출 사이 대기 시간 (밀리초)
 const API_CALL_DELAY = 2000; // 2초
 
@@ -201,11 +205,16 @@ JSON만 출력:`;
     });
 
     if (!response.ok) {
-      // 429 오류이고 재시도 가능한 경우 다음 키로 전환
-      if (response.status === 429 && _retryCount < GEMINI_API_KEYS.length - 1) {
-        console.warn(`⚠️ Gemini API 할당량 초과. 다음 키로 전환 시도...`);
-        switchToNextKey();
-        return quickAnalyzeVideo(videoId, transcript, gradeLevel, subject, intention, _retryCount + 1);
+      // 429 오류 처리
+      if (response.status === 429) {
+        const maxRetries = GEMINI_API_KEYS.length * 2;
+        if (_retryCount < maxRetries) {
+          const waitTime = Math.min(3000 * Math.pow(2, _retryCount), 30000);
+          console.warn(`⚠️ [빠른분석] API 할당량 초과. ${waitTime/1000}초 후 재시도... (${_retryCount + 1}/${maxRetries})`);
+          switchToNextKey();
+          await delay(waitTime);
+          return quickAnalyzeVideo(videoId, transcript, gradeLevel, subject, intention, _retryCount + 1);
+        }
       }
       throw new Error(`Gemini API error: ${response.status}`);
     }
@@ -284,7 +293,8 @@ ${intention ? `**수업 의도:** ${intention}` : ""}
       await delay(API_CALL_DELAY);
     }
 
-    const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+    // 검색어 생성은 가벼운 모델 사용 (토큰 절약)
+    const response = await fetch(`${GEMINI_LITE_API_URL}?key=${apiKey}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -301,16 +311,21 @@ ${intention ? `**수업 의도:** ${intention}` : ""}
         ],
         generationConfig: {
           temperature: 0.9,
-          maxOutputTokens: 4000,
+          maxOutputTokens: 500, // 검색어는 짧으므로 토큰 제한
         },
       }),
     });
 
     if (!response.ok) {
-      if (response.status === 429 && _retryCount < GEMINI_API_KEYS.length - 1) {
-        console.warn(`⚠️ Gemini API 할당량 초과. 다음 키로 전환 시도...`);
-        switchToNextKey();
-        return generateSearchKeywords(subject, intention, gradeLevel, _retryCount + 1);
+      if (response.status === 429) {
+        const maxRetries = GEMINI_API_KEYS.length * 2;
+        if (_retryCount < maxRetries) {
+          const waitTime = Math.min(3000 * Math.pow(2, _retryCount), 30000);
+          console.warn(`⚠️ [검색어생성] API 할당량 초과. ${waitTime/1000}초 후 재시도... (${_retryCount + 1}/${maxRetries})`);
+          switchToNextKey();
+          await delay(waitTime);
+          return generateSearchKeywords(subject, intention, gradeLevel, _retryCount + 1);
+        }
       }
       throw new Error(`Gemini API error: ${response.status}`);
     }
@@ -375,7 +390,8 @@ export async function generateAlternativeKeywords(
       await delay(API_CALL_DELAY);
     }
 
-    const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+    // 대체 검색어 생성도 가벼운 모델 사용 (토큰 절약)
+    const response = await fetch(`${GEMINI_LITE_API_URL}?key=${apiKey}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -392,16 +408,21 @@ export async function generateAlternativeKeywords(
         ],
         generationConfig: {
           temperature: 1.0, // 더 다양한 결과를 위해 높임
-          maxOutputTokens: 4000,
+          maxOutputTokens: 500, // 검색어는 짧으므로 토큰 제한
         },
       }),
     });
 
     if (!response.ok) {
-      if (response.status === 429 && _retryCount < GEMINI_API_KEYS.length - 1) {
-        console.warn(`⚠️ Gemini API 할당량 초과. 다음 키로 전환 시도...`);
-        switchToNextKey();
-        return generateAlternativeKeywords(subject, intention, gradeLevel, previousKeywords, _retryCount + 1);
+      if (response.status === 429) {
+        const maxRetries = GEMINI_API_KEYS.length * 2;
+        if (_retryCount < maxRetries) {
+          const waitTime = Math.min(3000 * Math.pow(2, _retryCount), 30000);
+          console.warn(`⚠️ [대체검색어] API 할당량 초과. ${waitTime/1000}초 후 재시도... (${_retryCount + 1}/${maxRetries})`);
+          switchToNextKey();
+          await delay(waitTime);
+          return generateAlternativeKeywords(subject, intention, gradeLevel, previousKeywords, _retryCount + 1);
+        }
       }
       throw new Error(`Gemini API error: ${response.status}`);
     }

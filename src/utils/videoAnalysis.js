@@ -336,11 +336,22 @@ ${transcript
     });
 
     if (!response.ok) {
-      // 429 오류이고 재시도 가능한 경우 다음 키로 전환
-      if (response.status === 429 && _retryCount < GEMINI_API_KEYS.length - 1) {
-        console.warn(`⚠️ Gemini API 할당량 초과. 다음 키로 전환 시도...`);
-        switchToNextKey();
-        return analyzeShortVideo(videoUrl, videoId, videoDuration, gradeLevel, onProgress, _retryCount + 1);
+      // 429 오류 처리
+      if (response.status === 429) {
+        // 최대 재시도 횟수 확인 (키 개수의 2배까지 재시도)
+        const maxRetries = GEMINI_API_KEYS.length * 2;
+        if (_retryCount < maxRetries) {
+          // Exponential backoff: 3초 → 6초 → 12초 → 24초
+          const waitTime = Math.min(3000 * Math.pow(2, _retryCount), 30000); // 최대 30초
+          console.warn(`⚠️ Gemini API 할당량 초과. ${waitTime/1000}초 후 재시도... (${_retryCount + 1}/${maxRetries})`);
+
+          // 키 전환 (매 재시도마다)
+          switchToNextKey();
+
+          // 대기 후 재시도
+          await delay(waitTime);
+          return analyzeShortVideo(videoUrl, videoId, videoDuration, gradeLevel, onProgress, _retryCount + 1);
+        }
       }
       throw new Error(`Gemini API error: ${response.status}`);
     }
@@ -451,11 +462,16 @@ ${transcriptHint}
     });
 
     if (!response.ok) {
-      // 429 오류이고 재시도 가능한 경우 다음 키로 전환
-      if (response.status === 429 && _retryCount < GEMINI_API_KEYS.length - 1) {
-        console.warn(`⚠️ Gemini API 할당량 초과. 다음 키로 전환 시도...`);
-        switchToNextKey();
-        return generateTimelineFromVideo(videoUrl, videoDuration, transcript, _retryCount + 1);
+      // 429 오류 처리
+      if (response.status === 429) {
+        const maxRetries = GEMINI_API_KEYS.length * 2;
+        if (_retryCount < maxRetries) {
+          const waitTime = Math.min(3000 * Math.pow(2, _retryCount), 30000);
+          console.warn(`⚠️ [타임라인] API 할당량 초과. ${waitTime/1000}초 후 재시도... (${_retryCount + 1}/${maxRetries})`);
+          switchToNextKey();
+          await delay(waitTime);
+          return generateTimelineFromVideo(videoUrl, videoDuration, transcript, _retryCount + 1);
+        }
       }
     }
 
@@ -648,10 +664,15 @@ ${transcript
 
       // 429 에러 처리
       if (!response.ok) {
-        if (response.status === 429 && chunkRetryCount < GEMINI_API_KEYS.length - 1) {
-          console.warn(`⚠️ 청크 ${i + 1} API 할당량 초과. 다음 키로 전환...`);
-          switchToNextKey();
-          return analyzeChunk(i, chunkRetryCount + 1);
+        if (response.status === 429) {
+          const maxRetries = GEMINI_API_KEYS.length * 2;
+          if (chunkRetryCount < maxRetries) {
+            const waitTime = Math.min(3000 * Math.pow(2, chunkRetryCount), 30000);
+            console.warn(`⚠️ 청크 ${i + 1} API 할당량 초과. ${waitTime/1000}초 후 재시도... (${chunkRetryCount + 1}/${maxRetries})`);
+            switchToNextKey();
+            await delay(waitTime);
+            return analyzeChunk(i, chunkRetryCount + 1);
+          }
         }
         throw new Error(`Gemini API error for chunk ${i + 1}: ${response.status}`);
       }
@@ -913,11 +934,16 @@ ${allWarnings
     );
 
     if (!summaryResponse.ok) {
-      // 429 오류이고 재시도 가능한 경우 다음 키로 전환
-      if (summaryResponse.status === 429 && _retryCount < GEMINI_API_KEYS.length - 1) {
-        console.warn(`⚠️ Gemini API 할당량 초과. 다음 키로 전환 시도...`);
-        switchToNextKey();
-        return analyzeLongVideo(videoUrl, videoId, videoDuration, gradeLevel, onProgress, _retryCount + 1);
+      // 429 오류 처리
+      if (summaryResponse.status === 429) {
+        const maxRetries = GEMINI_API_KEYS.length * 2;
+        if (_retryCount < maxRetries) {
+          const waitTime = Math.min(3000 * Math.pow(2, _retryCount), 30000);
+          console.warn(`⚠️ [요약] API 할당량 초과. ${waitTime/1000}초 후 재시도... (${_retryCount + 1}/${maxRetries})`);
+          switchToNextKey();
+          await delay(waitTime);
+          return analyzeLongVideo(videoUrl, videoId, videoDuration, gradeLevel, onProgress, _retryCount + 1);
+        }
       }
     }
 
@@ -1118,11 +1144,16 @@ ${JSON.stringify(chunkTranscript.slice(0, 80), null, 2)}
     });
 
     if (!response.ok) {
-      // 429 오류이고 재시도 가능한 경우 다음 키로 전환
-      if (response.status === 429 && _retryCount < GEMINI_API_KEYS.length - 1) {
-        console.warn(`⚠️ Gemini API 할당량 초과. 다음 키로 전환 시도...`);
-        switchToNextKey();
-        return generateChaptersFromTranscript(transcript, startSeconds, endSeconds, _retryCount + 1);
+      // 429 오류 처리
+      if (response.status === 429) {
+        const maxRetries = GEMINI_API_KEYS.length * 2;
+        if (_retryCount < maxRetries) {
+          const waitTime = Math.min(3000 * Math.pow(2, _retryCount), 30000);
+          console.warn(`⚠️ [챕터] API 할당량 초과. ${waitTime/1000}초 후 재시도... (${_retryCount + 1}/${maxRetries})`);
+          switchToNextKey();
+          await delay(waitTime);
+          return generateChaptersFromTranscript(transcript, startSeconds, endSeconds, _retryCount + 1);
+        }
       }
     }
 
