@@ -1,8 +1,41 @@
 // Gemini API 직접 호출 유틸리티
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+// 여러 개의 API 키를 배열로 관리
+const GEMINI_API_KEYS = [
+  import.meta.env.VITE_GEMINI_API_KEY,
+  import.meta.env.VITE_GEMINI_API_KEY_2,
+  import.meta.env.VITE_GEMINI_API_KEY_3,
+].filter(Boolean); // undefined 제거
+
 const GEMINI_API_URL =
   "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+
+/**
+ * 현재 사용 중인 API 키 인덱스 가져오기
+ */
+function getCurrentKeyIndex() {
+  const stored = localStorage.getItem("gemini_api_key_index");
+  return stored ? parseInt(stored) : 0;
+}
+
+/**
+ * 다음 API 키로 전환
+ */
+function switchToNextKey() {
+  const currentIndex = getCurrentKeyIndex();
+  const nextIndex = (currentIndex + 1) % GEMINI_API_KEYS.length;
+  localStorage.setItem("gemini_api_key_index", nextIndex.toString());
+  console.log(`🔄 Gemini API 키 전환: ${currentIndex} → ${nextIndex}`);
+  return nextIndex;
+}
+
+/**
+ * 현재 사용할 API 키 가져오기
+ */
+function getCurrentApiKey() {
+  const index = getCurrentKeyIndex();
+  return GEMINI_API_KEYS[index];
+}
 
 export async function checkSimilarityWithGemini(text1, text2) {
   try {
@@ -77,9 +110,11 @@ export async function quickAnalyzeVideo(
   transcript,
   gradeLevel,
   subject,
-  intention
+  intention,
+  _retryCount = 0
 ) {
   try {
+    const apiKey = getCurrentApiKey();
     // 평가 컨텍스트 생성
     let contextText = "";
     if (subject === "미정") {
@@ -128,7 +163,7 @@ JSON만 출력:
 
 JSON만 출력:`;
 
-    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+    const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -151,6 +186,12 @@ JSON만 출력:`;
     });
 
     if (!response.ok) {
+      // 429 오류이고 재시도 가능한 경우 다음 키로 전환
+      if (response.status === 429 && _retryCount < GEMINI_API_KEYS.length - 1) {
+        console.warn(`⚠️ Gemini API 할당량 초과. 다음 키로 전환 시도...`);
+        switchToNextKey();
+        return quickAnalyzeVideo(videoId, transcript, gradeLevel, subject, intention, _retryCount + 1);
+      }
       throw new Error(`Gemini API error: ${response.status}`);
     }
 
@@ -185,8 +226,9 @@ JSON만 출력:`;
 /**
  * Gemini API로 검색어 생성
  */
-export async function generateSearchKeywords(subject, intention, gradeLevel) {
+export async function generateSearchKeywords(subject, intention, gradeLevel, _retryCount = 0) {
   try {
+    const apiKey = getCurrentApiKey();
     let prompt;
 
     if (subject === "미정") {
@@ -222,7 +264,7 @@ ${intention ? `**수업 의도:** ${intention}` : ""}
 검색어만 출력:`;
     }
 
-    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+    const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -245,6 +287,11 @@ ${intention ? `**수업 의도:** ${intention}` : ""}
     });
 
     if (!response.ok) {
+      if (response.status === 429 && _retryCount < GEMINI_API_KEYS.length - 1) {
+        console.warn(`⚠️ Gemini API 할당량 초과. 다음 키로 전환 시도...`);
+        switchToNextKey();
+        return generateSearchKeywords(subject, intention, gradeLevel, _retryCount + 1);
+      }
       throw new Error(`Gemini API error: ${response.status}`);
     }
 
@@ -272,9 +319,11 @@ export async function generateAlternativeKeywords(
   subject,
   intention,
   gradeLevel,
-  previousKeywords = []
+  previousKeywords = [],
+  _retryCount = 0
 ) {
   try {
+    const apiKey = getCurrentApiKey();
     let prompt;
 
     if (intention) {
@@ -301,7 +350,7 @@ export async function generateAlternativeKeywords(
 이전 검색어와 다른 새로운 검색어만 출력:`;
     }
 
-    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+    const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -324,6 +373,11 @@ export async function generateAlternativeKeywords(
     });
 
     if (!response.ok) {
+      if (response.status === 429 && _retryCount < GEMINI_API_KEYS.length - 1) {
+        console.warn(`⚠️ Gemini API 할당량 초과. 다음 키로 전환 시도...`);
+        switchToNextKey();
+        return generateAlternativeKeywords(subject, intention, gradeLevel, previousKeywords, _retryCount + 1);
+      }
       throw new Error(`Gemini API error: ${response.status}`);
     }
 

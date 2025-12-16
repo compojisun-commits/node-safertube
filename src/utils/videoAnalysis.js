@@ -2,10 +2,43 @@
 
 import { fetchTranscript, extractVideoId } from "./transcript";
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+// 여러 개의 Gemini API 키를 배열로 관리
+const GEMINI_API_KEYS = [
+  import.meta.env.VITE_GEMINI_API_KEY,
+  import.meta.env.VITE_GEMINI_API_KEY_2,
+  import.meta.env.VITE_GEMINI_API_KEY_3,
+].filter(Boolean);
+
 const YOUTUBE_API_KEY = import.meta.env.VITE_YOUTUBE_API_KEY;
 const GEMINI_API_URL =
   "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+
+/**
+ * 현재 사용 중인 Gemini API 키 인덱스 가져오기
+ */
+function getCurrentKeyIndex() {
+  const stored = localStorage.getItem("gemini_api_key_index");
+  return stored ? parseInt(stored) : 0;
+}
+
+/**
+ * 다음 API 키로 전환
+ */
+function switchToNextKey() {
+  const currentIndex = getCurrentKeyIndex();
+  const nextIndex = (currentIndex + 1) % GEMINI_API_KEYS.length;
+  localStorage.setItem("gemini_api_key_index", nextIndex.toString());
+  console.log(`🔄 Gemini API 키 전환: ${currentIndex} → ${nextIndex}`);
+  return nextIndex;
+}
+
+/**
+ * 현재 사용할 API 키 가져오기
+ */
+function getCurrentApiKey() {
+  const index = getCurrentKeyIndex();
+  return GEMINI_API_KEYS[index];
+}
 
 /**
  * YouTube 영상 길이 가져오기
@@ -50,7 +83,8 @@ export async function analyzeShortVideo(
   videoId,
   videoDuration,
   gradeLevel,
-  onProgress
+  onProgress,
+  _retryCount = 0
 ) {
   try {
     // 자막 추출 (가능하면 활용)
@@ -74,7 +108,8 @@ export async function analyzeShortVideo(
     const selectedFilter =
       gradeFilters[gradeLevel] || gradeFilters["elementary-5-6"];
 
-    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+    const apiKey = getCurrentApiKey();
+    const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -286,6 +321,12 @@ ${transcript
     });
 
     if (!response.ok) {
+      // 429 오류이고 재시도 가능한 경우 다음 키로 전환
+      if (response.status === 429 && _retryCount < GEMINI_API_KEYS.length - 1) {
+        console.warn(`⚠️ Gemini API 할당량 초과. 다음 키로 전환 시도...`);
+        switchToNextKey();
+        return analyzeShortVideo(videoUrl, videoId, videoDuration, gradeLevel, onProgress, _retryCount + 1);
+      }
       throw new Error(`Gemini API error: ${response.status}`);
     }
 
@@ -323,7 +364,7 @@ ${transcript
  * 🆕 영상 전체를 한 번에 분석하여 타임라인 생성 (가장 정확!)
  * 청크 분할 X, AI가 영상 전체를 보고 주제 전환점을 직접 찾음
  */
-async function generateTimelineFromVideo(videoUrl, videoDuration, transcript) {
+async function generateTimelineFromVideo(videoUrl, videoDuration, transcript, _retryCount = 0) {
   console.log("[타임라인 생성] 시작 - 영상 길이:", formatTimestamp(videoDuration));
   
   // 자막이 있으면 자막 정보도 함께 제공
@@ -366,7 +407,8 @@ ${transcriptHint}
 **반드시 JSON 배열만 출력하세요! description은 한국어로!**`;
 
   try {
-    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+    const apiKey = getCurrentApiKey();
+    const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -387,10 +429,19 @@ ${transcriptHint}
         },
       }),
     });
-    
+
+    if (!response.ok) {
+      // 429 오류이고 재시도 가능한 경우 다음 키로 전환
+      if (response.status === 429 && _retryCount < GEMINI_API_KEYS.length - 1) {
+        console.warn(`⚠️ Gemini API 할당량 초과. 다음 키로 전환 시도...`);
+        switchToNextKey();
+        return generateTimelineFromVideo(videoUrl, videoDuration, transcript, _retryCount + 1);
+      }
+    }
+
     const data = await response.json();
     console.log("[타임라인 생성] API 응답 수신");
-    
+
     if (!data.candidates || !data.candidates[0]) {
       console.error("[타임라인 생성] 응답 없음:", data);
       return [];
@@ -434,7 +485,8 @@ export async function analyzeLongVideo(
   videoId,
   videoDuration,
   gradeLevel,
-  onProgress
+  onProgress,
+  _retryCount = 0
 ) {
   try {
     // 🆕 청크 크기 20분으로 확대 (정확도 유지 + 속도 향상)
@@ -493,7 +545,8 @@ export async function analyzeLongVideo(
       const startMin = Math.floor(startTime / 60);
       const endMin = Math.floor(endTime / 60);
 
-      const promise = fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+      const apiKey = getCurrentApiKey();
+      const promise = fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -697,8 +750,9 @@ ${transcript
     // 전체 요약 생성
     onProgress?.({ status: "summarizing", message: "전체 요약 생성 중..." });
 
+    const apiKey = getCurrentApiKey();
     const summaryResponse = await fetch(
-      `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`,
+      `${GEMINI_API_URL}?key=${apiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -825,6 +879,15 @@ ${allWarnings
         }),
       }
     );
+
+    if (!summaryResponse.ok) {
+      // 429 오류이고 재시도 가능한 경우 다음 키로 전환
+      if (summaryResponse.status === 429 && _retryCount < GEMINI_API_KEYS.length - 1) {
+        console.warn(`⚠️ Gemini API 할당량 초과. 다음 키로 전환 시도...`);
+        switchToNextKey();
+        return analyzeLongVideo(videoUrl, videoId, videoDuration, gradeLevel, onProgress, _retryCount + 1);
+      }
+    }
 
     const summaryData = await summaryResponse.json();
     const summaryText =
@@ -962,7 +1025,7 @@ export function alignFlowWithTranscript(analysis, transcript, minSeconds = 0, ma
  * @param {number} endSeconds - 청크 끝 시간
  * @returns {Promise<Array>} 챕터 배열
  */
-export async function generateChaptersFromTranscript(transcript, startSeconds, endSeconds) {
+export async function generateChaptersFromTranscript(transcript, startSeconds, endSeconds, _retryCount = 0) {
   if (!transcript || transcript.length === 0) return [];
   
   // 해당 청크의 자막만 필터링 + id 부여
@@ -1003,7 +1066,8 @@ ${JSON.stringify(chunkTranscript.slice(0, 80), null, 2)}
 만약 이 구간에 명확한 주제 전환이 없다면 빈 배열 []을 반환해.`;
 
   try {
-    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+    const apiKey = getCurrentApiKey();
+    const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1015,7 +1079,16 @@ ${JSON.stringify(chunkTranscript.slice(0, 80), null, 2)}
         },
       }),
     });
-    
+
+    if (!response.ok) {
+      // 429 오류이고 재시도 가능한 경우 다음 키로 전환
+      if (response.status === 429 && _retryCount < GEMINI_API_KEYS.length - 1) {
+        console.warn(`⚠️ Gemini API 할당량 초과. 다음 키로 전환 시도...`);
+        switchToNextKey();
+        return generateChaptersFromTranscript(transcript, startSeconds, endSeconds, _retryCount + 1);
+      }
+    }
+
     const data = await response.json();
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
     return parseJSON(text) || [];
