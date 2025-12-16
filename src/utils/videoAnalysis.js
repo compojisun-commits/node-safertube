@@ -13,6 +13,16 @@ const YOUTUBE_API_KEY = import.meta.env.VITE_YOUTUBE_API_KEY;
 const GEMINI_API_URL =
   "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 
+// Rate Limiting: API 호출 사이 대기 시간 (밀리초)
+const API_CALL_DELAY = 2000; // 2초
+
+/**
+ * API 호출 사이 지연 함수
+ */
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 /**
  * 현재 사용 중인 Gemini API 키 인덱스 가져오기
  */
@@ -107,6 +117,11 @@ export async function analyzeShortVideo(
 
     const selectedFilter =
       gradeFilters[gradeLevel] || gradeFilters["elementary-5-6"];
+
+    // Rate Limiting: API 호출 전 대기
+    if (_retryCount === 0) {
+      await delay(API_CALL_DELAY);
+    }
 
     const apiKey = getCurrentApiKey();
     const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
@@ -407,6 +422,11 @@ ${transcriptHint}
 **반드시 JSON 배열만 출력하세요! description은 한국어로!**`;
 
   try {
+    // Rate Limiting: API 호출 전 대기
+    if (_retryCount === 0) {
+      await delay(API_CALL_DELAY);
+    }
+
     const apiKey = getCurrentApiKey();
     const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
       method: "POST",
@@ -544,6 +564,11 @@ export async function analyzeLongVideo(
       const endTime = Math.min((i + 1) * CHUNK_DURATION, videoDuration);
       const startMin = Math.floor(startTime / 60);
       const endMin = Math.floor(endTime / 60);
+
+      // Rate Limiting: API 호출 전 대기 (재시도가 아닌 경우에만)
+      if (chunkRetryCount === 0) {
+        await delay(API_CALL_DELAY);
+      }
 
       const apiKey = getCurrentApiKey();
       const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
@@ -751,6 +776,11 @@ ${transcript
 
     // 전체 요약 생성
     onProgress?.({ status: "summarizing", message: "전체 요약 생성 중..." });
+
+    // Rate Limiting: API 호출 전 대기
+    if (_retryCount === 0) {
+      await delay(API_CALL_DELAY);
+    }
 
     const apiKey = getCurrentApiKey();
     const summaryResponse = await fetch(
@@ -1068,6 +1098,11 @@ ${JSON.stringify(chunkTranscript.slice(0, 80), null, 2)}
 만약 이 구간에 명확한 주제 전환이 없다면 빈 배열 []을 반환해.`;
 
   try {
+    // Rate Limiting: API 호출 전 대기
+    if (_retryCount === 0) {
+      await delay(API_CALL_DELAY);
+    }
+
     const apiKey = getCurrentApiKey();
     const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
       method: "POST",

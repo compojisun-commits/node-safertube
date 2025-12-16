@@ -10,6 +10,16 @@ const GEMINI_API_KEYS = [
 const GEMINI_API_URL =
   "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 
+// Rate Limiting: API 호출 사이 대기 시간 (밀리초)
+const API_CALL_DELAY = 2000; // 2초
+
+/**
+ * API 호출 사이 지연 함수
+ */
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 /**
  * 현재 사용 중인 API 키 인덱스 가져오기
  */
@@ -163,6 +173,11 @@ JSON만 출력:
 
 JSON만 출력:`;
 
+    // Rate Limiting: API 호출 전 대기
+    if (_retryCount === 0) {
+      await delay(API_CALL_DELAY);
+    }
+
     const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
       method: "POST",
       headers: {
@@ -264,6 +279,11 @@ ${intention ? `**수업 의도:** ${intention}` : ""}
 검색어만 출력:`;
     }
 
+    // Rate Limiting: API 호출 전 대기
+    if (_retryCount === 0) {
+      await delay(API_CALL_DELAY);
+    }
+
     const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
       method: "POST",
       headers: {
@@ -348,6 +368,11 @@ export async function generateAlternativeKeywords(
 **이전에 사용한 검색어 (중복 금지):** ${previousKeywords.join(", ")}
 
 이전 검색어와 다른 새로운 검색어만 출력:`;
+    }
+
+    // Rate Limiting: API 호출 전 대기
+    if (_retryCount === 0) {
+      await delay(API_CALL_DELAY);
     }
 
     const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
