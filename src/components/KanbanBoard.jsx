@@ -1732,6 +1732,9 @@ export default function KanbanBoard({
   const [editingColumn, setEditingColumn] = useState(null);
   const [isEditMode, setIsEditMode] = useState(false);
   
+  // 🆕 컬럼 메뉴 위치 (fixed position용)
+  const [columnMenuPosition, setColumnMenuPosition] = useState({ x: 0, y: 0 });
+  
   // 🆕 인라인 섹션명 편집 상태
   const [inlineEditingColumnId, setInlineEditingColumnId] = useState(null);
   const [inlineEditValue, setInlineEditValue] = useState('');
@@ -2395,6 +2398,91 @@ export default function KanbanBoard({
       });
     }
   }, [columns, videosByStatus, onUpdateVideoStatus]);
+
+  // 🆕 섹션을 다른 보드로 이동
+  const handleMoveSectionToBoard = useCallback(async (columnId) => {
+    const column = columns.find(c => c.id === columnId);
+    if (!column) return;
+
+    const columnItems = videosByStatus[columnId] || [];
+    const columnVideos = columnItems.filter(item => item._type !== 'memo');
+    
+    if (columnVideos.length === 0) {
+      Swal.fire({
+        icon: 'info',
+        title: '이동할 영상이 없습니다',
+        timer: 1500,
+        showConfirmButton: false
+      });
+      return;
+    }
+
+    // 다른 보드 목록 (현재 보드 제외)
+    const otherBoards = boards.filter(b => b.id !== currentBoardId);
+    if (otherBoards.length === 0) {
+      Swal.fire({
+        icon: 'info',
+        title: '이동할 보드가 없습니다',
+        text: '다른 보드를 먼저 만들어주세요.',
+        confirmButtonColor: '#8b5cf6'
+      });
+      return;
+    }
+
+    const boardOptions = {};
+    otherBoards.forEach(b => {
+      boardOptions[b.id] = `${b.icon || '📋'} ${b.name}`;
+    });
+
+    const { value: targetBoardId } = await Swal.fire({
+      title: '📦 다른 보드로 이동',
+      html: `
+        <p>"<strong>${column.title}</strong>" 섹션의 ${columnVideos.length}개 영상을 이동합니다.</p>
+        <p style="font-size: 13px; color: #64748b; margin-top: 8px;">
+          대상 보드의 첫 번째 섹션으로 이동됩니다.
+        </p>
+      `,
+      input: 'select',
+      inputOptions: boardOptions,
+      inputPlaceholder: '이동할 보드 선택',
+      showCancelButton: true,
+      confirmButtonText: '이동',
+      cancelButtonText: '취소',
+      confirmButtonColor: '#8b5cf6',
+      inputValidator: (value) => {
+        if (!value) return '보드를 선택해주세요';
+      }
+    });
+
+    if (targetBoardId) {
+      const targetBoard = boards.find(b => b.id === targetBoardId);
+      const targetColumnId = targetBoard?.columns?.[0]?.id;
+      
+      if (!targetColumnId) {
+        Swal.fire({
+          icon: 'error',
+          title: '이동 실패',
+          text: '대상 보드에 섹션이 없습니다.',
+          confirmButtonColor: '#ef4444'
+        });
+        return;
+      }
+
+      // 각 영상의 status를 대상 보드의 첫 번째 컬럼으로 변경
+      for (const video of columnVideos) {
+        await onUpdateVideoStatus?.(video.id, targetColumnId);
+      }
+
+      setColumnMenuOpen(null);
+      Swal.fire({
+        icon: 'success',
+        title: '이동 완료!',
+        html: `<p>${columnVideos.length}개 영상이 "<strong>${targetBoard.name}</strong>" 보드로 이동되었습니다.</p>`,
+        timer: 2500,
+        showConfirmButton: false
+      });
+    }
+  }, [columns, videosByStatus, boards, currentBoardId, onUpdateVideoStatus]);
 
   // 미분류 영상 수
   const unorganizedCount = useMemo(() => {
@@ -3097,6 +3185,12 @@ export default function KanbanBoard({
                       className="kanban-column-more-btn"
                       onClick={(e) => {
                         e.stopPropagation();
+                        // 메뉴 위치 계산 (fixed position용)
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setColumnMenuPosition({
+                          x: Math.min(rect.right - 220, window.innerWidth - 240),
+                          y: rect.bottom + 6
+                        });
                         setColumnMenuOpen(columnMenuOpen === column.id ? null : column.id);
                       }}
                       title="더보기"
@@ -3105,7 +3199,13 @@ export default function KanbanBoard({
                     </button>
                     
                     {columnMenuOpen === column.id && (
-                      <div className="kanban-column-dropdown-menu">
+                      <div 
+                        className="kanban-column-dropdown-menu"
+                        style={{
+                          left: columnMenuPosition.x,
+                          top: columnMenuPosition.y
+                        }}
+                      >
                         {/* 색상 변경 */}
                         <button 
                           className="kanban-dropdown-item"
@@ -3134,6 +3234,23 @@ export default function KanbanBoard({
                         >
                           <IconX />
                           <span>전체 비우기</span>
+                        </button>
+                        
+                        {/* 구분선 */}
+                        <div className="kanban-dropdown-divider"></div>
+                        
+                        {/* 🆕 다른 보드로 이동 */}
+                        <button 
+                          className="kanban-dropdown-item highlight"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setColumnMenuOpen(null);
+                            handleMoveSectionToBoard(column.id);
+                          }}
+                        >
+                          <IconFolder />
+                          <span>다른 보드로 이동</span>
+                          <span className="dropdown-badge">{(videosByStatus[column.id] || []).filter(v => v._type !== 'memo').length}</span>
                         </button>
                         
                         {/* 구분선 */}

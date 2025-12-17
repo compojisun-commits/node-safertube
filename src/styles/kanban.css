@@ -1045,14 +1045,12 @@
 
 /* 🆕 드롭다운 메뉴 (Notion/Trello 스타일) */
 .kanban-column-dropdown-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  min-width: 160px;
+  position: fixed;
+  min-width: 220px;
   background: white;
   border-radius: var(--radius-md, 10px);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15), 0 0 1px rgba(0, 0, 0, 0.1);
-  z-index: 1000;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25), 0 0 1px rgba(0, 0, 0, 0.15);
+  z-index: 999999; /* 🆕 최상위 표시 - fixed position 사용 */
   overflow: hidden;
   animation: menuSlideIn 0.15s ease-out;
 }
@@ -1094,6 +1092,33 @@
 
 .kanban-dropdown-item.danger:hover {
   background: #fef2f2;
+}
+
+/* 🆕 폴더로 저장 - 하이라이트 스타일 */
+.kanban-dropdown-item.highlight {
+  color: #7c3aed;
+  font-weight: 600;
+}
+
+.kanban-dropdown-item.highlight:hover {
+  background: #f5f3ff;
+}
+
+.kanban-dropdown-item.highlight svg {
+  color: #8b5cf6;
+}
+
+/* 🆕 드롭다운 뱃지 (영상 개수 표시) */
+.dropdown-badge {
+  margin-left: auto;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: white;
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  border-radius: 10px;
+  min-width: 20px;
+  text-align: center;
 }
 
 /* 🆕 드롭다운 구분선 */
@@ -2030,6 +2055,91 @@
 }
 
 /* ======================================== */
+/* 🆕 보드 전체 폴더로 저장 버튼 */
+/* ======================================== */
+.kanban-save-board-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 10px;
+  color: #7c3aed;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 200ms ease;
+  box-shadow: 0 1px 3px rgba(139, 92, 246, 0.1);
+}
+
+.kanban-save-board-btn:hover {
+  background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);
+  border-color: #8b5cf6;
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.2);
+  transform: translateY(-1px);
+}
+
+.kanban-save-board-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* ======================================== */
+/* 🆕 헤더 액션 버튼 (보드 수정/저장 등) */
+/* ======================================== */
+.kanban-header-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: white;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 200ms ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.kanban-header-btn:hover {
+  background: #f8fafc;
+  border-color: rgba(139, 92, 246, 0.3);
+  color: #7c3aed;
+}
+
+.kanban-header-btn.edit {
+  padding: 8px;
+}
+
+.kanban-header-btn.edit:hover {
+  background: #fef3c7;
+  border-color: #f59e0b;
+  color: #d97706;
+}
+
+.kanban-header-btn.save {
+  background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+  border-color: rgba(139, 92, 246, 0.3);
+  color: #7c3aed;
+}
+
+.kanban-header-btn.save:hover {
+  background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);
+  border-color: #8b5cf6;
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.2);
+}
+
+.kanban-header-btn svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+/* ======================================== */
 /* 🆕 와이드 뷰 토글 버튼 */
 /* ======================================== */
 .kanban-wide-toggle {
@@ -2394,6 +2504,2025 @@
 /* ======================================== */
 /* 🆕 보드 선택기 v23.0 */
 /* ======================================== */
+
+.kanban-board-selector {
+  position: relative;
+}
+
+.kanban-board-selector-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  background: white;
+  border: none;
+  border-radius: var(--radius-lg, 16px);
+  cursor: pointer;
+  transition: all 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: var(--shadow-sm);
+}
+
+.kanban-board-selector-btn:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.kanban-board-selector-btn:active {
+  transform: scale(0.98);
+}
+
+.kanban-board-icon {
+  font-size: 20px;
+}
+
+.kanban-board-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.kanban-board-selector-btn svg {
+  color: #94a3b8;
+  transition: transform 0.2s;
+}
+
+.kanban-board-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 8px;
+  min-width: 300px;
+  background: white;
+  border: none;
+  border-radius: var(--radius-xl, 20px);
+  box-shadow: var(--shadow-2xl);
+  z-index: 1000;
+  animation: dropdownSlide 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  backdrop-filter: blur(10px);
+  overflow: hidden;
+}
+
+@keyframes dropdownSlide {
+  from {
+    opacity: 0;
+    transform: translateY(-16px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.kanban-board-dropdown-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.kanban-board-dropdown-list {
+  padding: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.kanban-board-option {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  width: 100%;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s;
+}
+
+.kanban-board-option:hover {
+  background: #f8fafc;
+}
+
+.kanban-board-option.active {
+  background: #f5f3ff;
+}
+
+.kanban-board-option-icon {
+  font-size: 18px;
+}
+
+.kanban-board-option-name {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.kanban-board-option-cols {
+  font-size: 11px;
+  color: #94a3b8;
+  background: #f1f5f9;
+  padding: 3px 8px;
+  border-radius: 10px;
+}
+
+.kanban-board-option.active .kanban-board-option-cols {
+  background: #ede9fe;
+  color: #7c3aed;
+}
+
+.kanban-board-option svg {
+  color: #7c3aed;
+}
+
+/* 🆕 보드 옵션 메인 버튼 */
+.kanban-board-option-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  padding: 12px 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.kanban-board-option-main:hover {
+  background: #f8fafc;
+}
+
+.kanban-board-option.active .kanban-board-option-main {
+  background: #f5f3ff;
+}
+
+/* 🆕 보드 삭제 버튼 */
+.kanban-board-option-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin-right: 8px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #94a3b8;
+  opacity: 0;
+  transition: all 0.15s;
+}
+
+.kanban-board-option:hover .kanban-board-option-delete {
+  opacity: 1;
+}
+
+.kanban-board-option-delete:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.kanban-board-dropdown-footer {
+  padding: 8px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.kanban-board-create-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border: 2px dashed #e2e8f0;
+  border-radius: 8px;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.kanban-board-create-btn:hover {
+  background: #f5f3ff;
+  border-color: #c4b5fd;
+  color: #7c3aed;
+}
+
+/* ======================================== */
+/* 🆕 편집 모드 스타일 */
+/* ======================================== */
+
+.kanban-edit-mode-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.kanban-edit-mode-btn:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.kanban-edit-mode-btn.active {
+  background: #fef3c7;
+  border-color: #fbbf24;
+  color: #d97706;
+}
+
+.kanban-edit-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border-bottom: 1px solid #fbbf24;
+}
+
+.kanban-edit-toolbar-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #92400e;
+}
+
+.kanban-edit-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.kanban-toolbar-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.kanban-toolbar-btn.add {
+  background: white;
+  border: 1px solid #e2e8f0;
+  color: #374151;
+}
+
+.kanban-toolbar-btn.add:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.kanban-toolbar-btn.delete {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+}
+
+.kanban-toolbar-btn.delete:hover {
+  background: #fee2e2;
+}
+
+/* 편집 모드에서 컬럼 */
+.kanban-global-column.edit-mode {
+  border: 2px dashed #fbbf24;
+}
+
+.kanban-column-header-v2.editable {
+  cursor: pointer;
+  position: relative;
+}
+
+.kanban-column-header-v2.editable:hover {
+  filter: brightness(0.97);
+}
+
+.kanban-column-edit-btn {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  color: #64748b;
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.15s;
+}
+
+.kanban-column-header-v2.editable:hover .kanban-column-edit-btn {
+  opacity: 1;
+}
+
+.kanban-column-edit-btn:hover {
+  background: #f5f3ff;
+  border-color: #c4b5fd;
+  color: #7c3aed;
+}
+
+/* 🆕 섹션 추가 영역 */
+.kanban-add-column-area {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 0 10px;
+}
+
+.kanban-add-column-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  transition: all 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  position: relative;
+  overflow: hidden;
+  width: 160px;
+  padding: 40px 20px;
+  background: white;
+  border: 2px dashed #e2e8f0;
+  border-radius: 16px;
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.kanban-add-column-btn:hover {
+  background: linear-gradient(135deg, var(--primary-500, #8b5cf6), var(--primary-600, #7c3aed));
+  border-color: transparent;
+  color: white;
+  transform: scale(1.05);
+  box-shadow: var(--shadow-lg), 0 0 30px rgba(139, 92, 246, 0.3);
+}
+
+.kanban-add-column-btn:active {
+  transform: scale(0.98);
+}
+
+.kanban-add-column-btn svg {
+  width: 28px;
+  height: 28px;
+  transition: transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.kanban-add-column-btn:hover svg {
+  transform: rotate(90deg);
+}
+
+/* ======================================== */
+/* 🆕 컬럼 편집 모달 */
+/* ======================================== */
+
+.kanban-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999; /* 🆕 항상 최상위에 표시 */
+  animation: overlayFadeIn 0.25s ease-out;
+}
+
+@keyframes overlayFadeIn {
+  from { opacity: 0; backdrop-filter: blur(0); }
+  to { opacity: 1; backdrop-filter: blur(8px); }
+}
+
+.kanban-modal {
+  width: 100%;
+  max-width: 440px;
+  background: white;
+  border-radius: var(--radius-xl, 24px);
+  box-shadow: var(--shadow-2xl), 0 0 80px rgba(139, 92, 246, 0.1);
+  animation: modalSpring 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes modalSpring {
+  from { opacity: 0; transform: scale(0.9) translateY(20px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes modalSlide {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.kanban-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.kanban-modal-header h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+}
+
+.kanban-modal-close {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f1f5f9;
+  border: none;
+  border-radius: 8px;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.kanban-modal-close:hover {
+  background: #e2e8f0;
+  color: #374151;
+}
+
+.kanban-modal-content {
+  padding: 24px;
+}
+
+.kanban-modal-field {
+  margin-bottom: 20px;
+}
+
+.kanban-modal-field:last-child {
+  margin-bottom: 0;
+}
+
+.kanban-modal-field label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 8px;
+}
+
+.kanban-modal-field input {
+  width: 100%;
+  padding: 12px 14px;
+  font-size: 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  outline: none;
+  transition: all 0.15s;
+}
+
+.kanban-modal-field input:focus {
+  background: white;
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+}
+
+.kanban-modal-field small {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+/* 색상 팔레트 */
+.kanban-color-palette {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.kanban-color-btn {
+  width: 36px;
+  height: 36px;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: transparent;
+}
+
+.kanban-color-btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.kanban-color-btn.selected {
+  border-color: #8b5cf6;
+  color: #8b5cf6;
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.3);
+}
+
+/* 모달 푸터 */
+.kanban-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  background: #f8fafc;
+  border-top: 1px solid #f1f5f9;
+  border-radius: 0 0 16px 16px;
+}
+
+.kanban-modal-btn-group {
+  display: flex;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.kanban-modal-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.kanban-modal-btn.cancel {
+  background: white;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
+}
+
+.kanban-modal-btn.cancel:hover {
+  background: #f1f5f9;
+}
+
+.kanban-modal-btn.save {
+  background: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-600) 100%);
+  border: none;
+  color: white;
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+  transition: all 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.kanban-modal-btn.save:hover {
+  background: linear-gradient(135deg, var(--primary-600) 0%, var(--primary-700) 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(139, 92, 246, 0.4);
+}
+
+.kanban-modal-btn.save:active {
+  transform: scale(0.98);
+}
+
+.kanban-modal-btn.delete {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+}
+
+.kanban-modal-btn.delete:hover {
+  background: #fee2e2;
+}
+
+/* ======================================== */
+/* 📅 미니 캘린더 팝업 */
+/* ======================================== */
+.mini-calendar-popup {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15), 0 0 1px rgba(0, 0, 0, 0.1);
+  padding: 16px;
+  z-index: 10000;
+  min-width: 280px;
+  animation: calendarSlideIn 0.2s ease-out;
+}
+
+@keyframes calendarSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.mini-calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.mini-calendar-header h4 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+}
+
+.mini-calendar-nav {
+  display: flex;
+  gap: 4px;
+}
+
+.mini-calendar-nav button {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f1f5f9;
+  border: none;
+  border-radius: 6px;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.mini-calendar-nav button:hover {
+  background: #e2e8f0;
+  color: #374151;
+}
+
+.mini-calendar-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.mini-calendar-weekdays span {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: #94a3b8;
+  padding: 4px 0;
+}
+
+.mini-calendar-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.mini-calendar-day {
+  width: 100%;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  background: none;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.mini-calendar-day:hover {
+  background: #f1f5f9;
+}
+
+.mini-calendar-day.other-month {
+  color: #cbd5e1;
+}
+
+.mini-calendar-day.today {
+  background: #f0f9ff;
+  color: #0ea5e9;
+  font-weight: 700;
+}
+
+.mini-calendar-day.selected {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  color: white;
+  font-weight: 700;
+}
+
+.mini-calendar-day.selected:hover {
+  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+}
+
+.mini-calendar-footer {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.mini-calendar-footer button {
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.mini-calendar-footer .btn-clear {
+  background: #fef2f2;
+  border: none;
+  color: #dc2626;
+}
+
+.mini-calendar-footer .btn-clear:hover {
+  background: #fee2e2;
+}
+
+.mini-calendar-footer .btn-today {
+  background: #f0f9ff;
+  border: none;
+  color: #0ea5e9;
+}
+
+.mini-calendar-footer .btn-today:hover {
+  background: #e0f2fe;
+}
+
+/* ======================================== */
+/* 📝 메모 카드 스타일 */
+/* ======================================== */
+.kanban-memo-card {
+  position: relative;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  cursor: grab;
+  transition: all 0.2s ease;
+  min-height: 100px;
+}
+
+.kanban-memo-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+
+.kanban-memo-card.selected {
+  box-shadow: 0 0 0 2px #8b5cf6, 0 4px 12px rgba(139, 92, 246, 0.2);
+}
+
+.kanban-memo-card.dragging {
+  opacity: 0.7;
+  transform: rotate(3deg) scale(1.02);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+}
+
+.kanban-memo-card.has-date {
+  padding-top: 40px;
+}
+
+/* 메모 체크박스 */
+.kanban-memo-checkbox {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 10;
+  opacity: 0;
+  transition: opacity 0.15s;
+  cursor: pointer;
+}
+
+.kanban-memo-card:hover .kanban-memo-checkbox,
+.kanban-memo-card.selected .kanban-memo-checkbox {
+  opacity: 1;
+}
+
+.kanban-memo-checkbox input {
+  display: none;
+}
+
+.kanban-memo-checkbox .kanban-checkbox-custom {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  background: white;
+  border: 2px solid #d1d5db;
+  border-radius: 4px;
+  transition: all 0.15s;
+}
+
+.kanban-memo-checkbox input:checked + .kanban-checkbox-custom {
+  background: #8b5cf6;
+  border-color: #8b5cf6;
+}
+
+.kanban-memo-checkbox input:checked + .kanban-checkbox-custom::after {
+  content: '✓';
+  color: white;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+/* 메모 날짜 배지 */
+.kanban-memo-date-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.kanban-memo-date-badge:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.kanban-memo-date-badge.overdue {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #dc2626;
+}
+
+.kanban-memo-date-badge.today {
+  background: #fef3c7;
+  border-color: #fde68a;
+  color: #d97706;
+}
+
+.kanban-memo-date-badge.upcoming {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #16a34a;
+}
+
+/* 메모 내용 */
+.kanban-memo-content {
+  font-size: 14px;
+  line-height: 1.6;
+  min-height: 60px;
+  word-break: break-word;
+  cursor: text;
+}
+
+.kanban-memo-placeholder {
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.kanban-memo-textarea {
+  width: 100%;
+  min-height: 80px;
+  padding: 8px;
+  font-size: 14px;
+  line-height: 1.6;
+  background: transparent;
+  border: none;
+  outline: none;
+  resize: none;
+  font-family: inherit;
+}
+
+/* 메모 툴바 */
+.kanban-memo-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.kanban-memo-card:hover .kanban-memo-toolbar {
+  opacity: 1;
+}
+
+.kanban-memo-created {
+  font-size: 10px;
+  color: #94a3b8;
+}
+
+.kanban-memo-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.kanban-memo-action-btn {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.04);
+  border: none;
+  border-radius: 6px;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.kanban-memo-action-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: #374151;
+}
+
+.kanban-memo-action-btn.delete:hover {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+/* 색상 선택 팝업 */
+.kanban-color-picker-wrapper {
+  position: relative;
+}
+
+.kanban-color-picker-popup {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  display: flex;
+  gap: 6px;
+  padding: 8px;
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+  animation: popupFadeIn 0.15s ease-out;
+}
+
+@keyframes popupFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.kanban-color-option {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.kanban-color-option:hover {
+  transform: scale(1.15);
+}
+
+.kanban-color-option.active {
+  border-color: #374151;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
+}
+
+/* 색상 선택 드롭다운 */
+.kanban-color-picker-dropdown {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  display: flex;
+  gap: 6px;
+  padding: 10px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+  animation: popupFadeIn 0.15s ease-out;
+}
+
+/* 메모 추가 버튼 */
+.kanban-add-memo-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 12px;
+  background: linear-gradient(135deg, #fef9c3 0%, #fef3c7 100%);
+  border: 2px dashed #fde047;
+  border-radius: 10px;
+  color: #ca8a04;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.kanban-add-memo-btn:hover {
+  background: linear-gradient(135deg, #fef08a 0%, #fde68a 100%);
+  border-color: #facc15;
+}
+
+/* ======================================== */
+/* 🔗 링크 추가 모달 */
+/* ======================================== */
+.add-link-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: overlayFadeIn 0.2s ease-out;
+}
+
+.add-link-modal {
+  width: 100%;
+  max-width: 480px;
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+  animation: modalSpring 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  overflow: hidden;
+}
+
+.add-link-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.add-link-modal-header h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+}
+
+.add-link-modal-close {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f1f5f9;
+  border: none;
+  border-radius: 10px;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.add-link-modal-close:hover {
+  background: #e2e8f0;
+  color: #374151;
+}
+
+.add-link-modal-content {
+  padding: 24px;
+}
+
+.add-link-field {
+  margin-bottom: 20px;
+}
+
+.add-link-field:last-child {
+  margin-bottom: 0;
+}
+
+.add-link-field label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 8px;
+}
+
+.add-link-url-input-wrapper,
+.add-link-title-input-wrapper {
+  position: relative;
+}
+
+.add-link-url-input-wrapper input,
+.add-link-title-input-wrapper input {
+  width: 100%;
+  padding: 14px 16px;
+  padding-right: 100px;
+  font-size: 14px;
+  background: #f8fafc;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.add-link-url-input-wrapper input:focus,
+.add-link-title-input-wrapper input:focus {
+  background: white;
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.1);
+}
+
+.add-link-type-indicator {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  background: #f1f5f9;
+  border-radius: 6px;
+}
+
+.add-link-loading {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.add-link-field-hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.add-link-preview {
+  margin-top: 16px;
+  padding: 16px;
+  background: #f8fafc;
+  border-radius: 12px;
+}
+
+.add-link-preview-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.add-link-preview-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: white;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+}
+
+.add-link-preview-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f1f5f9;
+  border-radius: 10px;
+}
+
+.add-link-preview-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.add-link-preview-title {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.add-link-preview-url {
+  display: block;
+  font-size: 11px;
+  color: #94a3b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+.add-link-modal-footer {
+  display: flex;
+  gap: 10px;
+  padding: 16px 24px;
+  background: #f8fafc;
+  border-top: 1px solid #f1f5f9;
+}
+
+.add-link-btn {
+  flex: 1;
+  padding: 14px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.add-link-btn.cancel {
+  background: white;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
+}
+
+.add-link-btn.cancel:hover {
+  background: #f1f5f9;
+}
+
+.add-link-btn.submit {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  border: none;
+  color: white;
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+}
+
+.add-link-btn.submit:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(139, 92, 246, 0.4);
+}
+
+.add-link-btn.submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ======================================== */
+/* 🎬 YouTube 플레이어 모달 */
+/* ======================================== */
+.youtube-player-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: overlayFadeIn 0.2s ease-out;
+}
+
+.youtube-player-modal {
+  width: 100%;
+  max-width: 900px;
+  background: #000;
+  border-radius: 16px;
+  overflow: hidden;
+  animation: modalSpring 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.youtube-player-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: #1a1a1a;
+}
+
+.youtube-player-header h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: white;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.youtube-player-close {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.youtube-player-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.youtube-player-container {
+  position: relative;
+  padding-top: 56.25%;
+}
+
+.youtube-player-container iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* ======================================== */
+/* 🔲 Smart Embed 카드 */
+/* ======================================== */
+.smart-embed-card {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+  transition: all 0.2s;
+}
+
+.smart-embed-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.smart-embed-card.youtube {
+  border-color: #fecaca;
+}
+
+.smart-embed-card.twitter,
+.smart-embed-card.twitter-embed {
+  border-color: #bfdbfe;
+}
+
+.smart-embed-card.brand-card {
+  border-left: 4px solid;
+}
+
+.smart-embed-thumb {
+  position: relative;
+  aspect-ratio: 16/9;
+  background: #f1f5f9;
+  cursor: pointer;
+}
+
+.smart-embed-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.smart-embed-play-btn {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 50%;
+  color: white;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.smart-embed-thumb:hover .smart-embed-play-btn {
+  opacity: 1;
+}
+
+.smart-embed-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 6px;
+}
+
+.smart-embed-badge.youtube {
+  background: #dc2626;
+  color: white;
+}
+
+.smart-embed-badge.twitter {
+  background: #1d9bf0;
+  color: white;
+}
+
+.smart-embed-content {
+  padding: 14px;
+}
+
+.smart-embed-twitter-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.smart-embed-tweet-container {
+  padding: 14px;
+}
+
+.smart-embed-tweet-skeleton {
+  display: flex;
+  gap: 12px;
+}
+
+.skeleton-avatar {
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 50%;
+}
+
+.skeleton-content {
+  flex: 1;
+}
+
+.skeleton-line {
+  height: 12px;
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+.skeleton-line.short {
+  width: 40%;
+}
+
+.skeleton-line.medium {
+  width: 70%;
+}
+
+.smart-embed-twitter-content {
+  padding: 14px;
+}
+
+.smart-embed-twitter-text {
+  font-size: 14px;
+  color: #1e293b;
+  margin: 0 0 12px 0;
+}
+
+.smart-embed-twitter-link,
+.smart-embed-external-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1d9bf0;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.smart-embed-twitter-link:hover,
+.smart-embed-external-link:hover {
+  color: #0c7abf;
+}
+
+.smart-embed-brand-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.smart-embed-brand-icon {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f1f5f9;
+  border-radius: 8px;
+}
+
+.smart-embed-brand-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.smart-embed-brand-content {
+  padding: 14px;
+}
+
+.smart-embed-brand-content h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 6px 0;
+}
+
+.smart-embed-brand-url {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+/* ======================================== */
+/* 📅 캘린더 대체 스타일 (cal-*) */
+/* ======================================== */
+.cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.cal-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.cal-nav {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f1f5f9;
+  border: none;
+  border-radius: 8px;
+  font-size: 18px;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.cal-nav:hover {
+  background: #e2e8f0;
+  color: #374151;
+}
+
+.cal-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.cal-weekday {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: #94a3b8;
+  padding: 4px 0;
+}
+
+.cal-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.cal-day {
+  width: 100%;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  background: none;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.cal-day:hover:not(.empty) {
+  background: #f1f5f9;
+}
+
+.cal-day.empty {
+  cursor: default;
+}
+
+.cal-day.today {
+  background: #f0f9ff;
+  color: #0ea5e9;
+  font-weight: 700;
+}
+
+.cal-day.selected {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  color: white;
+  font-weight: 700;
+}
+
+.cal-day.selected:hover {
+  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+}
+
+.cal-footer {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.cal-today-btn,
+.cal-clear-btn {
+  flex: 1;
+  padding: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.cal-today-btn {
+  background: #f0f9ff;
+  color: #0ea5e9;
+}
+
+.cal-today-btn:hover {
+  background: #e0f2fe;
+}
+
+.cal-clear-btn {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.cal-clear-btn:hover {
+  background: #fee2e2;
+}
+
+/* 스피너 애니메이션 */
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ============================================================
+   🆕 새 보드 만들기 모달 (Notion 스타일)
+   ============================================================ */
+
+.create-board-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  backdrop-filter: blur(4px);
+}
+
+.create-board-modal {
+  background: white;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  animation: modalSlideIn 0.2s ease;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.create-board-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.create-board-header h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0;
+}
+
+.create-board-close {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f3f4f6;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #6b7280;
+  transition: all 0.15s;
+}
+
+.create-board-close:hover {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+/* 입력 영역 */
+.create-board-input-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 24px;
+}
+
+/* 이모지 선택 버튼 */
+.emoji-trigger-wrapper {
+  position: relative;
+}
+
+.emoji-trigger-btn {
+  width: 56px;
+  height: 56px;
+  font-size: 28px;
+  background: #f9fafb;
+  border: 2px dashed #d1d5db;
+  border-radius: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.emoji-trigger-btn:hover {
+  border-color: #8b5cf6;
+  background: #f5f3ff;
+}
+
+/* 이모지 피커 팝오버 */
+.emoji-picker-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  padding: 12px;
+  z-index: 100;
+  animation: fadeIn 0.15s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.emoji-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+}
+
+.emoji-option {
+  width: 36px;
+  height: 36px;
+  font-size: 20px;
+  background: none;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.1s;
+}
+
+.emoji-option:hover {
+  background: #f3f4f6;
+  transform: scale(1.1);
+}
+
+.emoji-option.selected {
+  background: #f5f3ff;
+  border-color: #8b5cf6;
+}
+
+/* 보드 이름 입력 */
+.create-board-input {
+  flex: 1;
+  height: 56px;
+  padding: 0 16px;
+  font-size: 16px;
+  font-weight: 500;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  outline: none;
+  transition: all 0.15s;
+}
+
+.create-board-input:focus {
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+}
+
+.create-board-input::placeholder {
+  color: #9ca3af;
+}
+
+/* 미리보기 */
+.create-board-preview {
+  padding: 0 24px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.preview-label {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.preview-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  padding: 4px 10px;
+  background: #f3f4f6;
+  border-radius: 6px;
+}
+
+/* 하단 버튼 */
+.create-board-footer {
+  display: flex;
+  gap: 12px;
+  padding: 16px 24px 24px;
+  border-top: 1px solid #f3f4f6;
+}
+
+.create-board-btn {
+  flex: 1;
+  padding: 14px;
+  font-size: 15px;
+  font-weight: 600;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.create-board-btn.cancel {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.create-board-btn.cancel:hover {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.create-board-btn.confirm {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+}
+
+.create-board-btn.confirm:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(139, 92, 246, 0.4);
+}
+
+.create-board-btn.confirm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 반응형 */
+@media (max-width: 1200px) {
+  .kanban-global-column {
+    min-width: 200px;
+  }
+}
+
+@media (max-width: 768px) {
+  .kanban-global-header {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  
+  .kanban-global-title .kanban-subtitle {
+    display: none;
+  }
+  
+  .kanban-global-columns {
+    padding: 12px;
+    gap: 12px;
+  }
+  
+  .kanban-global-column {
+    flex: 0 0 260px;
+    min-width: 260px;
+  }
+  
+  .kanban-board-dropdown {
+    width: calc(100vw - 48px);
+    max-width: 320px;
+  }
+  
+  .kanban-modal {
+    margin: 16px;
+    max-width: calc(100vw - 32px);
+  }
+  
+  .kanban-edit-toolbar {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+}
+
 
 .kanban-board-selector {
   position: relative;

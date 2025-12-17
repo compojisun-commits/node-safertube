@@ -1,6 +1,21 @@
 // Gemini API 직접 호출 유틸리티
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+// 🔄 Gemini API 키 로테이션 - 무료 할당량 분산
+const GEMINI_API_KEYS = [
+  import.meta.env.VITE_GEMINI_API_KEY,
+  import.meta.env.VITE_GEMINI_API_KEY_2,
+].filter(Boolean);
+
+const getRotatedGeminiKey = () => {
+  if (GEMINI_API_KEYS.length === 0) {
+    console.warn('⚠️ Gemini API 키가 설정되지 않았습니다.');
+    return '';
+  }
+  const idx = Math.floor(Math.random() * GEMINI_API_KEYS.length);
+  console.log(`🤖 Gemini API 키 ${idx + 1}/${GEMINI_API_KEYS.length} 사용`);
+  return GEMINI_API_KEYS[idx];
+};
+
 const GEMINI_API_URL =
   "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 
@@ -24,7 +39,7 @@ ${text2}
   "score": 0-100
 }`;
 
-    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+    const response = await fetch(`${GEMINI_API_URL}?key=${getRotatedGeminiKey()}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -128,7 +143,7 @@ JSON만 출력:
 
 JSON만 출력:`;
 
-    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+    const response = await fetch(`${GEMINI_API_URL}?key=${getRotatedGeminiKey()}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -222,7 +237,7 @@ ${intention ? `**수업 의도:** ${intention}` : ""}
 검색어만 출력:`;
     }
 
-    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+    const response = await fetch(`${GEMINI_API_URL}?key=${getRotatedGeminiKey()}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -301,7 +316,7 @@ export async function generateAlternativeKeywords(
 이전 검색어와 다른 새로운 검색어만 출력:`;
     }
 
-    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+    const response = await fetch(`${GEMINI_API_URL}?key=${getRotatedGeminiKey()}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

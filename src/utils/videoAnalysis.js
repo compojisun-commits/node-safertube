@@ -2,7 +2,22 @@
 
 import { fetchTranscript, extractVideoId } from "./transcript";
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+// 🔄 Gemini API 키 로테이션 - 무료 할당량 분산
+const GEMINI_API_KEYS = [
+  import.meta.env.VITE_GEMINI_API_KEY,
+  import.meta.env.VITE_GEMINI_API_KEY_2,
+].filter(Boolean);
+
+const getRotatedGeminiKey = () => {
+  if (GEMINI_API_KEYS.length === 0) {
+    console.warn('⚠️ Gemini API 키가 설정되지 않았습니다.');
+    return '';
+  }
+  const idx = Math.floor(Math.random() * GEMINI_API_KEYS.length);
+  console.log(`🤖 [videoAnalysis] Gemini API 키 ${idx + 1}/${GEMINI_API_KEYS.length} 사용`);
+  return GEMINI_API_KEYS[idx];
+};
+
 const YOUTUBE_API_KEY = import.meta.env.VITE_YOUTUBE_API_KEY;
 const GEMINI_API_URL =
   "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
@@ -74,7 +89,7 @@ export async function analyzeShortVideo(
     const selectedFilter =
       gradeFilters[gradeLevel] || gradeFilters["elementary-5-6"];
 
-    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+    const response = await fetch(`${GEMINI_API_URL}?key=${getRotatedGeminiKey()}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -366,7 +381,7 @@ ${transcriptHint}
 **반드시 JSON 배열만 출력하세요! description은 한국어로!**`;
 
   try {
-    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+    const response = await fetch(`${GEMINI_API_URL}?key=${getRotatedGeminiKey()}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -493,7 +508,7 @@ export async function analyzeLongVideo(
       const startMin = Math.floor(startTime / 60);
       const endMin = Math.floor(endTime / 60);
 
-      const promise = fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+      const promise = fetch(`${GEMINI_API_URL}?key=${getRotatedGeminiKey()}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -688,7 +703,7 @@ ${transcript
     onProgress?.({ status: "summarizing", message: "최종 안전 등급 및 이해도 분석 중..." });
 
     const summaryResponse = await fetch(
-      `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`,
+      `${GEMINI_API_URL}?key=${getRotatedGeminiKey()}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1080,7 +1095,7 @@ ${JSON.stringify(chunkTranscript.slice(0, 80), null, 2)}
 만약 이 구간에 명확한 주제 전환이 없다면 빈 배열 []을 반환해.`;
 
   try {
-    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+    const response = await fetch(`${GEMINI_API_URL}?key=${getRotatedGeminiKey()}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

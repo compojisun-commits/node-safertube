@@ -747,9 +747,9 @@ export default function JjimList({ onBack }) {
   const handleSelectAll = () => {
     const allIds = new Set();
     // 현재 폴더의 하위 폴더들
-    currentItems.folders.forEach(f => allIds.add(f.id));
+    filteredFolders.forEach(f => allIds.add(f.id));
     // 현재 폴더의 영상들
-    currentItems.videos.forEach(v => allIds.add(v.id));
+    filteredVideos.forEach(v => allIds.add(v.id));
     setSelectedIds(allIds);
   };
 
@@ -1246,9 +1246,35 @@ export default function JjimList({ onBack }) {
                   setAutoOrganizeTargets(unorganized);
                 }
               }
-              setShowAutoOrganize(true);
+              setAutoOrganizeOpen(true);
             }}
             onRefresh={loadJjimData}
+            onSaveSectionAsFolder={async (folderName, videosToSave, parentFolderId = null) => {
+              try {
+                const newFolder = await createFolder({ 
+                  user, 
+                  name: folderName, 
+                  parentId: parentFolderId || currentFolderId 
+                });
+                
+                for (const video of videosToSave) {
+                  await moveVideoToFolder({ 
+                    user, 
+                    videoId: video.id, 
+                    folderId: newFolder.id 
+                  });
+                }
+                
+                await loadJjimData();
+                console.log(`✅ 폴더 저장 완료: ${folderName} (${videosToSave.length}개 영상)`);
+                return newFolder;
+              } catch (error) {
+                console.error('폴더 저장 실패:', error);
+                throw error;
+              }
+            }}
+            allFolders={folders}
+            currentFolderId={currentFolderId}
           />
       ) : (
           // 리스트 & 그리드 뷰
