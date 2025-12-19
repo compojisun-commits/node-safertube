@@ -510,6 +510,28 @@ export async function searchTrustedChannelVideos(
       };
     });
 
+    // 키워드가 있는 경우: 제목과 키워드 관련성 필터링 (간단한 포함 검사)
+    if (keywords && keywords.trim() !== "") {
+      const beforeCount = videos.length;
+      const keywordLower = keywords.toLowerCase().trim();
+      const keywordParts = keywordLower.split(/\s+/); // 띄어쓰기로 분리
+
+      videos = videos.filter((video) => {
+        const titleLower = video.title.toLowerCase();
+        // 키워드의 주요 단어 중 하나라도 제목에 포함되어 있는지 확인
+        const hasMatch = keywordParts.some(part => {
+          // "초등", "중등", "고등", "학교" 같은 일반적인 단어는 제외
+          if (["초등", "중등", "고등", "학교", "수업", "활동"].includes(part)) {
+            return false;
+          }
+          return titleLower.includes(part);
+        });
+        return hasMatch;
+      });
+
+      console.log(`🔍 키워드 필터링: ${beforeCount}개 → ${videos.length}개`);
+    }
+
     // 조회수 순으로 정렬 후 maxResults만큼 반환
     videos.sort((a, b) => b.viewCount - a.viewCount);
 
