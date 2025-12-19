@@ -421,22 +421,52 @@ export default function VideoRecommendationDirect({ onBack }) {
       setPreviousKeywords(keywords); // 초기 키워드 저장
       console.log("🔍 검색어:", keywords);
 
-      // 2단계: YouTube 검색
+      // 2단계: YouTube 검색 (신뢰채널 우선)
       await Swal.fire({
         title: "⚡ 빠른 추천 시작",
-        html: `2단계: "${keywords.join(", ")}" 검색 중...`,
+        html: `2단계: 신뢰채널에서 검색 중...`,
         icon: "info",
         showConfirmButton: false,
         timer: 1500,
       });
 
-      const videos = await searchYouTubeVideos(
-        keywords,
-        10,
-        preferredDuration,
-        subject
-      );
-      console.log(`📺 ${videos.length}개 영상 발견`);
+      // 2-1. 신뢰채널에서 먼저 검색 (키워드 사용)
+      let videos = [];
+      if (subject && subject !== "미정") {
+        videos = await searchTrustedChannelVideos(
+          subject,
+          10,
+          preferredDuration,
+          keywords[0] // 첫 번째 키워드만 사용
+        );
+        console.log(`✅ 신뢰채널 검색 결과: ${videos.length}개`);
+      }
+
+      // 2-2. 신뢰채널에서 부족하면 일반 검색으로 보충
+      if (videos.length < 10) {
+        await Swal.fire({
+          title: "⚡ 빠른 추천 시작",
+          html: `2단계: 일반 검색으로 보충 중... (현재 ${videos.length}개)`,
+          icon: "info",
+          showConfirmButton: false,
+          timer: 1500,
+        });
+
+        const additionalVideos = await searchYouTubeVideos(
+          keywords,
+          10 - videos.length,
+          preferredDuration,
+          subject
+        );
+
+        // 중복 제거하면서 추가
+        const existingIds = new Set(videos.map(v => v.videoId));
+        const newVideos = additionalVideos.filter(v => !existingIds.has(v.videoId));
+        videos = [...videos, ...newVideos];
+        console.log(`📺 일반 검색 추가: ${newVideos.length}개 (총 ${videos.length}개)`);
+      }
+
+      console.log(`📺 최종 ${videos.length}개 영상 발견`);
 
       if (videos.length === 0) {
         await Swal.fire({
