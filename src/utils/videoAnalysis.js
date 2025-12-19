@@ -141,8 +141,8 @@ export async function analyzeShortVideo(
 
 자막(가능한 경우, 일부 샘플):
 ${transcript
-  .slice(0, 120)
-  .map((t) => `[${Math.round(t.start)}s] ${t.text}`)
+  .slice(0, 50)
+  .map((t) => `[${Math.round(t.start)}s] ${t.text.slice(0, 100)}`)
   .join("\n")}
 
 **중요: 모든 응답은 반드시 한국어로 작성하세요!**
@@ -327,7 +327,7 @@ ${transcript
         ],
         generationConfig: {
           temperature: 0.1, // 일관성을 위해 낮은 값
-          maxOutputTokens: 8192, // 긴 영상의 모든 경고 포함 위해 증가
+          maxOutputTokens: 4096, // TPM 절약: 8192 → 4096
           responseMimeType: "application/json",
           // 🆕 Thinking 비활성화로 속도 향상
           thinkingConfig: { thinkingBudget: 0 },
@@ -453,7 +453,7 @@ ${transcriptHint}
         ],
         generationConfig: {
           temperature: 0.2,
-          maxOutputTokens: 2048,
+          maxOutputTokens: 3072, // 15분+ 영상 정확도: 2048 → 3072
           responseMimeType: "application/json",
           // 🆕 Thinking 비활성화로 속도 향상
           thinkingConfig: { thinkingBudget: 0 },
@@ -609,8 +609,8 @@ export async function analyzeLongVideo(
 ## 자막 데이터
 ${transcript
   .filter((t) => t.start >= startTime && t.start < endTime)
-  .slice(0, 80)
-  .map((t) => `[${formatTimestamp(t.start)}] ${t.text}`)
+  .slice(0, 40)
+  .map((t) => `[${formatTimestamp(t.start)}] ${t.text.slice(0, 100)}`)
   .join("\n")}
 
 ## 분석 지시
@@ -654,7 +654,7 @@ ${transcript
           ],
           generationConfig: {
             temperature: 0.3, // 일관성을 위해 낮은 값
-            maxOutputTokens: 8192, // 모든 경고 포함 위해 증가
+            maxOutputTokens: 2048, // TPM 절약: 8192 → 2048
             responseMimeType: "application/json",
             // 🆕 Thinking 비활성화로 속도 향상
             thinkingConfig: { thinkingBudget: 0 },
@@ -924,7 +924,7 @@ ${allWarnings
           ],
           generationConfig: {
             temperature: 0.1, // 일관성을 위해 낮은 값
-            maxOutputTokens: 8192, // 점수 계산 설명을 위해 증가
+            maxOutputTokens: 4096, // TPM 절약: 8192 → 4096
             responseMimeType: "application/json",
             // 🆕 Thinking 비활성화로 속도 향상
             thinkingConfig: { thinkingBudget: 0 },

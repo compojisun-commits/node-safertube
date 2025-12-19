@@ -149,8 +149,8 @@ export async function quickAnalyzeVideo(
 
     const gradeDescription = gradeFilters[gradeLevel] || "초등 고학년 수준";
 
-    // 자막 텍스트 준비 (처음 3000자만 사용 - 빠른 분석)
-    const transcriptText = transcript.slice(0, 3000);
+    // 자막 텍스트 준비 (처음 1500자만 사용 - TPM 절약)
+    const transcriptText = transcript.slice(0, 1500);
 
     const prompt = `다음은 YouTube 영상의 자막입니다. "${gradeDescription}" 학생에게 ${contextText} 빠르게 평가하세요.
 
@@ -199,7 +199,7 @@ JSON만 출력:`;
         ],
         generationConfig: {
           temperature: 0.7,
-          maxOutputTokens: 4000,
+          maxOutputTokens: 300, // TPM 절약: 4000 → 300 (JSON 응답 충분)
         },
       }),
     });
