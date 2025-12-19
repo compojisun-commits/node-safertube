@@ -295,7 +295,7 @@ export async function getVideoTranscript(videoId, _retryCount = 0) {
 }
 
 /**
- * 신뢰채널에서 최근 2개월 이내 영상 검색 (2순위)
+ * 신뢰채널에서 최근 5년 이내 영상 검색 (2순위)
  * 영상이 부족하면 년도 상관없이 현재 월 ±2개월 영상도 검색 (3순위)
  */
 export async function searchTrustedChannelVideos(
@@ -329,10 +329,10 @@ export async function searchTrustedChannelVideos(
     const apiKey = getCurrentApiKey();
     console.log(`🔑 현재 API 키 인덱스: ${getCurrentKeyIndex()} / 총 ${YOUTUBE_API_KEYS.length}개`);
 
-    // 2순위: 최근 12개월 이내 영상 검색
-    const twelveMonthsAgo = new Date();
-    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
-    const publishedAfter = twelveMonthsAgo.toISOString();
+    // 2순위: 최근 5년 이내 영상 검색
+    const fiveYearsAgo = new Date();
+    fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 5);
+    const publishedAfter = fiveYearsAgo.toISOString();
 
     // 각 채널에서 2~3개씩 골고루 가져오기 (최대 30개 이내)
     const totalChannels = Math.min(trustedChannelIds.length, 15); // 최대 15개 채널
@@ -395,7 +395,7 @@ export async function searchTrustedChannelVideos(
       allItems.push(...channelItems);
     });
 
-    console.log(`📺 2순위(최근 2개월): ${allItems.length}개 영상 발견 (${channelResults.filter(r => r.items.length > 0).length}개 채널에서)`);
+    console.log(`📺 2순위(최근 5년): ${allItems.length}개 영상 발견 (${channelResults.filter(r => r.items.length > 0).length}개 채널에서)`);
 
     // 3순위: 2순위 영상이 부족하면 년도 상관없이 현재 월 ±2개월 영상 검색
     if (allItems.length < maxResults) {
