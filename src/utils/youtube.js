@@ -38,7 +38,50 @@ function getCurrentApiKey() {
 }
 
 /**
- * YouTube 영상 검색 (API 키 자동 전환 지원, 신뢰채널 필터)
+ * 단일 키워드로 YouTube 검색 (내부 헬퍼 함수)
+ */
+async function searchWithSingleKeyword(
+  keyword,
+  maxResults,
+  videoDuration,
+  apiKey,
+  _retryCount = 0
+) {
+  const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&q=${encodeURIComponent(
+    keyword
+  )}&maxResults=${maxResults}&videoEmbeddable=true&regionCode=KR&relevanceLanguage=ko${videoDuration}&key=${apiKey}`;
+
+  const response = await fetch(searchUrl);
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const errorMsg = errorData.error?.message || `HTTP ${response.status}`;
+
+    // 403 에러이고 재시도 가능한 경우 다음 키로 전환
+    if (
+      response.status === 403 &&
+      _retryCount < YOUTUBE_API_KEYS.length - 1
+    ) {
+      console.warn(`⚠️ API 키 할당량 초과. 다음 키로 전환 시도...`);
+      switchToNextKey();
+      const newApiKey = getCurrentApiKey();
+      return searchWithSingleKeyword(
+        keyword,
+        maxResults,
+        videoDuration,
+        newApiKey,
+        _retryCount + 1
+      );
+    }
+
+    throw new Error(`YouTube search failed: ${response.status} - ${errorMsg}`);
+  }
+
+  const data = await response.json();
+  return data.items || [];
+}
+
+/**
+ * YouTube 영상 검색 (우선순위 기반, API 키 자동 전환 지원)
  */
 export async function searchYouTubeVideos(
   keywords,
@@ -48,7 +91,10 @@ export async function searchYouTubeVideos(
   _retryCount = 0
 ) {
   try {
-    const searchQuery = Array.isArray(keywords) ? keywords.join(" ") : keywords;
+    // 단일 키워드인 경우 기존 로직 유지
+    if (!Array.isArray(keywords)) {
+      keywords = [keywords];
+    }
 
     // 영상 길이 필터
     let videoDuration = "";
@@ -64,49 +110,61 @@ export async function searchYouTubeVideos(
     }
 
     const apiKey = getCurrentApiKey();
-    const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&q=${encodeURIComponent(
-      searchQuery
-    )}&maxResults=${maxResults}&videoEmbeddable=true&regionCode=KR&relevanceLanguage=ko${videoDuration}&key=${apiKey}`;
 
-    const response = await fetch(searchUrl);
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const errorMsg = errorData.error?.message || `HTTP ${response.status}`;
+    // 우선순위 기반 검색: 첫 번째 키워드로 7개, 나머지 키워드로 각 1개씩
+    let allItems = [];
+    const seen = new Set(); // 중복 제거용
 
-      // 403 에러이고 재시도 가능한 경우 다음 키로 전환
-      if (
-        response.status === 403 &&
-        _retryCount < YOUTUBE_API_KEYS.length - 1
-      ) {
-        console.warn(`⚠️ API 키 할당량 초과. 다음 키로 전환 시도...`);
-        switchToNextKey();
-        return searchYouTubeVideos(
-          keywords,
-          maxResults,
-          preferredDuration,
-          _retryCount + 1
-        );
+    // 1. 첫 번째 키워드로 7개 검색
+    const primaryKeyword = keywords[0];
+    console.log(`🔍 1순위 검색: "${primaryKeyword}" (목표: 7개)`);
+    const primaryItems = await searchWithSingleKeyword(
+      primaryKeyword,
+      Math.min(15, maxResults), // 여유있게 검색
+      videoDuration,
+      apiKey
+    );
+
+    // 중복 없이 최대 7개 추가
+    for (const item of primaryItems) {
+      if (!seen.has(item.id.videoId) && allItems.length < 7) {
+        allItems.push(item);
+        seen.add(item.id.videoId);
       }
+    }
+    console.log(`  ✅ 1순위 검색 결과: ${allItems.length}개`);
 
-      const errorDetail =
-        response.status === 403
-          ? "모든 API 키 할당량이 초과되었습니다. 내일 다시 시도해주세요."
-          : "";
-      throw new Error(
-        `YouTube search failed: ${response.status} - ${errorMsg}${
-          errorDetail ? " / " + errorDetail : ""
-        }`
+    // 2. 나머지 키워드로 각 1개씩 채우기 (최대 10개까지)
+    for (let i = 1; i < keywords.length && allItems.length < maxResults; i++) {
+      const keyword = keywords[i];
+      console.log(`🔍 ${i + 1}순위 검색: "${keyword}" (목표: 1개)`);
+
+      const items = await searchWithSingleKeyword(
+        keyword,
+        5, // 1개만 필요하지만 여유있게
+        videoDuration,
+        apiKey
       );
+
+      // 중복 없이 1개 추가
+      for (const item of items) {
+        if (!seen.has(item.id.videoId)) {
+          allItems.push(item);
+          seen.add(item.id.videoId);
+          console.log(`  ✅ ${i + 1}순위 검색 결과: 1개 추가 (총 ${allItems.length}개)`);
+          break; // 1개만 추가
+        }
+      }
     }
 
-    const data = await response.json();
+    console.log(`📊 최종 검색 결과: ${allItems.length}개 영상`);
 
-    if (!data.items || data.items.length === 0) {
+    if (allItems.length === 0) {
       return [];
     }
 
     // 영상 상세 정보 가져오기 (길이, 조회수, 좋아요수 포함)
-    const videoIds = data.items.map((item) => item.id.videoId).join(",");
+    const videoIds = allItems.map((item) => item.id.videoId).join(",");
     console.log("검색된 영상 ID들:", videoIds);
     const detailsUrl = `https://www.googleapis.com/youtube/v3/videos?part=contentDetails,snippet,statistics&id=${videoIds}&key=${apiKey}`;
 
@@ -128,6 +186,7 @@ export async function searchYouTubeVideos(
           keywords,
           maxResults,
           preferredDuration,
+          subject,
           _retryCount + 1
         );
       }
