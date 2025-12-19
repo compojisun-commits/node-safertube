@@ -281,6 +281,88 @@ function generateArtKeywords(intention) {
 }
 
 /**
+ * 체육 과목용 하드코딩 검색어 생성
+ */
+function generatePEKeywords(intention, gradeLevel) {
+  const peSuffixes = ["운동", "활동"];
+
+  if (!intention || intention.trim() === "") {
+    return ["체육 활동", "초등 체육", "체육 수업"];
+  }
+
+  const baseKeyword = intention.trim();
+  const keywords = [];
+
+  // 이미 접미사가 포함되어 있는지 확인
+  const hasSuffix = peSuffixes.some(suffix => baseKeyword.includes(suffix));
+
+  if (hasSuffix) {
+    // "줄넘기 운동" → ["줄넘기 운동", "줄넘기 활동", "초등 줄넘기 운동"]
+    const base = baseKeyword.replace(/운동|활동/g, "").trim();
+    keywords.push(baseKeyword); // 원본 유지
+    peSuffixes.forEach(suffix => {
+      if (!keywords.includes(`${base} ${suffix}`)) {
+        keywords.push(`${base} ${suffix}`);
+      }
+    });
+    // 학년별 검색어 추가
+    if (gradeLevel && gradeLevel.includes("초등")) {
+      keywords.push(`초등 ${base} 운동`);
+    }
+  } else {
+    // "줄넘기" → ["줄넘기 운동", "줄넘기 활동", "초등 줄넘기 운동"]
+    peSuffixes.forEach(suffix => {
+      keywords.push(`${baseKeyword} ${suffix}`);
+    });
+    // 학년별 검색어 추가
+    if (gradeLevel && gradeLevel.includes("초등")) {
+      keywords.push(`초등 ${baseKeyword} 운동`);
+    }
+  }
+
+  return keywords.slice(0, 5); // 최대 5개
+}
+
+/**
+ * 범용 하드코딩 검색어 생성 (안전교육, 짜투리 영상 등)
+ */
+function generateGenericKeywords(intention, subject) {
+  if (!intention || intention.trim() === "") {
+    return [subject || "교육 영상"];
+  }
+
+  const baseKeyword = intention.trim();
+  const keywords = [];
+
+  // 1. 원본 키워드
+  keywords.push(baseKeyword);
+
+  // 2. 키워드 + 과목명 (과목이 있고 "미정"이 아닌 경우)
+  if (subject && subject !== "미정") {
+    keywords.push(`${baseKeyword} ${subject}`);
+  }
+
+  // 3. 키워드 변형 (띄어쓰기 제거/추가)
+  const noSpace = baseKeyword.replace(/\s+/g, "");
+  if (noSpace !== baseKeyword && noSpace.length >= 2) {
+    keywords.push(noSpace);
+  }
+
+  // 4. 교육/수업 관련 키워드 추가
+  if (!baseKeyword.includes("교육") && !baseKeyword.includes("수업")) {
+    keywords.push(`${baseKeyword} 교육`);
+  }
+
+  // 5. 초등/중등 키워드 추가 (아직 없는 경우)
+  if (!baseKeyword.includes("초등") && !baseKeyword.includes("중등") && !baseKeyword.includes("중학")) {
+    keywords.push(`초등 ${baseKeyword}`);
+  }
+
+  // 중복 제거 및 최대 5개 반환
+  return [...new Set(keywords)].slice(0, 5);
+}
+
+/**
  * Gemini API로 검색어 생성
  */
 export async function generateSearchKeywords(subject, intention, gradeLevel, _retryCount = 0) {
@@ -377,13 +459,30 @@ ${intention ? `**수업 의도:** ${intention}` : ""}
   } catch (error) {
     console.error("검색어 생성 실패:", error);
 
-    // 미술 과목인 경우 하드코딩 검색어 사용
+    // 과목별 하드코딩 검색어 폴백
     if (subject === "미술") {
       console.log("🎨 미술 과목 하드코딩 검색어 사용");
       return generateArtKeywords(intention);
     }
 
-    // 다른 과목은 기본 폴백
+    if (subject === "체육") {
+      console.log("⚽ 체육 과목 하드코딩 검색어 사용");
+      return generatePEKeywords(intention, gradeLevel);
+    }
+
+    // 안전교육, 짜투리 영상 등 기타 과목
+    if (["안전교육", "짜투리 영상", "미정"].includes(subject)) {
+      console.log(`📚 ${subject} 범용 하드코딩 검색어 사용`);
+      return generateGenericKeywords(intention, subject);
+    }
+
+    // 수업 의도가 있는 경우 범용 로직 사용
+    if (intention && intention.trim() !== "") {
+      console.log("💡 수업 의도 기반 범용 검색어 사용");
+      return generateGenericKeywords(intention, subject);
+    }
+
+    // 최종 폴백
     return [subject || "교육 영상"];
   }
 }
@@ -481,13 +580,30 @@ export async function generateAlternativeKeywords(
   } catch (error) {
     console.error("대체 검색어 생성 실패:", error);
 
-    // 미술 과목인 경우 하드코딩 검색어 사용
+    // 과목별 하드코딩 검색어 폴백
     if (subject === "미술") {
       console.log("🎨 미술 과목 하드코딩 대체 검색어 사용");
       return generateArtKeywords(intention);
     }
 
-    // 다른 과목은 기본 폴백
+    if (subject === "체육") {
+      console.log("⚽ 체육 과목 하드코딩 대체 검색어 사용");
+      return generatePEKeywords(intention, gradeLevel);
+    }
+
+    // 안전교육, 짜투리 영상 등 기타 과목
+    if (["안전교육", "짜투리 영상", "미정"].includes(subject)) {
+      console.log(`📚 ${subject} 범용 하드코딩 대체 검색어 사용`);
+      return generateGenericKeywords(intention, subject);
+    }
+
+    // 수업 의도가 있는 경우 범용 로직 사용
+    if (intention && intention.trim() !== "") {
+      console.log("💡 수업 의도 기반 범용 대체 검색어 사용");
+      return generateGenericKeywords(intention, subject);
+    }
+
+    // 최종 폴백
     return [subject || "교육 영상"];
   }
 }
