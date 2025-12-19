@@ -284,8 +284,6 @@ function generateArtKeywords(intention) {
  * 체육 과목용 하드코딩 검색어 생성
  */
 function generatePEKeywords(intention, gradeLevel) {
-  const peSuffixes = ["운동", "활동"];
-
   if (!intention || intention.trim() === "") {
     return ["체육 활동", "초등 체육", "체육 수업"];
   }
@@ -293,34 +291,24 @@ function generatePEKeywords(intention, gradeLevel) {
   const baseKeyword = intention.trim();
   const keywords = [];
 
-  // 이미 접미사가 포함되어 있는지 확인
-  const hasSuffix = peSuffixes.some(suffix => baseKeyword.includes(suffix));
+  // 1. 원본 키워드
+  keywords.push(baseKeyword);
 
-  if (hasSuffix) {
-    // "줄넘기 운동" → ["줄넘기 운동", "줄넘기 활동", "초등 줄넘기 운동"]
-    const base = baseKeyword.replace(/운동|활동/g, "").trim();
-    keywords.push(baseKeyword); // 원본 유지
-    peSuffixes.forEach(suffix => {
-      if (!keywords.includes(`${base} ${suffix}`)) {
-        keywords.push(`${base} ${suffix}`);
-      }
-    });
-    // 학년별 검색어 추가
-    if (gradeLevel && gradeLevel.includes("초등")) {
-      keywords.push(`초등 ${base} 운동`);
-    }
-  } else {
-    // "줄넘기" → ["줄넘기 운동", "줄넘기 활동", "초등 줄넘기 운동"]
-    peSuffixes.forEach(suffix => {
-      keywords.push(`${baseKeyword} ${suffix}`);
-    });
-    // 학년별 검색어 추가
-    if (gradeLevel && gradeLevel.includes("초등")) {
-      keywords.push(`초등 ${baseKeyword} 운동`);
+  // 2. 학년 접두사 추가
+  if (gradeLevel) {
+    if (gradeLevel.includes("초등")) {
+      keywords.push(`초등 ${baseKeyword}`);
+    } else if (gradeLevel.includes("중학")) {
+      keywords.push(`중등 ${baseKeyword}`);
+      keywords.push(`중학교 ${baseKeyword}`);
+    } else if (gradeLevel.includes("고등")) {
+      keywords.push(`고등 ${baseKeyword}`);
+      keywords.push(`고등학교 ${baseKeyword}`);
     }
   }
 
-  return keywords.slice(0, 5); // 최대 5개
+  // 중복 제거 및 최대 5개
+  return [...new Set(keywords)].slice(0, 5);
 }
 
 /**
