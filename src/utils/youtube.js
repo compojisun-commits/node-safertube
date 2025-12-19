@@ -510,26 +510,34 @@ export async function searchTrustedChannelVideos(
       };
     });
 
-    // 키워드가 있는 경우: 제목과 키워드 관련성 필터링 (간단한 포함 검사)
+    // 키워드가 있는 경우: 제목과 키워드 관련성 필터링 (엄격한 검사)
     if (keywords && keywords.trim() !== "") {
       const beforeCount = videos.length;
       const keywordLower = keywords.toLowerCase().trim();
       const keywordParts = keywordLower.split(/\s+/); // 띄어쓰기로 분리
 
+      // 일반적이거나 너무 포괄적인 단어 제외
+      const excludeWords = ["초등", "중등", "고등", "학교", "수업", "활동", "교실", "운동", "체육"];
+
+      // 핵심 키워드만 추출 (일반 단어 제외)
+      const coreKeywords = keywordParts.filter(part =>
+        !excludeWords.includes(part) && part.length >= 2
+      );
+
       videos = videos.filter((video) => {
         const titleLower = video.title.toLowerCase();
-        // 키워드의 주요 단어 중 하나라도 제목에 포함되어 있는지 확인
-        const hasMatch = keywordParts.some(part => {
-          // "초등", "중등", "고등", "학교" 같은 일반적인 단어는 제외
-          if (["초등", "중등", "고등", "학교", "수업", "활동"].includes(part)) {
-            return false;
-          }
-          return titleLower.includes(part);
-        });
+
+        // 핵심 키워드가 없으면 원본 키워드 전체가 포함되어야 함
+        if (coreKeywords.length === 0) {
+          return titleLower.includes(keywordLower);
+        }
+
+        // 핵심 키워드 중 하나라도 제목에 포함되어야 함
+        const hasMatch = coreKeywords.some(keyword => titleLower.includes(keyword));
         return hasMatch;
       });
 
-      console.log(`🔍 키워드 필터링: ${beforeCount}개 → ${videos.length}개`);
+      console.log(`🔍 키워드 필터링 (핵심: ${coreKeywords.join(", ")}): ${beforeCount}개 → ${videos.length}개`);
     }
 
     // 조회수 순으로 정렬 후 maxResults만큼 반환
