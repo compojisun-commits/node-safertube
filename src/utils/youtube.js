@@ -517,7 +517,7 @@ export async function searchTrustedChannelVideos(
       const keywordParts = keywordLower.split(/\s+/); // 띄어쓰기로 분리
 
       // 일반적이거나 너무 포괄적인 단어 제외
-      const excludeWords = ["초등", "중등", "고등", "학교", "수업", "활동", "교실", "운동", "체육"];
+      const excludeWords = ["초등", "중등", "고등", "학교", "수업", "활동", "교실", "운동", "체육", "미술", "만들기", "그리기", "꾸미기"];
 
       // 핵심 키워드만 추출 (일반 단어 제외)
       const coreKeywords = keywordParts.filter(part =>
@@ -532,9 +532,14 @@ export async function searchTrustedChannelVideos(
           return titleLower.includes(keywordLower);
         }
 
-        // 핵심 키워드 중 하나라도 제목에 포함되어야 함
-        const hasMatch = coreKeywords.some(keyword => titleLower.includes(keyword));
-        return hasMatch;
+        // 핵심 키워드가 1개인 경우: 반드시 포함되어야 함
+        if (coreKeywords.length === 1) {
+          return titleLower.includes(coreKeywords[0]);
+        }
+
+        // 핵심 키워드가 2개 이상인 경우: 모두 포함되어야 함
+        const allMatch = coreKeywords.every(keyword => titleLower.includes(keyword));
+        return allMatch;
       });
 
       console.log(`🔍 키워드 필터링 (핵심: ${coreKeywords.join(", ")}): ${beforeCount}개 → ${videos.length}개`);
