@@ -216,6 +216,13 @@ export async function searchYouTubeVideos(
       };
     });
 
+    // Shorts 제외 (70초 이상만 유지)
+    const beforeCount = videos.length;
+    videos = videos.filter((v) => v.duration >= 70);
+    if (beforeCount > videos.length) {
+      console.log(`🚫 Shorts 제외: ${beforeCount}개 → ${videos.length}개`);
+    }
+
     // 신뢰채널 필터링 (과목이 지정된 경우에만)
     // if (subject) {
     //   const trustedChannelIds = getTrustedChannelIds(subject);
