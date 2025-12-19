@@ -329,10 +329,10 @@ export async function searchTrustedChannelVideos(
     const apiKey = getCurrentApiKey();
     console.log(`🔑 현재 API 키 인덱스: ${getCurrentKeyIndex()} / 총 ${YOUTUBE_API_KEYS.length}개`);
 
-    // 2순위: 최근 2개월 이내 영상 검색
-    const twoMonthsAgo = new Date();
-    twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
-    const publishedAfter = twoMonthsAgo.toISOString();
+    // 2순위: 최근 12개월 이내 영상 검색
+    const twelveMonthsAgo = new Date();
+    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+    const publishedAfter = twelveMonthsAgo.toISOString();
 
     // 각 채널에서 2~3개씩 골고루 가져오기 (최대 30개 이내)
     const totalChannels = Math.min(trustedChannelIds.length, 15); // 최대 15개 채널
