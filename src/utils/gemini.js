@@ -459,7 +459,7 @@ ${intention ? `**수업 의도:** ${intention}` : ""}
   } catch (error) {
     console.error("검색어 생성 실패:", error);
 
-    // 과목별 하드코딩 검색어 폴백
+    // 과목별 하드코딩 검색어 폴백 (과목과 의도가 맞는 경우만)
     if (subject === "미술") {
       console.log("🎨 미술 과목 하드코딩 검색어 사용");
       return generateArtKeywords(intention);
@@ -476,13 +476,13 @@ ${intention ? `**수업 의도:** ${intention}` : ""}
       return generateGenericKeywords(intention, subject);
     }
 
-    // 수업 의도가 있는 경우 범용 로직 사용
+    // 최종 폴백: 수업 의도를 그대로 검색어로 사용
     if (intention && intention.trim() !== "") {
-      console.log("💡 수업 의도 기반 범용 검색어 사용");
-      return generateGenericKeywords(intention, subject);
+      console.log("💡 수업 의도를 검색어로 사용");
+      return [intention.trim()];
     }
 
-    // 최종 폴백
+    // 그것도 없으면 과목명
     return [subject || "교육 영상"];
   }
 }
@@ -580,7 +580,7 @@ export async function generateAlternativeKeywords(
   } catch (error) {
     console.error("대체 검색어 생성 실패:", error);
 
-    // 과목별 하드코딩 검색어 폴백
+    // 과목별 하드코딩 검색어 폴백 (과목과 의도가 맞는 경우만)
     if (subject === "미술") {
       console.log("🎨 미술 과목 하드코딩 대체 검색어 사용");
       return generateArtKeywords(intention);
@@ -597,13 +597,13 @@ export async function generateAlternativeKeywords(
       return generateGenericKeywords(intention, subject);
     }
 
-    // 수업 의도가 있는 경우 범용 로직 사용
+    // 최종 폴백: 수업 의도를 그대로 검색어로 사용
     if (intention && intention.trim() !== "") {
-      console.log("💡 수업 의도 기반 범용 대체 검색어 사용");
-      return generateGenericKeywords(intention, subject);
+      console.log("💡 수업 의도를 대체 검색어로 사용");
+      return [intention.trim()];
     }
 
-    // 최종 폴백
+    // 그것도 없으면 과목명
     return [subject || "교육 영상"];
   }
 }
