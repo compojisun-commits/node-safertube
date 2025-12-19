@@ -248,6 +248,39 @@ JSON만 출력:`;
 }
 
 /**
+ * 미술 과목용 하드코딩 검색어 생성
+ */
+function generateArtKeywords(intention) {
+  const artSuffixes = ["만들기", "그리기", "꾸미기", "감상", "전시"];
+
+  if (!intention || intention.trim() === "") {
+    return ["미술 수업", "미술 활동", "창작 활동"];
+  }
+
+  const baseKeyword = intention.trim();
+  const keywords = [];
+
+  // 이미 접미사가 포함되어 있는지 확인
+  const hasSuffix = artSuffixes.some(suffix => baseKeyword.includes(suffix));
+
+  if (hasSuffix) {
+    // "크리스마스 트리 만들기" → ["크리스마스 트리 만들기", "크리스마스 트리 꾸미기", ...]
+    artSuffixes.forEach(suffix => {
+      // 기존 접미사 제거하고 새 접미사 추가
+      const base = baseKeyword.replace(/만들기|그리기|꾸미기|감상|전시/g, "").trim();
+      keywords.push(`${base} ${suffix}`);
+    });
+  } else {
+    // "크리스마스 트리" → ["크리스마스 트리 만들기", "크리스마스 트리 그리기", ...]
+    artSuffixes.forEach(suffix => {
+      keywords.push(`${baseKeyword} ${suffix}`);
+    });
+  }
+
+  return keywords.slice(0, 5); // 최대 5개
+}
+
+/**
  * Gemini API로 검색어 생성
  */
 export async function generateSearchKeywords(subject, intention, gradeLevel, _retryCount = 0) {
@@ -343,6 +376,14 @@ ${intention ? `**수업 의도:** ${intention}` : ""}
     return keywords.length > 0 ? keywords : [subject || "교육 영상"];
   } catch (error) {
     console.error("검색어 생성 실패:", error);
+
+    // 미술 과목인 경우 하드코딩 검색어 사용
+    if (subject === "미술") {
+      console.log("🎨 미술 과목 하드코딩 검색어 사용");
+      return generateArtKeywords(intention);
+    }
+
+    // 다른 과목은 기본 폴백
     return [subject || "교육 영상"];
   }
 }
@@ -439,6 +480,14 @@ export async function generateAlternativeKeywords(
     return keywords.length > 0 ? keywords : [subject || "교육 영상"];
   } catch (error) {
     console.error("대체 검색어 생성 실패:", error);
+
+    // 미술 과목인 경우 하드코딩 검색어 사용
+    if (subject === "미술") {
+      console.log("🎨 미술 과목 하드코딩 대체 검색어 사용");
+      return generateArtKeywords(intention);
+    }
+
+    // 다른 과목은 기본 폴백
     return [subject || "교육 영상"];
   }
 }
