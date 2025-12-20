@@ -401,12 +401,11 @@ function generateGenericKeywords(intention, subject) {
  * Gemini API로 검색어 생성
  */
 export async function generateSearchKeywords(subject, intention, gradeLevel, _retryCount = 0) {
-  try {
-    const apiKey = getCurrentApiKey();
-    let prompt;
+  // prompt를 함수 스코프에 선언 (catch에서도 접근 가능하도록)
+  let prompt;
 
-    if (subject === "미정") {
-      prompt = `초등학생/중학생에게 적합한 재미있고 교육적인 YouTube 영상을 찾기 위한 검색어 3-5개 생성 (쉼표 구분, 한국어):
+  if (subject === "미정") {
+    prompt = `초등학생/중학생에게 적합한 재미있고 교육적인 YouTube 영상을 찾기 위한 검색어 3-5개 생성 (쉼표 구분, 한국어):
 
 **목표:** 학생들이 즐겁게 보면서 배울 수 있는 영상
 ${intention ? `**수업 의도:** ${intention}` : ""}
@@ -418,8 +417,8 @@ ${intention ? `**수업 의도:** ${intention}` : ""}
 - 긍정적인 메시지 전달
 
 검색어만 출력:`;
-    } else if (intention) {
-      prompt = `YouTube 검색어 3-5개 생성 (쉼표 구분, 한국어, 2-4단어):
+  } else if (intention) {
+    prompt = `YouTube 검색어 3-5개 생성 (쉼표 구분, 한국어, 2-4단어):
 
 **수업 의도 (최우선 고려):** ${intention}
 주제: ${subject}
@@ -429,14 +428,17 @@ ${intention ? `**수업 의도:** ${intention}` : ""}
 예: "색상환" → 색상환, 색상환 그리기, 색상환 활용
 
 검색어만 출력:`;
-    } else {
-      prompt = `YouTube 검색어 3-5개 생성 (쉼표 구분, 한국어, 2-4단어):
+  } else {
+    prompt = `YouTube 검색어 3-5개 생성 (쉼표 구분, 한국어, 2-4단어):
 
 주제: ${subject}
 학년: ${gradeLevel}
 
 검색어만 출력:`;
-    }
+  }
+
+  try {
+    const apiKey = getCurrentApiKey();
 
     // Rate Limiting: API 호출 전 대기
     if (_retryCount === 0) {
@@ -554,12 +556,11 @@ export async function generateAlternativeKeywords(
   previousKeywords = [],
   _retryCount = 0
 ) {
-  try {
-    const apiKey = getCurrentApiKey();
-    let prompt;
+  // prompt를 함수 스코프에 선언 (catch에서도 접근 가능하도록)
+  let prompt;
 
-    if (intention) {
-      prompt = `YouTube 검색어 3-5개 생성 (쉼표 구분, 한국어, 2-4단어):
+  if (intention) {
+    prompt = `YouTube 검색어 3-5개 생성 (쉼표 구분, 한국어, 2-4단어):
 
 **수업 의도 (최우선 고려):** ${intention}
 주제: ${subject}
@@ -571,8 +572,8 @@ export async function generateAlternativeKeywords(
 예: 이전 "색상환, 색상환 그리기" → 새로운 "색상환 설명, 색상환 활용법, 쉬운 색상환"
 
 검색어만 출력:`;
-    } else {
-      prompt = `YouTube 검색어 3-5개 생성 (쉼표 구분, 한국어, 2-4단어):
+  } else {
+    prompt = `YouTube 검색어 3-5개 생성 (쉼표 구분, 한국어, 2-4단어):
 
 주제: ${subject}
 학년: ${gradeLevel}
@@ -580,7 +581,10 @@ export async function generateAlternativeKeywords(
 **이전에 사용한 검색어 (중복 금지):** ${previousKeywords.join(", ")}
 
 이전 검색어와 다른 새로운 검색어만 출력:`;
-    }
+  }
+
+  try {
+    const apiKey = getCurrentApiKey();
 
     // Rate Limiting: API 호출 전 대기
     if (_retryCount === 0) {
