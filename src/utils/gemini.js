@@ -1,4 +1,4 @@
-// Gemini API 직접 호출 유틸리티
+// Gemini API 직접 호출 유틸리티 (OpenAI 폴백 지원)
 
 // 여러 개의 API 키를 배열로 관리
 const GEMINI_API_KEYS = [
@@ -13,6 +13,10 @@ const GEMINI_API_URL =
 // 가벼운 작업용 (검색어 생성 등) - 토큰 소비 적음
 const GEMINI_LITE_API_URL =
   "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
+
+// OpenAI API (폴백용)
+const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
+const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
 
 // Rate Limiting: API 호출 사이 대기 시간 (밀리초)
 const API_CALL_DELAY = 2000; // 2초
@@ -49,6 +53,49 @@ function switchToNextKey() {
 function getCurrentApiKey() {
   const index = getCurrentKeyIndex();
   return GEMINI_API_KEYS[index];
+}
+
+/**
+ * OpenAI API 호출 (Gemini 폴백용)
+ */
+async function callOpenAI(prompt, maxTokens = 500) {
+  try {
+    if (!OPENAI_API_KEY) {
+      throw new Error("OpenAI API 키가 설정되지 않았습니다.");
+    }
+
+    console.log("🔄 OpenAI API 폴백 사용 (gpt-4o-mini)");
+
+    const response = await fetch(OPENAI_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        max_tokens: maxTokens,
+        temperature: 0.7,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(`OpenAI API error: ${response.status} - ${errorData.error?.message || "Unknown error"}`);
+    }
+
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content || "";
+  } catch (error) {
+    console.error("OpenAI API 호출 실패:", error);
+    throw error;
+  }
 }
 
 export async function checkSimilarityWithGemini(text1, text2) {
@@ -447,6 +494,28 @@ ${intention ? `**수업 의도:** ${intention}` : ""}
   } catch (error) {
     console.error("검색어 생성 실패:", error);
 
+    // OpenAI 폴백 시도
+    if (OPENAI_API_KEY && (error.message.includes("429") || error.message.includes("404"))) {
+      try {
+        console.log("🔄 OpenAI로 폴백 시도...");
+        let openAIPrompt = prompt;
+        const openAIResponse = await callOpenAI(openAIPrompt, 500);
+
+        const openAIKeywords = openAIResponse
+          .trim()
+          .split(",")
+          .map((k) => k.trim())
+          .filter((k) => k.length > 0);
+
+        if (openAIKeywords.length > 0) {
+          console.log("✅ OpenAI 검색어 생성 성공");
+          return openAIKeywords;
+        }
+      } catch (openAIError) {
+        console.error("OpenAI 폴백도 실패:", openAIError);
+      }
+    }
+
     // 과목별 하드코딩 검색어 폴백 (과목과 의도가 맞는 경우만)
     if (subject === "미술") {
       console.log("🎨 미술 과목 하드코딩 검색어 사용");
@@ -567,6 +636,28 @@ export async function generateAlternativeKeywords(
     return keywords.length > 0 ? keywords : [subject || "교육 영상"];
   } catch (error) {
     console.error("대체 검색어 생성 실패:", error);
+
+    // OpenAI 폴백 시도
+    if (OPENAI_API_KEY && (error.message.includes("429") || error.message.includes("404"))) {
+      try {
+        console.log("🔄 OpenAI로 폴백 시도 (대체 검색어)...");
+        let openAIPrompt = prompt;
+        const openAIResponse = await callOpenAI(openAIPrompt, 500);
+
+        const openAIKeywords = openAIResponse
+          .trim()
+          .split(",")
+          .map((k) => k.trim())
+          .filter((k) => k.length > 0);
+
+        if (openAIKeywords.length > 0) {
+          console.log("✅ OpenAI 대체 검색어 생성 성공");
+          return openAIKeywords;
+        }
+      } catch (openAIError) {
+        console.error("OpenAI 폴백도 실패:", openAIError);
+      }
+    }
 
     // 과목별 하드코딩 검색어 폴백 (과목과 의도가 맞는 경우만)
     if (subject === "미술") {
