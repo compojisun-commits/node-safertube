@@ -403,10 +403,21 @@ export default function VideoRecommendationDirect({ onBack }) {
         });
 
         setLoading(false);
-        return;
-      }
+    } catch (error) {
+      console.error("신뢰채널 검색 오류:", error);
+      Swal.close();
+      await Swal.fire({
+        title: "오류",
+        text: error.message || "검색 중 오류가 발생했습니다",
+        icon: "error",
+        confirmButtonColor: "#4285f4",
+      });
+      setLoading(false);
+    }
+    return;
+  }
 
-      // 수업의도가 있는 경우: 기존 로직 (키워드 검색)
+  // 수업의도가 있는 경우: 기존 로직 (키워드 검색)
       // 1단계: 검색어 생성
       await Swal.fire({
         title: "⚡ 빠른 추천 시작",
