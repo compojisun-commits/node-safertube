@@ -2,6 +2,7 @@ import { useState } from "react";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import VideoInput from "./components/VideoInput";
 import AnalysisResult from "./components/AnalysisResult";
+import QuickAnalysisResult from "./components/QuickAnalysisResult";
 import VideoRecommendationDirect from "./components/VideoRecommendationDirect";
 import PhysicalArtsRecommendation from "./components/PhysicalArtsRecommendation";
 import Board from "./components/Board";
@@ -95,12 +96,30 @@ function AppContent() {
 
         {mode === "analyze" && currentRequestId && (
           <div className="main-content">
-            <AnalysisResult
-              requestId={currentRequestId}
-              directResult={currentResult}
-              progress={currentProgress}
-              onReset={handleReset}
-            />
+            {/* 간편분석 결과 vs 상세분석 결과 */}
+            {currentResult?.analysisType === "quick" ? (
+              <QuickAnalysisResult
+                result={currentResult}
+                videoId={currentResult?.videoId || currentRequestId}
+                videoUrl={currentResult?.videoUrl}
+                onReset={handleReset}
+                onDetailedAnalysis={() => {
+                  // 상세분석으로 전환 (같은 영상을 상세분석)
+                  handleAnalysisStart(currentRequestId, {
+                    ...currentResult,
+                    analysisType: "detailed",
+                    status: "pending-detailed", // 상세분석 대기 상태
+                  });
+                }}
+              />
+            ) : (
+              <AnalysisResult
+                requestId={currentRequestId}
+                directResult={currentResult}
+                progress={currentProgress}
+                onReset={handleReset}
+              />
+            )}
           </div>
         )}
 

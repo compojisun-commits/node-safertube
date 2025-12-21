@@ -754,3 +754,18 @@ export default {
   // 기존 호환성 유지
   extractKeywordsGuaranteed: extractNounKeywords,
 };
+
+  smartClassify,
+  smartClassifyBatch,
+  smartClassifyHybrid, // 🆕 AI + 규칙 하이브리드
+  aiClassifyWithGemini, // 🆕 AI 전용
+  extractNounKeywords,
+  inferSubjectFromKeywords,
+  findBestExistingFolder,
+  generateNewFolderPath,
+  buildFolderPathList,
+  testSmartClassify,
+  runTests,
+  // 기존 호환성 유지
+  extractKeywordsGuaranteed: extractNounKeywords,
+};

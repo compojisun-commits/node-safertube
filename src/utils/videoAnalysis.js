@@ -1314,6 +1314,145 @@ function filterDuplicateWarnings(warnings) {
 }
 
 /**
+ * 🆕 간편분석 함수 - 자막 있으면 자막 기반, 없으면 영상 직접 분석
+ * 출력 간소화로 속도 최적화
+ */
+export async function analyzeVideoQuick(videoUrl, videoId, gradeLevel, onProgress) {
+  try {
+    onProgress?.({ status: "fetching", message: "영상 정보 가져오는 중..." });
+    const { duration, title } = await getVideoDuration(videoId);
+
+    // 자막 추출 시도
+    let transcript = [];
+    try {
+      onProgress?.({ status: "transcript", message: "자막 확인 중..." });
+      transcript = await fetchTranscript(videoUrl);
+      console.log(`[간편분석] 자막 ${transcript.length}개 추출`);
+    } catch (e) {
+      console.warn("[간편분석] 자막 없음 - 영상 직접 분석");
+    }
+
+    onProgress?.({ status: "analyzing", message: "AI가 안전도를 분석하는 중..." });
+
+    const gradeFilters = {
+      "elementary-1-2": { name: "초등 1~2학년", criteria: "만 7-8세" },
+      "elementary-3-4": { name: "초등 3~4학년", criteria: "만 9-10세" },
+      "elementary-5-6": { name: "초등 5~6학년", criteria: "만 11-12세" },
+      "middle-school": { name: "중학생", criteria: "만 13-15세" },
+      "high-school": { name: "고등학생", criteria: "만 16-18세" },
+    };
+    const selectedFilter = gradeFilters[gradeLevel] || gradeFilters["elementary-5-6"];
+    const hasTranscript = transcript.length > 0;
+
+    const durationMin = Math.floor(duration / 60);
+    const durationSec = duration % 60;
+
+    // 자막 샘플링 (최대 100개)
+    const sampledTranscript = transcript.length > 100 
+      ? transcript.filter((_, i) => i % Math.ceil(transcript.length / 100) === 0)
+      : transcript;
+
+    // 🔥 간결한 프롬프트 (자막/영상 모두 지원)
+    const prompt = `# 빠른 안전도 분석
+대상: ${selectedFilter.name} (${selectedFilter.criteria})
+영상 길이: ${durationMin}분 ${durationSec}초
+
+${hasTranscript ? `## 자막 데이터
+${sampledTranscript.map(t => `[${formatTimestamp(t.start)}] ${t.text}`).join("\n")}` : "## 영상 직접 분석 (자막 없음)"}
+
+## 분석 요청
+1. 안전 점수 (0-100): 해당 학년에 적합한지
+2. 유해 구간이 있다면 시간대 표시
+
+## 6대 유해 요소
+폭력성, 선정성, 욕설/언어, 공포, 약물(음주/흡연), 모방위험
+
+## JSON 응답
+{
+  "safetyScore": 85,
+  "safetyLevel": "safe/caution/warning/danger",
+  "safetyDescription": "한 줄 평가",
+  "summary": "영상 내용 2문장 요약",
+  "mainConcern": "가장 우려되는 점 (없으면 null)",
+  "warnings": [
+    {"startTime": "2:30", "endTime": "2:45", "category": "profanity", "severity": "medium", "description": "문제 내용"}
+  ]
+}
+
+점수 기준: 90-100(safe), 70-89(caution), 40-69(warning), 0-39(danger)
+시간 범위: 0:00 ~ ${durationMin}:${durationSec.toString().padStart(2, '0')}
+warnings는 문제 없으면 빈 배열 []. 한국어로 응답.`;
+
+    // 🔥 자막 있으면 텍스트만, 없으면 영상 직접 분석
+    const requestBody = {
+      contents: [
+        {
+          parts: hasTranscript 
+            ? [{ text: prompt }]
+            : [
+                { fileData: { fileUri: videoUrl } },
+                { text: prompt }
+              ]
+        }
+      ],
+      generationConfig: {
+        temperature: 0.1,
+        maxOutputTokens: 2048,
+        responseMimeType: "application/json",
+        thinkingConfig: { thinkingBudget: 0 },
+      },
+    };
+
+    const response = await fetch(`${GEMINI_API_URL}?key=${getRotatedGeminiKey()}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Gemini API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+    const result = parseJSON(text);
+
+    onProgress?.({ status: "completed", message: "분석 완료!" });
+
+    // 안전도 설명 생성
+    const getSafetyDescription = (score) => {
+      if (score >= 90) return "교육적으로 적합한 안전한 콘텐츠입니다.";
+      if (score >= 70) return "일부 주의가 필요할 수 있습니다. 보호자 사전 확인을 권장합니다.";
+      if (score >= 40) return "부적절한 내용이 포함되어 있습니다. 보호자와 함께 시청하세요.";
+      return "해당 학년에 적합하지 않은 콘텐츠입니다.";
+    };
+
+    return {
+      analysisType: "quick",
+      safetyScore: result.safetyScore || 70,
+      safetyLevel: result.safetyLevel || "caution",
+      safetyDescription: result.safetyDescription || getSafetyDescription(result.safetyScore || 70),
+      summary: result.summary || "영상 분석이 완료되었습니다.",
+      mainConcern: result.mainConcern || null,
+      warnings: (result.warnings || []).map(w => ({
+        startTime: w.startTime || w.time || "0:00",
+        endTime: w.endTime || w.startTime || w.time || "0:00",
+        category: w.category || "unknown",
+        severity: w.severity || "medium",
+        description: w.description || w.issue || "주의 필요",
+      })),
+      title: title || "제목 없음",
+      videoId,
+      videoUrl,
+      duration,
+    };
+  } catch (error) {
+    console.error("간편분석 실패:", error);
+    throw error;
+  }
+}
+
+/**
  * 메인 분석 함수
  */
 export async function analyzeVideo(videoUrl, videoId, gradeLevel, onProgress) {
