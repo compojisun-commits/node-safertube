@@ -46,11 +46,6 @@ export async function addToJjim({ user, videoUrl, videoId, analysis, title, fold
     tags,
     isManualAdd: false,
     createdAt: Timestamp.now(),
-    metadata: {
-      grade: "",
-      semester: "",
-      subject: "",
-    },
   };
 
   // 메인 문서 ID
@@ -205,13 +200,13 @@ export async function removeFromJjim({ user, videoId }) {
  * @param {string} [params.linkType] - 링크 타입 ('youtube' | 'generic')
  * @param {string} [params.thumbnail] - 썸네일 URL
  */
-export async function addLinkDirectly({ user, videoUrl, title, memo = "", folderId = null, tags = [], linkType = "youtube", thumbnail = "" }) {
+export async function addLinkDirectly({ user, videoUrl, title, memo = "", folderId = null, tags = [], linkType = "youtube", thumbnail = "", videoId: providedVideoId = null, status = null }) {
   if (!user) throw new Error("로그인이 필요합니다");
-  if (!videoUrl || !title) throw new Error("URL과 제목은 필수입니다");
+  if (!videoUrl) throw new Error("URL은 필수입니다");
 
   // YouTube URL에서 videoId 추출 (YouTube 타입인 경우만)
-  let videoId = null;
-  if (linkType === 'youtube') {
+  let videoId = providedVideoId;
+  if (!videoId && (linkType === 'youtube' || videoUrl.includes('youtube') || videoUrl.includes('youtu.be'))) {
     const patterns = [
       /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/,
       /youtube\.com\/embed\/([^&\n?#]+)/,
@@ -227,8 +222,26 @@ export async function addLinkDirectly({ user, videoUrl, title, memo = "", folder
     }
   }
 
-  // 일반 URL인 경우 썸네일이 없으면 파비콘 사용
+  // 제목 Fallback: 비어있으면 URL 또는 기본값 사용
+  let finalTitle = title;
+  if (!finalTitle || finalTitle.trim() === '') {
+    if (videoId) {
+      finalTitle = 'YouTube 영상';
+    } else if (videoUrl.includes('twitter') || videoUrl.includes('x.com')) {
+      finalTitle = 'X(Twitter) 게시물';
+    } else if (videoUrl.includes('blog.naver')) {
+      finalTitle = '네이버 블로그';
+    } else {
+      finalTitle = videoUrl.length > 50 ? videoUrl.substring(0, 50) + '...' : videoUrl;
+    }
+  }
+
+  // YouTube인 경우 썸네일 자동 생성
   let finalThumbnail = thumbnail;
+  if (!finalThumbnail && videoId) {
+    finalThumbnail = `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`;
+  }
+  // 일반 URL인 경우 파비콘 사용
   if (!finalThumbnail && linkType === 'generic') {
     try {
       const urlObj = new URL(videoUrl.startsWith('http') ? videoUrl : `https://${videoUrl}`);
@@ -243,20 +256,16 @@ export async function addLinkDirectly({ user, videoUrl, title, memo = "", folder
     id: generateId(),
     videoId,
     videoUrl,
-    title,
+    title: finalTitle, // Fallback 적용된 제목 사용
     memo,
     folderId,
     tags,
     linkType, // 링크 타입 추가
     thumbnail: finalThumbnail, // 썸네일 URL 추가
+    status: status, // 🆕 칸반 보드 섹션 상태
     isManualAdd: true, // 직접 추가된 영상 표시
     analysis: null,
     createdAt: Timestamp.now(),
-    metadata: {
-      grade: "",
-      semester: "",
-      subject: "",
-    },
   };
 
   const mainDocId = user.uid;

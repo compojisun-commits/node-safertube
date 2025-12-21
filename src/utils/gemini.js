@@ -7,6 +7,15 @@ const GEMINI_API_KEYS = [
   import.meta.env.VITE_GEMINI_API_KEY_3,
 ].filter(Boolean); // undefined 제거
 
+const getRotatedGeminiKey = () => {
+  if (GEMINI_API_KEYS.length === 0) {
+    console.warn("⚠️ Gemini API 키가 설정되지 않았습니다.");
+    return "";
+  }
+  const idx = Math.floor(Math.random() * GEMINI_API_KEYS.length);
+  console.log(`🤖 Gemini API 키 ${idx + 1}/${GEMINI_API_KEYS.length} 사용`);
+  return GEMINI_API_KEYS[idx];
+};
 const GEMINI_API_URL =
   "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 
@@ -25,7 +34,7 @@ const API_CALL_DELAY = 2000; // 2초
  * API 호출 사이 지연 함수
  */
 function delay(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
@@ -70,7 +79,7 @@ async function callOpenAI(prompt, maxTokens = 500) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${OPENAI_API_KEY}`,
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
         model: "gpt-4o-mini",
@@ -87,7 +96,11 @@ async function callOpenAI(prompt, maxTokens = 500) {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(`OpenAI API error: ${response.status} - ${errorData.error?.message || "Unknown error"}`);
+      throw new Error(
+        `OpenAI API error: ${response.status} - ${
+          errorData.error?.message || "Unknown error"
+        }`
+      );
     }
 
     const data = await response.json();
@@ -118,27 +131,30 @@ ${text2}
   "score": 0-100
 }`;
 
-    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              {
-                text: prompt,
-              },
-            ],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.5, // 안정적인 결과를 위해 낮은 온도 설정
-          maxOutputTokens: 500, // 유사도 점수만 출력하므로 적은 토큰 사용
+    const response = await fetch(
+      `${GEMINI_API_URL}?key=${getRotatedGeminiKey()}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-      }),
-    });
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: prompt,
+                },
+              ],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.5, // 안정적인 결과를 위해 낮은 온도 설정
+            maxOutputTokens: 500, // 유사도 점수만 출력하므로 적은 토큰 사용
+          },
+        }),
+      }
+    );
 
     if (!response.ok) {
       throw new Error(`Gemini API error: ${response.status}`);
@@ -257,10 +273,21 @@ JSON만 출력:`;
         const maxRetries = GEMINI_API_KEYS.length * 2;
         if (_retryCount < maxRetries) {
           const waitTime = Math.min(3000 * Math.pow(2, _retryCount), 30000);
-          console.warn(`⚠️ [빠른분석] API 할당량 초과. ${waitTime/1000}초 후 재시도... (${_retryCount + 1}/${maxRetries})`);
+          console.warn(
+            `⚠️ [빠른분석] API 할당량 초과. ${
+              waitTime / 1000
+            }초 후 재시도... (${_retryCount + 1}/${maxRetries})`
+          );
           switchToNextKey();
           await delay(waitTime);
-          return quickAnalyzeVideo(videoId, transcript, gradeLevel, subject, intention, _retryCount + 1);
+          return quickAnalyzeVideo(
+            videoId,
+            transcript,
+            gradeLevel,
+            subject,
+            intention,
+            _retryCount + 1
+          );
         }
       }
       throw new Error(`Gemini API error: ${response.status}`);
@@ -308,18 +335,20 @@ function generateArtKeywords(intention) {
   const keywords = [];
 
   // 이미 접미사가 포함되어 있는지 확인
-  const hasSuffix = artSuffixes.some(suffix => baseKeyword.includes(suffix));
+  const hasSuffix = artSuffixes.some((suffix) => baseKeyword.includes(suffix));
 
   if (hasSuffix) {
     // "크리스마스 트리 만들기" → ["크리스마스 트리 만들기", "크리스마스 트리 꾸미기", ...]
-    artSuffixes.forEach(suffix => {
+    artSuffixes.forEach((suffix) => {
       // 기존 접미사 제거하고 새 접미사 추가
-      const base = baseKeyword.replace(/만들기|그리기|꾸미기|감상|전시/g, "").trim();
+      const base = baseKeyword
+        .replace(/만들기|그리기|꾸미기|감상|전시/g, "")
+        .trim();
       keywords.push(`${base} ${suffix}`);
     });
   } else {
     // "크리스마스 트리" → ["크리스마스 트리 만들기", "크리스마스 트리 그리기", ...]
-    artSuffixes.forEach(suffix => {
+    artSuffixes.forEach((suffix) => {
       keywords.push(`${baseKeyword} ${suffix}`);
     });
   }
@@ -389,7 +418,11 @@ function generateGenericKeywords(intention, subject) {
   }
 
   // 5. 초등/중등 키워드 추가 (아직 없는 경우)
-  if (!baseKeyword.includes("초등") && !baseKeyword.includes("중등") && !baseKeyword.includes("중학")) {
+  if (
+    !baseKeyword.includes("초등") &&
+    !baseKeyword.includes("중등") &&
+    !baseKeyword.includes("중학")
+  ) {
     keywords.push(`초등 ${baseKeyword}`);
   }
 
@@ -400,7 +433,12 @@ function generateGenericKeywords(intention, subject) {
 /**
  * Gemini API로 검색어 생성
  */
-export async function generateSearchKeywords(subject, intention, gradeLevel, _retryCount = 0) {
+export async function generateSearchKeywords(
+  subject,
+  intention,
+  gradeLevel,
+  _retryCount = 0
+) {
   // prompt를 함수 스코프에 선언 (catch에서도 접근 가능하도록)
   let prompt;
 
@@ -473,10 +511,19 @@ ${intention ? `**수업 의도:** ${intention}` : ""}
         const maxRetries = GEMINI_API_KEYS.length * 2;
         if (_retryCount < maxRetries) {
           const waitTime = Math.min(3000 * Math.pow(2, _retryCount), 30000);
-          console.warn(`⚠️ [검색어생성] API 할당량 초과. ${waitTime/1000}초 후 재시도... (${_retryCount + 1}/${maxRetries})`);
+          console.warn(
+            `⚠️ [검색어생성] API 할당량 초과. ${
+              waitTime / 1000
+            }초 후 재시도... (${_retryCount + 1}/${maxRetries})`
+          );
           switchToNextKey();
           await delay(waitTime);
-          return generateSearchKeywords(subject, intention, gradeLevel, _retryCount + 1);
+          return generateSearchKeywords(
+            subject,
+            intention,
+            gradeLevel,
+            _retryCount + 1
+          );
         }
       }
       throw new Error(`Gemini API error: ${response.status}`);
@@ -497,7 +544,10 @@ ${intention ? `**수업 의도:** ${intention}` : ""}
     console.error("검색어 생성 실패:", error);
 
     // OpenAI 폴백 시도
-    if (OPENAI_API_KEY && (error.message.includes("429") || error.message.includes("404"))) {
+    if (
+      OPENAI_API_KEY &&
+      (error.message.includes("429") || error.message.includes("404"))
+    ) {
       try {
         console.log("🔄 OpenAI로 폴백 시도...");
         let openAIPrompt = prompt;
@@ -619,10 +669,20 @@ export async function generateAlternativeKeywords(
         const maxRetries = GEMINI_API_KEYS.length * 2;
         if (_retryCount < maxRetries) {
           const waitTime = Math.min(3000 * Math.pow(2, _retryCount), 30000);
-          console.warn(`⚠️ [대체검색어] API 할당량 초과. ${waitTime/1000}초 후 재시도... (${_retryCount + 1}/${maxRetries})`);
+          console.warn(
+            `⚠️ [대체검색어] API 할당량 초과. ${
+              waitTime / 1000
+            }초 후 재시도... (${_retryCount + 1}/${maxRetries})`
+          );
           switchToNextKey();
           await delay(waitTime);
-          return generateAlternativeKeywords(subject, intention, gradeLevel, previousKeywords, _retryCount + 1);
+          return generateAlternativeKeywords(
+            subject,
+            intention,
+            gradeLevel,
+            previousKeywords,
+            _retryCount + 1
+          );
         }
       }
       throw new Error(`Gemini API error: ${response.status}`);
@@ -642,7 +702,10 @@ export async function generateAlternativeKeywords(
     console.error("대체 검색어 생성 실패:", error);
 
     // OpenAI 폴백 시도
-    if (OPENAI_API_KEY && (error.message.includes("429") || error.message.includes("404"))) {
+    if (
+      OPENAI_API_KEY &&
+      (error.message.includes("429") || error.message.includes("404"))
+    ) {
       try {
         console.log("🔄 OpenAI로 폴백 시도 (대체 검색어)...");
         let openAIPrompt = prompt;

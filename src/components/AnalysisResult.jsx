@@ -3,6 +3,7 @@ import { doc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
 import { db } from "../firebase/config";
 import { useAuth } from "../context/AuthContext";
 import Swal from "sweetalert2";
+import { Brain, Layers, FileText, MessageCircle, BarChart2, AlertTriangle, CheckCircle } from "lucide-react";
 
 import { addToJjim } from "../utils/jjim";
 import { shareToBoard } from "../utils/share";
@@ -120,6 +121,7 @@ export default function AnalysisResult({ requestId, directResult, progress, onRe
   const [expandedSections, setExpandedSections] = useState({
     categoryRatings: false,
     comprehension: false,
+    warnings: false,
   });
 
   // 섹션 토글 함수
@@ -676,114 +678,133 @@ export default function AnalysisResult({ requestId, directResult, progress, onRe
                 
                 {expandedSections.comprehension && (
                   <div className="collapsible-content">
-                    <div className="comprehension-grid">
-                      <div className="comprehension-card recommended-age">
-                        <div className="comprehension-card-header">
-                          <span className="comprehension-label">AI 추천 연령</span>
+                    {/* 🆕 ContentDepthMeter 스타일 - 통합 콘텐츠 분석 카드 */}
+                    <div className="integrated-depth-card">
+                      {/* 헤더: 종합 난이도 */}
+                      <div className="depth-card-header-new">
+                        <div className="depth-header-left">
+                          <BarChart2 size={18} className="depth-header-icon" />
+                          <span className="depth-header-title">콘텐츠 분석 결과</span>
                         </div>
-                        <div className="comprehension-value-large">
-                          {analysis.comprehensionAnalysis.recommendedAge || "분석 중"}
+                        <div className="overall-difficulty-badge">
+                          <span className="badge-label-small">종합 난이도</span>
+                          <span className="badge-value-bold">{analysis.comprehensionAnalysis.overallDifficulty || "보통"}</span>
                         </div>
-                        <p className="comprehension-disclaimer">
-                          ⚠️ AI 추정치이며, 공식 등급이 아닙니다
-                        </p>
                       </div>
 
-                      <div className="comprehension-card difficulty-summary">
-                        <div className="difficulty-item">
-                          <span className="difficulty-label">어휘 수준</span>
-                          <span className={`difficulty-badge ${getDifficultyClass(analysis.comprehensionAnalysis.vocabularyLevel)}`}>
-                            {analysis.comprehensionAnalysis.vocabularyLevel || "-"}
-                          </span>
-                        </div>
-                        <div className="difficulty-item">
-                          <span className="difficulty-label">주제 복잡도</span>
-                          <span className={`difficulty-badge ${getDifficultyClass(analysis.comprehensionAnalysis.topicComplexity)}`}>
-                            {analysis.comprehensionAnalysis.topicComplexity || "-"}
-                          </span>
-                        </div>
-                        <div className="difficulty-item">
-                          <span className="difficulty-label">종합 난이도</span>
-                          <span className={`difficulty-badge ${getDifficultyClass(analysis.comprehensionAnalysis.overallDifficulty)}`}>
-                            {analysis.comprehensionAnalysis.overallDifficulty || "-"}
-                          </span>
-                        </div>
-                      </div>
-                      
-                      {/* 🆕 콘텐츠 깊이 분석 - 가로 나열 */}
-                      <div className="depth-analysis-row">
-                        {/* 추상화 레벨 */}
-                        <div className="depth-item">
-                          <span className="depth-label">🧠 추상화</span>
-                          <div className="depth-dots">
-                            {[1, 2, 3, 4, 5].map((level) => (
-                              <span 
-                                key={level}
-                                className={`depth-dot ${level <= (analysis.comprehensionAnalysis.abstractConceptLevel || 1) ? 'active' : ''}`}
-                              />
-                            ))}
+                      {/* 메인 그리드: 4개의 카드 (2x2) */}
+                      <div className="metrics-grid-new">
+                        {/* Card 1: 콘텐츠 깊이 (추상화) */}
+                        <div className="metric-card-new">
+                          <div className="metric-icon-circle purple">
+                            <Brain size={24} />
                           </div>
-                          <span className="depth-value">
-                            {(analysis.comprehensionAnalysis.abstractConceptLevel || 1) <= 2 ? '구체적' :
-                             (analysis.comprehensionAnalysis.abstractConceptLevel || 1) <= 3 ? '경험적' : '추상적'}
-                          </span>
+                          <div className="metric-card-content">
+                            <span className="metric-card-label">콘텐츠 깊이</span>
+                            <div className="metric-card-value-row">
+                              <span className="metric-main-value">
+                                {(analysis.comprehensionAnalysis.abstractConceptLevel || 3) <= 2 ? '구체적' :
+                                 (analysis.comprehensionAnalysis.abstractConceptLevel || 3) <= 3 ? '경험적' : '추상적'}
+                              </span>
+                              <span className="metric-sub-badge">Lv.{analysis.comprehensionAnalysis.abstractConceptLevel || 3}</span>
+                            </div>
+                            <p className="metric-card-desc">
+                              {(analysis.comprehensionAnalysis.abstractConceptLevel || 3) <= 2 ? '사물/행동 위주' :
+                               (analysis.comprehensionAnalysis.abstractConceptLevel || 3) <= 3 ? '생활/경험 소재' : '원리/철학 개념'}
+                            </p>
+                          </div>
                         </div>
 
-                        {/* 어휘 밀도 */}
-                        <div className="depth-item">
-                          <span className="depth-label">📝 어휘밀도</span>
-                          <span className={`depth-badge depth-${(analysis.comprehensionAnalysis.lexicalDensity || 'Medium').toLowerCase()}`}>
-                            {analysis.comprehensionAnalysis.lexicalDensity === 'Low' ? '가벼움' :
-                             analysis.comprehensionAnalysis.lexicalDensity === 'High' ? '빽빽함' : '보통'}
-                          </span>
+                        {/* Card 2: 주제 복잡도 */}
+                        <div className="metric-card-new">
+                          <div className="metric-icon-circle orange">
+                            <Layers size={24} />
+                          </div>
+                          <div className="metric-card-content">
+                            <span className="metric-card-label">주제 복잡도</span>
+                            <div className="metric-card-value-row">
+                              <span className="metric-main-value">{analysis.comprehensionAnalysis.topicComplexity || "보통"}</span>
+                            </div>
+                            <p className="metric-card-desc">
+                              {analysis.comprehensionAnalysis.topicComplexity === '어려움' ? '다면적 사고 필요' :
+                               analysis.comprehensionAnalysis.topicComplexity === '쉬움' ? '직관적인 주제' : '일반적인 배경지식'}
+                            </p>
+                          </div>
                         </div>
 
-                        {/* 문장 복잡도 */}
-                        <div className="depth-item">
-                          <span className="depth-label">💬 문장</span>
-                          <span className={`depth-badge complexity-${(analysis.comprehensionAnalysis.sentenceComplexity || 'Simple').toLowerCase()}`}>
-                            {analysis.comprehensionAnalysis.sentenceComplexity === 'Complex' ? '복잡' : '단순'}
-                          </span>
+                        {/* Card 3: 어휘 수준 */}
+                        <div className="metric-card-new">
+                          <div className="metric-icon-circle blue">
+                            <FileText size={24} />
+                          </div>
+                          <div className="metric-card-content">
+                            <span className="metric-card-label">어휘 수준</span>
+                            <div className="metric-card-value-row">
+                              <span className="metric-main-value">{analysis.comprehensionAnalysis.vocabularyLevel || "보통"}</span>
+                            </div>
+                            <p className="metric-card-desc">
+                              {analysis.comprehensionAnalysis.vocabularyLevel === '어려움' || analysis.comprehensionAnalysis.lexicalDensity === 'High' ? '전문 용어 다수' :
+                               analysis.comprehensionAnalysis.vocabularyLevel === '쉬움' || analysis.comprehensionAnalysis.lexicalDensity === 'Low' ? '일상 어휘 위주' : '교과 어휘 수준'}
+                            </p>
+                          </div>
                         </div>
-                      </div>
 
-                      {/* 🎬 KMRB 등급 결과 */}
-                      {analysis.ratingResult && (
-                        <div className={`comprehension-card rating-result-card ${analysis.ratingResult.isClassroomSafe ? 'classroom-safe' : 'classroom-unsafe'}`}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-                            <div>
-                              <h5 className="metrics-title" style={{ marginBottom: '8px' }}>🎬 영상등급위원회 판정</h5>
-                              <span className={`rating-badge ${
-                                analysis.ratingResult.finalRating?.includes('전체') ? 'all' :
-                                analysis.ratingResult.finalRating?.includes('12세') ? 'age12' :
-                                analysis.ratingResult.finalRating?.includes('15세') ? 'age15' : 'adult'
-                              }`}>
-                                {analysis.ratingResult.finalRating || '전체관람가'}
+                        {/* Card 4: 문장 구조 */}
+                        <div className="metric-card-new">
+                          <div className="metric-icon-circle green">
+                            <MessageCircle size={24} />
+                          </div>
+                          <div className="metric-card-content">
+                            <span className="metric-card-label">문장 구조</span>
+                            <div className="metric-card-value-row">
+                              <span className="metric-main-value">
+                                {analysis.comprehensionAnalysis.sentenceComplexity === 'Complex' ? '복잡' : '단순'}
                               </span>
                             </div>
-                            <div style={{ textAlign: 'right' }}>
-                              <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>교실 상영 점수</div>
-                              <div style={{ fontSize: '24px', fontWeight: '800', color: analysis.ratingResult.isClassroomSafe ? '#16a34a' : '#dc2626' }}>
-                                {analysis.ratingResult.schoolSafetyScore || '-'}점
-                              </div>
-                            </div>
+                            <p className="metric-card-desc">
+                              {analysis.comprehensionAnalysis.sentenceComplexity === 'Complex' ? '긴 호흡의 문장' : '짧고 간결한 문장'}
+                            </p>
                           </div>
-                          <div style={{ marginTop: '12px', padding: '10px', background: 'rgba(255,255,255,0.5)', borderRadius: '8px' }}>
-                            <span style={{ fontSize: '12px', fontWeight: '600', color: analysis.ratingResult.isClassroomSafe ? '#166534' : '#991b1b' }}>
-                              {analysis.ratingResult.isClassroomSafe ? '✅ 초등 교실 상영 가능' : '⚠️ 초등 교실 상영 주의 필요'}
-                            </span>
-                          </div>
-                          {analysis.ratingResult.warningKeywords?.length > 0 && (
-                            <div className="warning-keywords">
-                              <span style={{ fontSize: '11px', color: '#64748b', marginRight: '6px' }}>⚠️ 주의 표현:</span>
-                              {analysis.ratingResult.warningKeywords.map((keyword, idx) => (
-                                <span key={idx} className="warning-keyword">{keyword}</span>
-                              ))}
-                            </div>
-                          )}
                         </div>
-                      )}
+                      </div>
+
+                      {/* AI 추천 연령 */}
+                      <div className="recommended-age-bar">
+                        <span className="age-bar-label">🎯 AI 추천 연령</span>
+                        <span className="age-bar-value">{analysis.comprehensionAnalysis.recommendedAge || "분석 중"}</span>
+                        <span className="age-bar-disclaimer">※ AI 추정치이며, 공식 등급이 아닙니다</span>
+                      </div>
                     </div>
+
+                    {/* 🎬 KMRB 등급 결과 - 개선된 디자인 */}
+                    {analysis.ratingResult && (
+                      <div className={`kmrb-card-new ${analysis.ratingResult.isClassroomSafe ? 'safe' : 'unsafe'}`}>
+                        <div className="kmrb-card-header">
+                          <div className={`kmrb-rating-badge ${
+                            analysis.ratingResult.finalRating?.includes('전체') ? 'all' :
+                            analysis.ratingResult.finalRating?.includes('12세') ? 'age12' :
+                            analysis.ratingResult.finalRating?.includes('15세') ? 'age15' : 'adult'
+                          }`}>
+                            {analysis.ratingResult.finalRating || '전체관람가'}
+                          </div>
+                          <div className="kmrb-classroom-status">
+                            {analysis.ratingResult.isClassroomSafe ? (
+                              <><CheckCircle size={16} className="status-icon safe" /> 교실 상영 가능</>
+                            ) : (
+                              <><AlertTriangle size={16} className="status-icon unsafe" /> 상영 주의</>
+                            )}
+                          </div>
+                        </div>
+                        {analysis.ratingResult.warningKeywords?.length > 0 && (
+                          <div className="kmrb-keyword-list">
+                            <span className="keyword-label">⚠️ 주의 표현:</span>
+                            {analysis.ratingResult.warningKeywords.map((kw, i) => (
+                              <span key={i} className="keyword-tag">{kw}</span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     <div className="comprehension-details">
                       {analysis.comprehensionAnalysis.difficultWords?.length > 0 && (
@@ -847,19 +868,38 @@ export default function AnalysisResult({ requestId, directResult, progress, onRe
           </div>
         )}
 
-        {/* 위험 구간 - 카테고리별 아이콘과 정확한 시간 표시 */}
+        {/* 주의 구간 - 토글 형태 */}
         {analysis.warnings && analysis.warnings.length > 0 && (
-          <div className="mb-6">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-6 h-6 rounded bg-red-100 flex items-center justify-center">
-                <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
+          <div className="collapsible-section warning-section">
+            <button 
+              className="collapsible-header warning-header"
+              onClick={() => setExpandedSections(prev => ({...prev, warnings: !prev.warnings}))}
+            >
+              <div className="collapsible-title">
+                <div className="w-6 h-6 rounded bg-red-100 flex items-center justify-center">
+                  <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <span>주의 구간</span>
+                <span className="warning-count-badge">{analysis.warnings.length}개</span>
+                {/* 카테고리 미리보기 */}
+                {(() => {
+                  const cats = [...new Set(analysis.warnings.map(w => w.category))];
+                  const icons = { drug: "💊", violence: "⚔️", profanity: "🗣️", sexuality: "🔞", fear: "👻", imitation: "⚠️" };
+                  return cats.slice(0, 3).map(cat => <span key={cat} className="category-preview">{icons[cat] || "❓"}</span>);
+                })()}
               </div>
-              <h3 className="text-lg font-semibold text-gray-900">
-                주의 구간 <span className="text-red-600 font-bold">{analysis.warnings.length}개</span>
-              </h3>
-            </div>
+              <svg 
+                className={`collapsible-chevron ${expandedSections.warnings ? 'expanded' : ''}`} 
+                width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+              >
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+            </button>
+
+            {expandedSections.warnings && (
+              <div className="collapsible-content">
             
             {/* 🆕 카테고리별 요약 통계 */}
             <div className="flex flex-wrap gap-2 mb-4">
@@ -979,6 +1019,8 @@ export default function AnalysisResult({ requestId, directResult, progress, onRe
                 );
               })}
             </div>
+              </div>
+            )}
           </div>
         )}
 

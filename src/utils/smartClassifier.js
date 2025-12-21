@@ -470,7 +470,22 @@ export function smartClassifyBatch(videos, userFolders, options = {}) {
 // 🤖 AI 기반 족집게 분류 (Gemini API)
 // ============================================
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+// 🔄 Gemini API 키 로테이션 - 무료 할당량 분산
+const GEMINI_API_KEYS = [
+  import.meta.env.VITE_GEMINI_API_KEY,
+  import.meta.env.VITE_GEMINI_API_KEY_2,
+].filter(Boolean);
+
+const getRotatedGeminiKey = () => {
+  if (GEMINI_API_KEYS.length === 0) {
+    console.warn('⚠️ Gemini API 키가 설정되지 않았습니다.');
+    return '';
+  }
+  const idx = Math.floor(Math.random() * GEMINI_API_KEYS.length);
+  console.log(`🤖 [smartClassifier] Gemini API 키 ${idx + 1}/${GEMINI_API_KEYS.length} 사용`);
+  return GEMINI_API_KEYS[idx];
+};
+
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent";
 
 /**
@@ -547,7 +562,7 @@ JSON만 출력:`;
     console.log('\n🤖 [AI 분류] Gemini API 호출 중...');
     console.log('📝 파일명:', fileName);
 
-    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+    const response = await fetch(`${GEMINI_API_URL}?key=${getRotatedGeminiKey()}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -725,6 +740,21 @@ export function runTests() {
 }
 
 export default {
+  smartClassify,
+  smartClassifyBatch,
+  smartClassifyHybrid, // 🆕 AI + 규칙 하이브리드
+  aiClassifyWithGemini, // 🆕 AI 전용
+  extractNounKeywords,
+  inferSubjectFromKeywords,
+  findBestExistingFolder,
+  generateNewFolderPath,
+  buildFolderPathList,
+  testSmartClassify,
+  runTests,
+  // 기존 호환성 유지
+  extractKeywordsGuaranteed: extractNounKeywords,
+};
+
   smartClassify,
   smartClassifyBatch,
   smartClassifyHybrid, // 🆕 AI + 규칙 하이브리드

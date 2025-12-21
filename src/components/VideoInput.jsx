@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
-import { analyzeVideo } from "../utils/videoAnalysis";
+import { analyzeVideo, analyzeVideoQuick } from "../utils/videoAnalysis";
 import Swal from "sweetalert2";
 import SaveWizard from "./SaveWizard";
 
@@ -418,7 +418,8 @@ export default function VideoInput({ onAnalysisStart, onProgressUpdate, onBack, 
   };
 
   // 유튜브 영상 분석하기 (기존 handleSubmit 대체)
-  const handleAnalyze = async () => {
+  // mode: 'quick' (간편분석) | 'detailed' (상세분석)
+  const handleAnalyze = async (mode = 'detailed') => {
     // 유튜브 링크만 필터링
     const youtubeLinks = links.filter(link => detectUrlType(link.url) === 'youtube');
     
@@ -480,29 +481,54 @@ export default function VideoInput({ onAnalysisStart, onProgressUpdate, onBack, 
     const title = await fetchVideoTitle(url);
 
     try {
-      await Swal.fire({
-        title: "분석 시작",
-        html: `
-          <div style="text-align: left; line-height: 1.6;">
-            <p style="margin-bottom: 10px;">프론트엔드에서 직접 영상을 분석합니다.</p>
-            <div style="background-color: #fff4f4; padding: 12px; border-radius: 8px; margin-top: 10px;">
-              <p style="margin: 0; color: #dc3232; font-size: 14px;">
-                <b>⚡ 정확하고 빠른 분석</b><br/>
-                장면과 소리, 자막 모두를 분석하고 있습니다.<br/>
-                <br/>
-                분석 진행 상황을 실시간으로 확인하세요!
-              </p>
+      // 간편분석 vs 상세분석 안내
+      if (mode === 'quick') {
+        await Swal.fire({
+          title: "⚡ 간편분석 시작",
+          html: `
+            <div style="text-align: left; line-height: 1.6;">
+              <p style="margin-bottom: 10px;">자막 기반으로 빠르게 안전도를 확인합니다.</p>
+              <div style="background-color: #e8f4fd; padding: 12px; border-radius: 8px; margin-top: 10px;">
+                <p style="margin: 0; color: #2563eb; font-size: 14px;">
+                  <b>⚡ 5~15초 내 완료!</b><br/>
+                  종합 안전 점수와 유해 구간만 빠르게 확인하세요.
+                </p>
+              </div>
             </div>
-          </div>
-        `,
-        icon: "info",
-        confirmButtonText: "확인",
-        confirmButtonColor: "#dc3232",
-        timer: 5000,
-        timerProgressBar: true,
-      });
+          `,
+          icon: "info",
+          confirmButtonText: "확인",
+          confirmButtonColor: "#2563eb",
+          timer: 2000,
+          timerProgressBar: true,
+        });
+      } else {
+        await Swal.fire({
+          title: "🔍 상세분석 시작",
+          html: `
+            <div style="text-align: left; line-height: 1.6;">
+              <p style="margin-bottom: 10px;">프론트엔드에서 직접 영상을 분석합니다.</p>
+              <div style="background-color: #fff4f4; padding: 12px; border-radius: 8px; margin-top: 10px;">
+                <p style="margin: 0; color: #dc3232; font-size: 14px;">
+                  <b>🔍 정밀한 분석</b><br/>
+                  장면과 소리, 자막 모두를 분석합니다.<br/>
+                  분석 시간이 조금 더 소요됩니다.
+                </p>
+              </div>
+            </div>
+          `,
+          icon: "info",
+          confirmButtonText: "확인",
+          confirmButtonColor: "#dc3232",
+          timer: 3000,
+          timerProgressBar: true,
+        });
+      }
 
-      const result = await analyzeVideo(
+      // 분석 함수 선택 (간편 vs 상세)
+      const analyzeFunction = mode === 'quick' ? analyzeVideoQuick : analyzeVideo;
+      
+      const result = await analyzeFunction(
         `https://www.youtube.com/watch?v=${videoId}`,
         videoId,
         gradeLevel,
@@ -514,6 +540,7 @@ export default function VideoInput({ onAnalysisStart, onProgressUpdate, onBack, 
             onAnalysisStart(videoId, {
               status: "processing",
               analysis: null,
+              analysisType: mode, // 분석 타입 전달
             });
           }
         }
@@ -538,6 +565,7 @@ export default function VideoInput({ onAnalysisStart, onProgressUpdate, onBack, 
         analysis: result,
         videoId: videoId,
         videoUrl: `https://www.youtube.com/watch?v=${videoId}`,
+        analysisType: mode, // 간편/상세 구분
       });
       
       // 입력창 초기화
@@ -668,8 +696,8 @@ export default function VideoInput({ onAnalysisStart, onProgressUpdate, onBack, 
           )}
 
           {linkAnalysis.case === 'B' && (
-            // Case B: 유튜브만 - 두 버튼 모두 표시
-            <div className="dual-buttons-container">
+            // Case B: 유튜브만 - 세 버튼 표시 (찜보따리 + 간편분석 + 상세분석)
+            <div className="action-buttons-container">
               <button
                 type="button"
                 className="btn-jjim-new"
@@ -678,14 +706,32 @@ export default function VideoInput({ onAnalysisStart, onProgressUpdate, onBack, 
               >
                 🎁 찜보따리 넣기
               </button>
-              <button
-                type="button"
-                className="btn-analyze-new"
-                onClick={handleAnalyze}
-                disabled={loading}
-              >
-                {loading ? "분석중..." : "🚀 영상 분석하기"}
-              </button>
+              <div className="analysis-buttons-row">
+                <button
+                  type="button"
+                  className="btn-quick-analyze"
+                  onClick={() => handleAnalyze('quick')}
+                  disabled={loading}
+                >
+                  <span className="btn-icon">⚡</span>
+                  <span className="btn-text">
+                    <span className="btn-main">간편분석</span>
+                    <span className="btn-sub">안전도만 빠르게</span>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className="btn-detailed-analyze"
+                  onClick={() => handleAnalyze('detailed')}
+                  disabled={loading}
+                >
+                  <span className="btn-icon">🔍</span>
+                  <span className="btn-text">
+                    <span className="btn-main">상세분석</span>
+                    <span className="btn-sub">전체 분석</span>
+                  </span>
+                </button>
+              </div>
             </div>
           )}
 

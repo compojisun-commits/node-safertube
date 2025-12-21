@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import VideoInput from "./components/VideoInput";
 import AnalysisResult from "./components/AnalysisResult";
+import QuickAnalysisResult from "./components/QuickAnalysisResult";
 import VideoRecommendationDirect from "./components/VideoRecommendationDirect";
 import PhysicalArtsRecommendation from "./components/PhysicalArtsRecommendation";
 import Board from "./components/Board";
@@ -11,11 +12,22 @@ import Header from "./components/Header";
 import Footer from "./components/Footer";
 import Terms from "./components/Terms";
 import Privacy from "./components/Privacy";
-import SettingsModal from "./components/SettingsModal";
+import NewSettingsModal from "./components/NewSettingsModal";
 
 function AppContent() {
   const { user } = useAuth();
-  const [mode, setMode] = useState("analyze");
+  // 🆕 localStorage에서 초기 화면 설정 읽기
+  const [mode, setMode] = useState(() => {
+    try {
+      const savedLanding = localStorage.getItem('default_landing_page');
+      // analyze, recommend, jjim 중 하나로 매핑
+      if (savedLanding === 'recommend') return 'recommend';
+      if (savedLanding === 'jjim') return 'jjim';
+      return 'analyze'; // 기본값
+    } catch {
+      return 'analyze';
+    }
+  });
   const [currentRequestId, setCurrentRequestId] = useState(null);
   const [currentResult, setCurrentResult] = useState(null);
   const [currentProgress, setCurrentProgress] = useState({
@@ -25,18 +37,6 @@ function AppContent() {
     completedChunks: 0,
   });
   const [showSettings, setShowSettings] = useState(false);
-
-  // URL에 auto=1 또는 /jjim 경로로 진입 시 찜보따리 화면으로 전환해 자동분류 모달이 뜨도록 함
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const auto = params.get("auto") || params.get("autoClassify");
-    const path = window.location.pathname;
-    if (auto === "1" || path.includes("/jjim")) {
-      setMode("jjim");
-      setCurrentRequestId(null);
-      setCurrentResult(null);
-    }
-  }, []);
 
   const handleAnalysisStart = (requestId, result = null) => {
     setCurrentRequestId(requestId);
@@ -96,12 +96,30 @@ function AppContent() {
 
         {mode === "analyze" && currentRequestId && (
           <div className="main-content">
-            <AnalysisResult
-              requestId={currentRequestId}
-              directResult={currentResult}
-              progress={currentProgress}
-              onReset={handleReset}
-            />
+            {/* 간편분석 결과 vs 상세분석 결과 */}
+            {currentResult?.analysisType === "quick" ? (
+              <QuickAnalysisResult
+                result={currentResult}
+                videoId={currentResult?.videoId || currentRequestId}
+                videoUrl={currentResult?.videoUrl}
+                onReset={handleReset}
+                onDetailedAnalysis={() => {
+                  // 상세분석으로 전환 (같은 영상을 상세분석)
+                  handleAnalysisStart(currentRequestId, {
+                    ...currentResult,
+                    analysisType: "detailed",
+                    status: "pending-detailed", // 상세분석 대기 상태
+                  });
+                }}
+              />
+            ) : (
+              <AnalysisResult
+                requestId={currentRequestId}
+                directResult={currentResult}
+                progress={currentProgress}
+                onReset={handleReset}
+              />
+            )}
           </div>
         )}
 
@@ -150,9 +168,10 @@ function AppContent() {
         <Footer onNavigate={handleFooterNavigate} />
 
         {/* 설정 모달 */}
-        {showSettings && (
-          <SettingsModal onClose={() => setShowSettings(false)} />
-        )}
+        <NewSettingsModal 
+          isOpen={showSettings} 
+          onClose={() => setShowSettings(false)} 
+        />
     </div>
   );
 }

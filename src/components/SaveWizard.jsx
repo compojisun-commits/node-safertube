@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { AutoOrganizeModal } from './JjimList';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { createFolder, addLinkDirectly } from '../utils/jjim';
@@ -87,6 +86,7 @@ export default function SaveWizard({ videoData, multiLinks, user, onClose, onSuc
   
   // 멀티 모드용 상태 - 각 링크별 폴더 지정
   const [linkFolders, setLinkFolders] = useState({});
+  const [linkTitles, setLinkTitles] = useState({}); // 🆕 각 링크별 제목 편집
   const [expandedLinkIndex, setExpandedLinkIndex] = useState(null);
   
   // 드롭다운 내 폴더 네비게이션 상태
@@ -95,8 +95,6 @@ export default function SaveWizard({ videoData, multiLinks, user, onClose, onSuc
   // 일괄 적용 폴더 네비게이션 상태
   const [bulkPath, setBulkPath] = useState([]); // 일괄 적용에서 탐색 중인 경로
   const [showBulkDropdown, setShowBulkDropdown] = useState(false);
-  const [showAutoModal, setShowAutoModal] = useState(false);
-  const [autoModalVideos, setAutoModalVideos] = useState([]);
   
   // 멀티 링크 모드 확인
   const isMultiMode = multiLinks && multiLinks.length > 0;
@@ -114,14 +112,17 @@ export default function SaveWizard({ videoData, multiLinks, user, onClose, onSuc
     }
   }, [videoData?.title]);
 
-  // 멀티 링크 초기화 - 모든 링크를 최상위(null)로 설정
+  // 멀티 링크 초기화 - 폴더와 제목 초기화
   useEffect(() => {
     if (isMultiMode && multiLinks) {
       const initialFolders = {};
-      multiLinks.forEach((_, idx) => {
+      const initialTitles = {};
+      multiLinks.forEach((link, idx) => {
         initialFolders[idx] = null; // null = 최상위
+        initialTitles[idx] = link.title || link.url; // 🆕 크롤링된 제목 또는 URL
       });
       setLinkFolders(initialFolders);
+      setLinkTitles(initialTitles);
     }
   }, [isMultiMode, multiLinks]);
 
@@ -146,14 +147,25 @@ export default function SaveWizard({ videoData, multiLinks, user, onClose, onSuc
     }
   };
 
-  // 루트 레벨 폴더만 가져오기
-  const getRootFolders = () => folders.filter(f => !f.parentId);
+  // 루트 레벨 폴더만 가져오기 (parentId가 null, undefined, "" 모두 처리)
+  const getRootFolders = () => folders.filter(f => !f.parentId && f.parentId !== 0);
 
   // 특정 폴더의 하위 폴더 가져오기
   const getChildFolders = (parentId) => {
-    if (!parentId) return folders.filter(f => !f.parentId);
+    // 🆕 parentId가 null/undefined/"" 인 경우 루트 폴더 반환
+    if (!parentId) {
+      return folders.filter(f => !f.parentId || f.parentId === '' || f.parentId === null);
+    }
     return folders.filter(f => f.parentId === parentId);
   };
+
+  // 🆕 디버그용 로그 (폴더 목록 확인)
+  useEffect(() => {
+    if (folders.length > 0) {
+      console.log('📂 SaveWizard - 전체 폴더:', folders);
+      console.log('📂 SaveWizard - 루트 폴더:', getRootFolders());
+    }
+  }, [folders]);
 
   // 현재 드롭다운에서 보여줄 폴더들
   const getCurrentDropdownFolders = () => {
@@ -335,15 +347,16 @@ export default function SaveWizard({ videoData, multiLinks, user, onClose, onSuc
     setSaving(true);
     try {
       if (isMultiMode) {
-        // 멀티 링크 - 각각 지정된 폴더에 저장
+        // 멀티 링크 - 각각 지정된 폴더에 저장 (🆕 수정된 제목 사용)
         for (let i = 0; i < linksToSave.length; i++) {
           const link = linksToSave[i];
-          const folderId = linkFolders[i] || null;
+          const folderId = linkFolders[i] ?? null; // null도 유효한 값으로 처리
+          const customTitle = linkTitles[i] || link.title || link.url; // 🆕 수정된 제목 우선 사용
           
           await addLinkDirectly({
             user,
             videoUrl: link.url,
-            title: link.title || link.url,
+            title: customTitle.trim(),
             memo: '',
             folderId,
             tags: [],
@@ -374,22 +387,6 @@ export default function SaveWizard({ videoData, multiLinks, user, onClose, onSuc
     }
   };
 
-  // 현재 단일 영상으로 자동분류 모달을 띄우기 위한 데이터 구성
-  const openAutoModalForCurrent = () => {
-    if (isMultiMode) return;
-    const displayTitle = videoData?.title || videoData?.url || '제목 없음';
-    const autoVideo = {
-      id: videoData?.url || videoData?.title || 'temp',
-      title: displayTitle,
-      memo: '',
-      tags: [],
-      folderId: null,
-      videoUrl: videoData?.url || ''
-    };
-    setAutoModalVideos([autoVideo]);
-    setShowAutoModal(true);
-  };
-
   if (loading) {
     return (
       <div className="sw-overlay">
@@ -404,9 +401,8 @@ export default function SaveWizard({ videoData, multiLinks, user, onClose, onSuc
   }
 
   return (
-    <>
-      <div className="sw-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-        <div className={`sw-modal ${isMultiMode ? 'sw-modal-multi' : ''}`}>
+    <div className="sw-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className={`sw-modal ${isMultiMode ? 'sw-modal-multi' : ''}`}>
         {/* 헤더 */}
         <div className="sw-header">
           <h2 className="sw-title">
@@ -467,10 +463,10 @@ export default function SaveWizard({ videoData, multiLinks, user, onClose, onSuc
                       </span>
                     </button>
                     
-                    {/* 하위 폴더 목록 */}
+                    {/* 폴더 목록 */}
                     {getCurrentBulkFolders().length > 0 && (
                       <div className="sw-dropdown-section-label">
-                        하위 폴더로 이동
+                        {bulkPath.length === 0 ? '📁 폴더 선택' : '📂 하위 폴더'}
                       </div>
                     )}
                     
@@ -479,23 +475,41 @@ export default function SaveWizard({ videoData, multiLinks, user, onClose, onSuc
                         key={folder.id}
                         className="sw-dropdown-item sw-dropdown-folder"
                         onClick={() => {
+                          // 🆕 폴더 클릭 시 바로 선택 가능하도록 수정
+                          // Shift 키를 누르면 들어가기, 그냥 클릭하면 선택
+                          applyBulkFolder(folder.id);
+                        }}
+                        onDoubleClick={() => {
+                          // 더블클릭하면 하위 폴더로 이동
                           if (hasChildren(folder.id)) {
                             navigateIntoBulkFolder(folder);
-                          } else {
-                            applyBulkFolder(folder.id);
                           }
                         }}
                       >
                         <IconFolder />
                         <span>{folder.name}</span>
-                        {hasChildren(folder.id) ? (
-                          <IconChevronRight />
-                        ) : null}
+                        {hasChildren(folder.id) && (
+                          <button
+                            className="sw-folder-expand-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigateIntoBulkFolder(folder);
+                            }}
+                            title="하위 폴더 보기"
+                          >
+                            <IconChevronRight />
+                          </button>
+                        )}
                       </button>
                     ))}
                     
                     {/* 폴더 없을 때 */}
-                    {getCurrentBulkFolders().length === 0 && (
+                    {getCurrentBulkFolders().length === 0 && folders.length === 0 && (
+                      <div className="sw-dropdown-empty">
+                        📭 폴더가 없습니다. 새 폴더를 만들어주세요.
+                      </div>
+                    )}
+                    {getCurrentBulkFolders().length === 0 && folders.length > 0 && bulkPath.length > 0 && (
                       <div className="sw-dropdown-empty">
                         하위 폴더가 없습니다
                       </div>
@@ -509,12 +523,21 @@ export default function SaveWizard({ videoData, multiLinks, user, onClose, onSuc
             <div className="sw-links-list">
               {linksToSave.map((link, idx) => (
                 <div key={idx} className="sw-link-item">
-                  {/* 링크 정보 */}
+                  {/* 링크 정보 - 🆕 제목 편집 가능 */}
                   <div className="sw-link-info">
                     <div className={`sw-link-icon ${link.type}`}>
                       {link.type === 'youtube' ? <IconYoutube /> : <IconGlobe />}
                     </div>
-                    <span className="sw-link-title">{link.title || link.url}</span>
+                    <input
+                      type="text"
+                      className="sw-link-title-input"
+                      value={linkTitles[idx] || ''}
+                      onChange={(e) => setLinkTitles(prev => ({
+                        ...prev,
+                        [idx]: e.target.value
+                      }))}
+                      placeholder="제목을 입력하세요"
+                    />
                   </div>
                   
                   {/* 폴더 선택 드롭다운 */}
@@ -837,34 +860,17 @@ export default function SaveWizard({ videoData, multiLinks, user, onClose, onSuc
           {/* 저장 후 바로 AI 자동분류 페이지로 이동 */}
           <button
             type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (isMultiMode) {
-                alert('여러 링크 저장 모드에서는 한 번에 AI 자동분류를 실행할 수 없습니다.');
-                return;
-              }
-              openAutoModalForCurrent();
+            onClick={() => {
+              const url = `${window.location.origin}/jjim?auto=1`;
+              window.open(url, '_blank', 'noopener');
             }}
             className="sw-btn ghost"
-            title="찜보따리에서 AI 자동분류/정리 실행"
+            title="찜보따리에서 AI 자동분류/정리 실행 (새 탭)"
           >
             AI 자동분류 열기
           </button>
         </div>
-        </div>
       </div>
-
-      {/* AI 자동분류 모달 (단일 영상용, 현재 페이지에서 바로 표시) */}
-      {showAutoModal && (
-        <AutoOrganizeModal
-          videos={autoModalVideos}
-          folders={[]}
-          user={user}
-          scanTargets={autoModalVideos}
-          onClose={() => setShowAutoModal(false)}
-          onApply={() => setShowAutoModal(false)}
-        />
-      )}
-    </>
+    </div>
   );
 }

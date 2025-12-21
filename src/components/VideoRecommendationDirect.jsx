@@ -212,84 +212,65 @@ export default function VideoRecommendationDirect({ onBack }) {
     setLoading(true);
 
     try {
-      // 수업의도가 비어있는 경우: 기존 추천목록 또는 신뢰채널 검색
-      if (!intention.trim()) {
-        await Swal.fire({
-          title: "⚡ 빠른 추천 시작",
-          html: "기존 추천 목록 확인 중...",
-          icon: "info",
-          showConfirmButton: false,
-          timer: 1000,
-        });
-
-        // 1순위: Firestore에서 학년-주제 문서 찾기
-        const docName = `${gradeLevel}-${subject}`;
-        const keywordDocRef = doc(db, "recommendKeywords", docName);
-        const keywordDoc = await getDoc(keywordDocRef);
-
-        if (keywordDoc.exists()) {
-          const data = keywordDoc.data();
-          const lists = data.lists || [];
-
-          if (lists.length > 0) {
-            // 좋아요 많은 순으로 정렬해서 가장 인기있는 목록 선택
-            const sortedLists = [...lists].sort((a, b) => (b.likes || 0) - (a.likes || 0));
-            const bestList = sortedLists[0];
-
-            console.log(`✅ 기존 추천목록 발견: ${docName}, ${bestList.videos?.length || 0}개 영상`);
-
-            // 한도 증가
-            if (!isLocalDev) {
-              incrementLimit();
+      // 🔄 개선된 로직: 항상 신뢰채널 우선 검색 (저장된 목록 스킵)
+      // 키워드 생성: 수업의도가 있으면 사용, 없으면 기본 키워드 생성
+      let searchKeywords = intention.trim() || null;
+      
+      // 안전교육은 교육과정 기반 키워드 사용
+      if (subject === "안전교육" && !searchKeywords) {
+        const weightedKeywords = findKeywordsFromCurriculum(gradeLevel, subject);
+        if (weightedKeywords && weightedKeywords.length > 0) {
+          const totalWeight = weightedKeywords.reduce((sum, item) => sum + item.weight, 0);
+          let random = Math.random() * totalWeight;
+          searchKeywords = weightedKeywords[0].keyword;
+          for (const item of weightedKeywords) {
+            random -= item.weight;
+            if (random <= 0) {
+              searchKeywords = item.keyword;
+              break;
             }
-
-            setRecommendations({
-              videos: bestList.videos || [],
-              subject,
-              gradeLevel,
-              intention: bestList.keywords || "",
-              fromSavedList: true,
-            });
-
-            Swal.close();
-            await Swal.fire({
-              title: "✅ 추천 완료!",
-              html: `기존 인기 추천 목록을 불러왔습니다<br/><small>키워드: ${bestList.keywords || "없음"}</small>`,
-              icon: "success",
-              confirmButtonColor: "#4285f4",
-              timer: 2000,
-            });
-
-            setLoading(false);
-            return;
           }
+          console.log(`🔍 안전교육 키워드: "${searchKeywords}"`);
         }
+      }
+      
+      // 수업의도 없으면 기본 키워드 생성 (과목 수업)
+      if (!searchKeywords) {
+        searchKeywords = `${subject} 수업`;
+        console.log(`🔍 기본 키워드 생성: "${searchKeywords}"`);
+      }
 
-        // 2,3순위: 신뢰채널에서 영상 검색
-        // 안전교육일 경우 gradeSubject.js에서 키워드 생성
-        let searchKeywords = null;
-        if (subject === "안전교육") {
-          const weightedKeywords = findKeywordsFromCurriculum(gradeLevel, subject);
-          if (weightedKeywords && weightedKeywords.length > 0) {
-            // 가중치 기반 랜덤 선택
-            const totalWeight = weightedKeywords.reduce((sum, item) => sum + item.weight, 0);
-            let random = Math.random() * totalWeight;
+      // 1단계: 신뢰채널 검색 (항상 우선)
+      Swal.fire({
+        title: "⚡ 신뢰채널 검색",
+        html: `${subject} 신뢰채널에서 영상 검색 중...<br/><small>키워드: ${searchKeywords}</small><br/><small>안전도 70점 이상 영상만 선별합니다</small>`,
+        icon: "info",
+        showConfirmButton: false,
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        didOpen: () => {
+          Swal.showLoading();
+        },
+      });
 
-            searchKeywords = weightedKeywords[0].keyword;
-            for (const item of weightedKeywords) {
-              random -= item.weight;
-              if (random <= 0) {
-                searchKeywords = item.keyword;
-                break;
-              }
-            }
-            console.log(`🔍 안전교육 키워드 생성: "${searchKeywords}"`);
-          }
-        }
+      // 신뢰채널에서 키워드로 검색
+      let trustedVideos = await searchTrustedChannelVideos(
+        subject,
+        20,
+        preferredDuration,
+        searchKeywords
+      );
 
+      console.log(`📺 신뢰채널 검색 결과: ${trustedVideos.length}개`);
+
+      // 2단계: 신뢰채널 결과가 부족하면 전체 YouTube 검색으로 보완
+      let fromTrustedChannels = true;
+      if (trustedVideos.length < 5) {
+        console.log(`⚠️ 신뢰채널 결과 부족 (${trustedVideos.length}개). 전체 YouTube 검색 보완...`);
+        
         Swal.fire({
-          title: "⚡ 신뢰채널 검색",
-          html: `${subject} 신뢰채널에서 영상 검색 및 분석 중...${searchKeywords ? `<br/><small>키워드: ${searchKeywords}</small>` : ""}<br/><small>안전도 70점 이상 영상만 선별합니다</small>`,
+          title: "⚡ 추가 검색 중",
+          html: `신뢰채널 결과가 부족하여 전체 YouTube에서 추가 검색 중...<br/><small>키워드: ${searchKeywords}</small>`,
           icon: "info",
           showConfirmButton: false,
           allowOutsideClick: false,
@@ -299,96 +280,118 @@ export default function VideoRecommendationDirect({ onBack }) {
           },
         });
 
-        // 넉넉하게 가져와서 필터링
-        const trustedVideos = await searchTrustedChannelVideos(
-          subject,
-          20, // 필터링 후 10개 남기려면 넉넉하게
+        const youtubeVideos = await searchYouTubeVideos(
+          searchKeywords,
+          15,
           preferredDuration,
-          searchKeywords // 안전교육일 때만 키워드 전달
+          subject
         );
+        
+        // 중복 제거 후 합치기
+        const existingIds = new Set(trustedVideos.map(v => v.videoId));
+        const newVideos = youtubeVideos.filter(v => !existingIds.has(v.videoId));
+        trustedVideos = [...trustedVideos, ...newVideos].slice(0, 20);
+        fromTrustedChannels = false;
+        
+        console.log(`📺 전체 검색 후 총: ${trustedVideos.length}개`);
+      }
 
-        if (trustedVideos.length === 0) {
-          Swal.close();
-          await Swal.fire({
-            title: "검색 결과 없음",
-            text: "신뢰채널에서 영상을 찾을 수 없습니다. 수업 의도를 입력해보세요!",
-            icon: "warning",
-            confirmButtonColor: "#4285f4",
-          });
-          setLoading(false);
-          return;
-        }
-
-        // 각 영상 분석 후 안전도 70점 이상만 필터링
-        const analysisPromises = trustedVideos.map(async (video) => {
-          try {
-            const transcript = await getVideoTranscript(video.videoId);
-            const analysis = await quickAnalyzeVideo(
-              video.videoId,
-              transcript,
-              gradeLevel,
-              subject,
-              ""
-            );
-            return {
-              ...video,
-              safetyScore: analysis.safetyScore,
-              safetyDescription: analysis.summary,
-              summary: analysis.summary,
-              warnings: [],
-              warningCount: 0,
-              chapters: [],
-              flow: [],
-            };
-          } catch (error) {
-            console.error(`분석 실패 (${video.videoId}):`, error);
-            return {
-              ...video,
-              safetyScore: 0, // 분석 실패 시 낮은 점수로 제외되도록
-              safetyDescription: "분석 실패",
-              summary: "분석 중 오류가 발생했습니다",
-              warnings: [],
-              warningCount: 0,
-              chapters: [],
-              flow: [],
-            };
-          }
+      if (trustedVideos.length === 0) {
+        Swal.close();
+        await Swal.fire({
+          title: "검색 결과 없음",
+          text: "조건에 맞는 영상을 찾을 수 없습니다. 다른 키워드로 시도해보세요!",
+          icon: "warning",
+          confirmButtonColor: "#4285f4",
         });
+        setLoading(false);
+        return;
+      }
 
-        const allResults = await Promise.all(analysisPromises);
+      // 3단계: 영상 분석
+      Swal.fire({
+        title: "⚡ 영상 분석 중",
+        html: `${trustedVideos.length}개 영상 안전도 분석 중...<br/><small>잠시만 기다려주세요</small>`,
+        icon: "info",
+        showConfirmButton: false,
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        didOpen: () => {
+          Swal.showLoading();
+        },
+      });
 
-        // 안전도 70점 초과 영상만 필터링
-        const safeResults = allResults.filter((video) => video.safetyScore > 70);
-        console.log(`✅ 안전도 필터링: ${allResults.length}개 → ${safeResults.length}개 (70점 초과)`);
-
-        if (safeResults.length === 0) {
-          Swal.close();
-          await Swal.fire({
-            title: "적합한 영상 없음",
-            text: "안전도 기준을 충족하는 영상을 찾지 못했습니다. 수업 의도를 입력해보세요!",
-            icon: "warning",
-            confirmButtonColor: "#4285f4",
-          });
-          setLoading(false);
-          return;
+      const analysisPromises = trustedVideos.map(async (video) => {
+        try {
+          const transcript = await getVideoTranscript(video.videoId);
+          const analysis = await quickAnalyzeVideo(
+            video.videoId,
+            transcript,
+            gradeLevel,
+            subject,
+            intention.trim() || ""
+          );
+          return {
+            ...video,
+            safetyScore: analysis.safetyScore,
+            safetyDescription: analysis.summary,
+            summary: analysis.summary,
+            warnings: [],
+            warningCount: 0,
+            chapters: [],
+            flow: [],
+          };
+        } catch (error) {
+          console.error(`분석 실패 (${video.videoId}):`, error);
+          return {
+            ...video,
+            safetyScore: 0,
+            safetyDescription: "분석 실패",
+            summary: "분석 중 오류가 발생했습니다",
+            warnings: [],
+            warningCount: 0,
+            chapters: [],
+            flow: [],
+          };
         }
+      });
 
-        // 조회수 순 정렬 후 최대 10개
-        safeResults.sort((a, b) => b.viewCount - a.viewCount);
-        const finalResults = safeResults.slice(0, 10);
+      const allResults = await Promise.all(analysisPromises);
 
-        // 한도 증가
-        if (!isLocalDev) {
-          incrementLimit();
-        }
+      // 안전도 70점 초과 영상만 필터링
+      const safeResults = allResults.filter((video) => video.safetyScore > 70);
+      console.log(`✅ 안전도 필터링: ${allResults.length}개 → ${safeResults.length}개 (70점 초과)`);
 
-        setRecommendations({
-          videos: finalResults,
-          subject,
-          gradeLevel,
-          intention: "",
-          fromTrustedChannels: true,
+      if (safeResults.length === 0) {
+        Swal.close();
+        await Swal.fire({
+          title: "적합한 영상 없음",
+          text: "안전도 기준을 충족하는 영상을 찾지 못했습니다. 다른 키워드로 시도해보세요!",
+          icon: "warning",
+          confirmButtonColor: "#4285f4",
         });
+        setLoading(false);
+        return;
+      }
+
+      // 조회수 순 정렬 후 최대 10개
+      safeResults.sort((a, b) => b.viewCount - a.viewCount);
+      const finalResults = safeResults.slice(0, 10);
+
+      // 한도 증가
+      if (!isLocalDev) {
+        incrementLimit();
+      }
+
+      setPreviousKeywords([searchKeywords]);
+
+      setRecommendations({
+        videos: finalResults,
+        subject,
+        gradeLevel,
+        intention: intention.trim() || searchKeywords,
+        fromTrustedChannels,
+      });
 
         Swal.close();
         await Swal.fire({
