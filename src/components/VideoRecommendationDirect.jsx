@@ -414,12 +414,13 @@ export default function VideoRecommendationDirect({ onBack }) {
       });
       setLoading(false);
     }
-    return;
-  }
+  };
 
-  // 수업의도가 있는 경우: 기존 로직 (키워드 검색)
-      // 1단계: 검색어 생성
-      await Swal.fire({
+  // 아래는 이전 로직 (사용되지 않음, 추후 삭제 예정)
+  /*
+    // 수업의도가 있는 경우: 기존 로직 (키워드 검색)
+    // 1단계: 검색어 생성
+    await Swal.fire({
         title: "⚡ 빠른 추천 시작",
         html: "1단계: 검색어 생성 중...",
         icon: "info",
@@ -598,7 +599,7 @@ export default function VideoRecommendationDirect({ onBack }) {
     } finally {
       setLoading(false);
     }
-  };
+  */
 
   // 학년 매핑 함수 (초등 저학년 -> 1학년, 2학년 등)
   const getGradeNumbers = (grade) => {
