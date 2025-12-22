@@ -1,0 +1,474 @@
+/* ============================================
+   AI 자동 정리 모달 V2 - 브레드크럼 스타일
+   ============================================ */
+
+/* 모달 확장 */
+.jjim-auto-organize-modal.wide {
+  width: 95%;
+  max-width: 800px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+}
+
+/* 모달 컨텐츠 영역 - 스크롤 가능 */
+.jjim-auto-organize-modal.wide .jjim-aom-content {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+/* 모달 컨텐츠 스크롤바 */
+.jjim-auto-organize-modal.wide .jjim-aom-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.jjim-auto-organize-modal.wide .jjim-aom-content::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.jjim-auto-organize-modal.wide .jjim-aom-content::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #a5b4fc 0%, #818cf8 100%);
+  border-radius: 4px;
+}
+
+.jjim-auto-organize-modal.wide .jjim-aom-content::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #818cf8 0%, #6366f1 100%);
+}
+
+/* 리스트 V2 */
+.jjim-aom-list-v2 {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px;
+}
+
+/* 리스트 스크롤바 - 불필요 (상위에서 스크롤) */
+
+/* 아이템 V2 */
+.aom-item-v2 {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  overflow: visible;
+  transition: all 0.2s ease;
+}
+
+.aom-item-v2:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.aom-item-v2.checked {
+  border-color: #a5b4fc;
+  background: linear-gradient(135deg, #faf5ff 0%, #f5f3ff 100%);
+}
+
+.aom-item-v2.expanded {
+  border-color: #818cf8;
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.15);
+}
+
+/* 아이템 헤더 */
+.aom-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.aom-item-header:hover {
+  background: rgba(99, 102, 241, 0.05);
+}
+
+.aom-item-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.aom-video-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.aom-video-info svg {
+  flex-shrink: 0;
+  color: #6366f1;
+}
+
+.aom-video-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: #1e293b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.aom-item-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.aom-expand-icon {
+  font-size: 10px;
+  color: #94a3b8;
+  transition: transform 0.2s ease;
+}
+
+.aom-item-v2.expanded .aom-expand-icon {
+  color: #6366f1;
+}
+
+/* 배지 스타일 */
+.aom-badge {
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.aom-badge.semantic {
+  background: linear-gradient(135deg, #dc2626 0%, #ea580c 100%);
+  color: white;
+}
+
+.aom-badge.entity {
+  background: linear-gradient(135deg, #0891b2 0%, #0d9488 100%);
+  color: white;
+}
+
+.aom-badge.critical {
+  background: linear-gradient(135deg, #7c3aed 0%, #db2777 100%);
+  color: white;
+}
+
+.aom-badge.ambiguous {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: white;
+}
+
+.aom-badge.confidence {
+  font-weight: 500;
+}
+
+.aom-badge.confidence.high {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.aom-badge.confidence.medium {
+  background: #fef9c3;
+  color: #854d0e;
+}
+
+.aom-badge.confidence.low {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* 경로 표시 */
+.aom-path-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px 12px;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-top: 1px solid #e2e8f0;
+}
+
+.aom-arrow {
+  color: #6366f1;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.aom-path-breadcrumb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+.aom-crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #64748b;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: white;
+  border: 1px solid #e2e8f0;
+}
+
+.aom-crumb.active {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: white;
+  border-color: #6366f1;
+  font-weight: 500;
+}
+
+.aom-crumb.new {
+  background: #fef3c7;
+  border: 1px dashed #f59e0b;
+  color: #92400e;
+  font-weight: 500;
+}
+
+.aom-crumb.new svg {
+  width: 12px;
+  height: 12px;
+}
+
+.aom-sep {
+  color: #cbd5e1;
+  font-size: 14px;
+  margin: 0 2px;
+}
+
+/* 펼침 콘텐츠 */
+.aom-expanded-content {
+  padding: 16px;
+  background: #fafafa;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: expandIn 0.2s ease;
+  overflow: visible;
+  position: relative;
+  z-index: 5;
+}
+
+@keyframes expandIn {
+  from {
+    opacity: 0;
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    max-height: 500px;
+  }
+}
+
+/* 키워드 */
+.aom-keywords {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.aom-keywords-label {
+  font-size: 11px;
+  color: #7c3aed;
+  font-weight: 500;
+}
+
+.aom-keyword-tag {
+  font-size: 11px;
+  background: #f3e8ff;
+  color: #7c3aed;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+/* 후보 선택 */
+.aom-candidates {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border: 1px solid #f59e0b;
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.aom-candidates-header {
+  font-size: 12px;
+  font-weight: 600;
+  color: #92400e;
+  margin-bottom: 10px;
+}
+
+.aom-candidate-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  margin-top: 6px;
+  background: white;
+  border: 1px solid #fcd34d;
+  border-radius: 8px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+}
+
+.aom-candidate-btn:first-of-type {
+  margin-top: 0;
+}
+
+.aom-candidate-btn:hover {
+  background: #fffbeb;
+  border-color: #f59e0b;
+}
+
+.aom-candidate-btn.recommended {
+  border: 2px solid #f59e0b;
+  background: #fff;
+}
+
+.aom-candidate-num {
+  font-weight: 600;
+  color: #92400e;
+  width: 20px;
+}
+
+.aom-candidate-subject {
+  font-size: 10px;
+  background: #e0e7ff;
+  color: #3730a3;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.aom-candidate-name {
+  flex: 1;
+  color: #78350f;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.aom-candidate-rec {
+  font-size: 9px;
+  background: #f59e0b;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.aom-candidate-score {
+  font-size: 10px;
+  color: #b45309;
+}
+
+/* 경로 선택기 섹션 */
+.aom-path-selector-section {
+  position: relative;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px;
+  overflow: visible;
+  z-index: 10;
+}
+
+.aom-selector-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 8px;
+}
+
+/* 새 폴더 섹션 */
+.aom-new-folder-section {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fef3c7;
+  border: 1px dashed #f59e0b;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.aom-new-folder-section label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #92400e;
+  white-space: nowrap;
+}
+
+.aom-new-folder-input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid #fcd34d;
+  border-radius: 6px;
+  font-size: 12px;
+  outline: none;
+  background: white;
+}
+
+.aom-new-folder-input:focus {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
+}
+
+/* 푸터 */
+.jjim-aom-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+}
+
+.aom-footer-stats {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.aom-footer-actions {
+  display: flex;
+  gap: 10px;
+}
+
+/* 반응형 */
+@media (max-width: 640px) {
+  .jjim-auto-organize-modal.wide {
+    width: 100%;
+    max-width: none;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+  
+  .aom-item-header {
+    padding: 10px 12px;
+  }
+  
+  .aom-video-title {
+    font-size: 12px;
+    max-width: 150px;
+  }
+  
+  .aom-path-display {
+    padding: 8px 12px;
+  }
+  
+  .aom-crumb {
+    font-size: 11px;
+    padding: 2px 4px;
+  }
+  
+  .aom-expanded-content {
+    padding: 12px;
+  }
+}
+

@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(firebase deploy:*)",
+      "WebFetch(domain:gemini.google.com)",
+      "Bash(npm install:*)",
+      "Bash(npx tailwindcss:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(dir:*)",
+      "Bash(firebase functions:log:*)",
+      "Bash(npm run build:*)",
+      "WebSearch",
+      "Bash(cat:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
