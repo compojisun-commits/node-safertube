@@ -2425,7 +2425,7 @@ body {
 
 /* ========== Video Player Section ========== */
 .video-player-section {
-  background: #000;
+  background: transparent;
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
@@ -4744,11 +4744,10 @@ body {
 .video-player-section {
   position: relative;
   width: 100%;
-  padding-bottom: 56.25%; /* 16:9 비율 */
   margin-bottom: 16px;
   border-radius: var(--radius-lg);
   overflow: hidden;
-  background: #000;
+  background: transparent;
   box-shadow: var(--shadow-lg);
 }
 

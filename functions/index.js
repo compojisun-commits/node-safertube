@@ -2,10 +2,11 @@ const {
   onDocumentCreated,
   onDocumentUpdated,
 } = require("firebase-functions/v2/firestore");
+const { onCall } = require("firebase-functions/v2/https");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore } = require("firebase-admin/firestore");
 const { getAuth } = require("firebase-admin/auth");
-const { GoogleGenAI } = require("@google/genai");
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { YoutubeTranscript } = require("youtube-transcript");
 const nodemailer = require("nodemailer");
 const { getTrustedChannelIds } = require("./trustedChannels");
@@ -14,8 +15,46 @@ initializeApp();
 const db = getFirestore();
 const auth = getAuth();
 
-// Gemini API 초기화
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+// ========================================
+// Gemini API 키 관리
+// ========================================
+
+// 여러 개의 Gemini API 키를 배열로 관리
+const GEMINI_API_KEYS = [
+  process.env.GEMINI_API_KEY,
+  process.env.GEMINI_API_KEY_2,
+  process.env.GEMINI_API_KEY_3,
+].filter(Boolean); // undefined 제거
+
+// 현재 사용 중인 Gemini API 키 인덱스 (메모리에 저장)
+let currentGeminiKeyIndex = 0;
+
+/**
+ * 현재 사용할 Gemini API 키 가져오기
+ */
+function getCurrentGeminiApiKey() {
+  if (GEMINI_API_KEYS.length === 0) {
+    throw new Error("Gemini API 키가 설정되지 않았습니다");
+  }
+  return GEMINI_API_KEYS[currentGeminiKeyIndex];
+}
+
+/**
+ * 다음 Gemini API 키로 전환
+ */
+function switchToNextGeminiKey() {
+  const prevIndex = currentGeminiKeyIndex;
+  currentGeminiKeyIndex = (currentGeminiKeyIndex + 1) % GEMINI_API_KEYS.length;
+  console.log(
+    `🔄 Gemini API 키 전환: ${prevIndex} → ${currentGeminiKeyIndex} (총 ${GEMINI_API_KEYS.length}개)`
+  );
+  return getCurrentGeminiApiKey();
+}
+
+// Gemini API 초기화 (동적으로 키를 사용)
+function getGenAI() {
+  return new GoogleGenerativeAI(getCurrentGeminiApiKey());
+}
 
 // ========================================
 // YouTube API 키 관리
@@ -2868,3 +2907,201 @@ async function sendAccountDeletionEmail(toEmail, userName, deletedData) {
   await transporter.sendMail(mailOptions);
   console.log(`탈퇴 완료 이메일 전송: ${toEmail}`);
 }
+
+// ========================================
+// Callable Functions - 영상 분석
+// ========================================
+
+/**
+ * 간편 영상 분석 (Callable Function)
+ * 프론트엔드에서 직접 호출
+ */
+exports.analyzeVideoQuick = onCall(
+  {
+    cors: ["http://localhost:5173", "http://localhost:5174", "https://safer-tube-on.web.app", "https://safer-tube-on.firebaseapp.com"],
+    maxInstances: 10,
+    timeoutSeconds: 540,
+    memory: "512MiB",
+  },
+  async (request) => {
+    try {
+      const { videoUrl, videoId, gradeLevel } = request.data;
+
+      if (!videoUrl || !videoId) {
+        throw new Error("videoUrl과 videoId는 필수입니다");
+      }
+
+      console.log(
+        `[간편분석] 시작: ${videoId}, 학년: ${gradeLevel || "기본"}`
+      );
+
+      // 1. 자막 추출 시도
+      let transcript = [];
+      let duration = 600;
+      let title = "YouTube 영상";
+
+      try {
+        const transcriptData = await YoutubeTranscript.fetchTranscript(videoId, {
+          lang: "ko",
+          country: "KR",
+        });
+        transcript = transcriptData.map((c) => ({
+          text: c.text,
+          start: c.offset / 1000,
+          duration: c.duration / 1000,
+        }));
+
+        // 자막에서 영상 길이 추정
+        if (transcript.length > 0) {
+          const lastCaption = transcript[transcript.length - 1];
+          duration = Math.ceil(lastCaption.start + lastCaption.duration);
+        }
+
+        console.log(`[간편분석] 자막 ${transcript.length}개 추출, 예상 길이: ${duration}초`);
+      } catch (e) {
+        console.warn("[간편분석] 자막 없음 - 기본값 사용");
+      }
+
+      // 3. Gemini API로 분석
+      const gradeFilters = {
+        "elementary-1-2": { name: "초등 1~2학년", criteria: "만 7-8세" },
+        "elementary-3-4": { name: "초등 3~4학년", criteria: "만 9-10세" },
+        "elementary-5-6": { name: "초등 5~6학년", criteria: "만 11-12세" },
+        "middle-school": { name: "중학생", criteria: "만 13-15세" },
+        "high-school": { name: "고등학생", criteria: "만 16-18세" },
+      };
+      const selectedFilter =
+        gradeFilters[gradeLevel] || gradeFilters["elementary-5-6"];
+      const hasTranscript = transcript.length > 0;
+
+      const durationMin = Math.floor(duration / 60);
+      const durationSec = duration % 60;
+
+      // 자막 샘플링
+      const sampledTranscript =
+        transcript.length > 100
+          ? transcript.filter(
+              (_, i) => i % Math.ceil(transcript.length / 100) === 0
+            )
+          : transcript;
+
+      const formatTimestamp = (seconds) => {
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins}:${secs.toString().padStart(2, "0")}`;
+      };
+
+      const prompt = `# 빠른 안전도 분석
+대상: ${selectedFilter.name} (${selectedFilter.criteria})
+영상 길이: ${durationMin}분 ${durationSec}초
+
+${
+  hasTranscript
+    ? `## 자막 데이터
+${sampledTranscript.map((t) => `[${formatTimestamp(t.start)}] ${t.text}`).join("\n")}`
+    : "## 영상 직접 분석 (자막 없음)"
+}
+
+## 분석 요청
+1. 안전 점수 (0-100): 해당 학년에 적합한지
+2. 유해 구간이 있다면 시간대 표시
+
+## 6대 유해 요소
+폭력성, 선정성, 욕설/언어, 공포, 약물(음주/흡연), 모방위험
+
+## JSON 응답
+{
+  "safetyScore": 85,
+  "safetyLevel": "safe/caution/warning/danger",
+  "safetyDescription": "한 줄 평가",
+  "summary": "영상 내용 2문장 요약",
+  "mainConcern": "가장 우려되는 점 (없으면 null)",
+  "warnings": [
+    {"startTime": "2:30", "endTime": "2:45", "category": "profanity", "severity": "medium", "description": "문제 내용"}
+  ]
+}
+
+점수 기준: 90-100(safe), 70-89(caution), 40-69(warning), 0-39(danger)
+시간 범위: 0:00 ~ ${durationMin}:${durationSec.toString().padStart(2, "0")}
+warnings는 문제 없으면 빈 배열 []. 한국어로 응답.`;
+
+      // Gemini API 호출 (재시도 로직 포함)
+      let analysisResult;
+      let lastError;
+
+      for (let attempt = 0; attempt < GEMINI_API_KEYS.length; attempt++) {
+        try {
+          const genAI = getGenAI();
+          const model = genAI.getGenerativeModel({
+            model: "gemini-2.0-flash-exp",
+          });
+
+          const result = await model.generateContent({
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0.1,
+              maxOutputTokens: 2048,
+              responseMimeType: "application/json",
+            },
+          });
+
+          const responseText = result.response.text();
+          analysisResult = JSON.parse(responseText);
+          break; // 성공하면 반복 종료
+        } catch (error) {
+          lastError = error;
+          console.error(`[간편분석] Gemini API 호출 실패 (시도 ${attempt + 1}/${GEMINI_API_KEYS.length}):`, error.message);
+
+          // 마지막 키가 아니면 다음 키로 전환
+          if (attempt < GEMINI_API_KEYS.length - 1) {
+            switchToNextGeminiKey();
+          }
+        }
+      }
+
+      // 모든 키로 시도했는데도 실패한 경우
+      if (!analysisResult) {
+        throw lastError || new Error("Gemini API 호출 실패");
+      }
+
+      // 안전도 설명 생성
+      const getSafetyDescription = (score) => {
+        if (score >= 90) return "교육적으로 적합한 안전한 콘텐츠입니다.";
+        if (score >= 70)
+          return "일부 주의가 필요할 수 있습니다. 보호자 사전 확인을 권장합니다.";
+        if (score >= 40)
+          return "부적절한 내용이 포함되어 있습니다. 보호자와 함께 시청하세요.";
+        return "해당 학년에 적합하지 않은 콘텐츠입니다.";
+      };
+
+      return {
+        success: true,
+        data: {
+          analysisType: "quick",
+          safetyScore: analysisResult.safetyScore || 70,
+          safetyLevel: analysisResult.safetyLevel || "caution",
+          safetyDescription:
+            analysisResult.safetyDescription ||
+            getSafetyDescription(analysisResult.safetyScore || 70),
+          summary: analysisResult.summary || "영상 분석이 완료되었습니다.",
+          mainConcern: analysisResult.mainConcern || null,
+          warnings: (analysisResult.warnings || []).map((w) => ({
+            startTime: w.startTime || w.time || "0:00",
+            endTime: w.endTime || w.startTime || w.time || "0:00",
+            category: w.category || "unknown",
+            severity: w.severity || "medium",
+            description: w.description || w.issue || "주의 필요",
+          })),
+          title: title,
+          videoId,
+          videoUrl,
+          duration,
+        },
+      };
+    } catch (error) {
+      console.error("[간편분석] 실패:", error);
+      throw new Error(`분석 실패: ${error.message}`);
+    }
+  }
+);
+
