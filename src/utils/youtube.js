@@ -107,7 +107,7 @@ export async function searchYouTubeVideos(
 
     // 영상 상세 정보 가져오기 (길이, 조회수, 좋아요수 포함)
     const videoIds = data.items.map((item) => item.id.videoId).join(",");
-    console.log("검색된 영상 ID들:", videoIds);
+    console.log(`✅ 전체 YouTube 검색: ${data.items.length}개 영상 발견`);
     const detailsUrl = `https://www.googleapis.com/youtube/v3/videos?part=contentDetails,snippet,statistics&id=${videoIds}&key=${apiKey}`;
 
     const detailsResponse = await fetch(detailsUrl);
@@ -272,10 +272,7 @@ export async function searchTrustedChannelVideos(
     const totalChannels = Math.min(trustedChannelIds.length, 15); // 최대 15개 채널
     const videosPerChannel = Math.min(3, Math.max(2, Math.floor(30 / totalChannels))); // 채널당 2~3개
 
-    console.log(`📺 ${totalChannels}개 신뢰채널에서 각 ${videosPerChannel}개씩 검색`);
-    if (keywords) {
-      console.log(`🔍 키워드: "${keywords}"`);
-    }
+    console.log(`🔍 신뢰채널 검색: "${keywords || subject}" (${totalChannels}개 채널, 각 ${videosPerChannel}개씩)`);
 
     // 403 에러 감지용 플래그
     let hasQuotaError = false;
@@ -321,15 +318,13 @@ export async function searchTrustedChannelVideos(
 
     // 각 채널별로 최대 2개씩만 가져와서 골고루 분배
     let allItems = [];
-    channelResults.forEach((result, idx) => {
+    channelResults.forEach((result) => {
       const channelItems = result.items.slice(0, 2); // 채널당 최대 2개
-      if (channelItems.length > 0) {
-        console.log(`  - 채널 ${idx + 1}: ${channelItems.length}개`);
-      }
       allItems.push(...channelItems);
     });
 
-    console.log(`📺 2순위(최근 2개월): ${allItems.length}개 영상 발견 (${channelResults.filter(r => r.items.length > 0).length}개 채널에서)`);
+    const activeChannels = channelResults.filter(r => r.items.length > 0).length;
+    console.log(`✅ 2순위 결과: ${allItems.length}개 영상 (${activeChannels}개 채널)`);
 
     // 3순위: 2순위 영상이 부족하면 년도 상관없이 현재 월 ±2개월 영상 검색
     if (allItems.length < maxResults) {
@@ -401,12 +396,12 @@ export async function searchTrustedChannelVideos(
         (item) => !existingIds.has(item.id.videoId)
       );
 
-      console.log(`📺 3순위(같은 시즌): ${newSeasonItems.length}개 추가 영상 발견`);
+      console.log(`✅ 3순위 결과: ${newSeasonItems.length}개 추가 (같은 시즌)`);
       allItems = [...allItems, ...newSeasonItems];
     }
 
     if (allItems.length === 0) {
-      console.log("신뢰채널에서 영상을 찾지 못했습니다.");
+      console.log("❌ 신뢰채널 검색 결과 없음 → 전체 YouTube 검색으로 전환");
       return [];
     }
 

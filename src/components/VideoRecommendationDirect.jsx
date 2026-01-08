@@ -8,6 +8,8 @@ import {
   checkSimilarityWithGemini,
 } from "../utils/gemini";
 import { searchYouTubeVideos, getVideoTranscript, searchTrustedChannelVideos } from "../utils/youtube";
+import { generateSearchKeywords as generateOpenAIKeywords } from "../utils/openai";
+import { getCachedSearchResults, setCachedSearchResults } from "../utils/searchCache";
 import {
   doc,
   getDoc,
@@ -240,10 +242,10 @@ export default function VideoRecommendationDirect({ onBack }) {
         console.log(`🔍 기본 키워드 생성: "${searchKeywords}"`);
       }
 
-      // 1단계: 신뢰채널 검색 (항상 우선)
+      // 🆕 OpenAI로 검색 키워드 확장 생성
       Swal.fire({
-        title: "⚡ 신뢰채널 검색",
-        html: `${subject} 신뢰채널에서 영상 검색 중...<br/><small>키워드: ${searchKeywords}</small><br/><small>안전도 70점 이상 영상만 선별합니다</small>`,
+        title: "🤖 AI 키워드 생성 중",
+        html: `최적의 검색 키워드를 생성하고 있습니다...<br/><small>원본: ${searchKeywords}</small>`,
         icon: "info",
         showConfirmButton: false,
         allowOutsideClick: false,
@@ -253,24 +255,43 @@ export default function VideoRecommendationDirect({ onBack }) {
         },
       });
 
-      // 신뢰채널에서 키워드로 검색
-      let trustedVideos = await searchTrustedChannelVideos(
+      const expandedKeywords = await generateOpenAIKeywords(searchKeywords, subject, gradeLevel);
+      console.log(`🤖 확장된 키워드: ${expandedKeywords.join(", ")}`);
+
+      // 🔥 캐시 확인 (24시간 이내 동일 검색)
+      const cacheParams = {
         subject,
-        20,
-        preferredDuration,
-        searchKeywords
-      );
+        gradeLevel,
+        keywords: expandedKeywords[0], // 첫 번째 키워드만 사용
+        preferredDuration
+      };
 
-      console.log(`📺 신뢰채널 검색 결과: ${trustedVideos.length}개`);
+      const cachedResults = await getCachedSearchResults(cacheParams);
 
-      // 2단계: 신뢰채널 결과가 부족하면 전체 YouTube 검색으로 보완
+      let trustedVideos;
       let fromTrustedChannels = true;
-      if (trustedVideos.length < 5) {
-        console.log(`⚠️ 신뢰채널 결과 부족 (${trustedVideos.length}개). 전체 YouTube 검색 보완...`);
-        
+
+      if (cachedResults) {
+        // ✅ 캐시 히트: API 호출 없이 즉시 반환
+        trustedVideos = cachedResults;
+        console.log(`💾 캐시된 결과 사용: ${trustedVideos.length}개 영상 (API 호출 0)`);
+
         Swal.fire({
-          title: "⚡ 추가 검색 중",
-          html: `신뢰채널 결과가 부족하여 전체 YouTube에서 추가 검색 중...<br/><small>키워드: ${searchKeywords}</small>`,
+          title: "⚡ 캐시된 결과 로드",
+          html: `이전 검색 결과를 불러왔습니다<br/><small>${trustedVideos.length}개 영상 (API 사용량 0)</small>`,
+          icon: "success",
+          timer: 1500,
+          showConfirmButton: false
+        });
+
+      } else {
+        // ❌ 캐시 미스: 새로운 검색 실행
+        console.log("🔍 새로운 검색 실행 (캐시 없음)");
+
+        // 1단계: 신뢰채널 검색 (항상 우선)
+        Swal.fire({
+          title: "⚡ 신뢰채널 검색",
+          html: `${subject} 신뢰채널에서 영상 검색 중...<br/><small>키워드: ${expandedKeywords.join(", ")}</small><br/><small>안전도 70점 이상 영상만 선별합니다</small>`,
           icon: "info",
           showConfirmButton: false,
           allowOutsideClick: false,
@@ -280,20 +301,54 @@ export default function VideoRecommendationDirect({ onBack }) {
           },
         });
 
-        const youtubeVideos = await searchYouTubeVideos(
-          searchKeywords,
-          15,
+        // 🎯 YouTube API 할당량 절약: 첫 번째 키워드만 사용
+        // (첫 번째가 가장 관련성 높음)
+        const primaryKeyword = expandedKeywords[0];
+
+        trustedVideos = await searchTrustedChannelVideos(
+          subject,
+          20, // 20개 검색
           preferredDuration,
-          subject
+          primaryKeyword
         );
-        
-        // 중복 제거 후 합치기
-        const existingIds = new Set(trustedVideos.map(v => v.videoId));
-        const newVideos = youtubeVideos.filter(v => !existingIds.has(v.videoId));
-        trustedVideos = [...trustedVideos, ...newVideos].slice(0, 20);
-        fromTrustedChannels = false;
-        
-        console.log(`📺 전체 검색 후 총: ${trustedVideos.length}개`);
+
+        console.log(`✅ 신뢰채널: ${trustedVideos.length}개 발견 (키워드: "${primaryKeyword}")`);
+
+        // 2단계: 신뢰채널 결과가 부족하면 전체 YouTube 검색으로 보완
+        if (trustedVideos.length < 5) {
+          console.log(`🔍 부족 (${trustedVideos.length}개) → 전체 YouTube 검색 시작...`);
+
+          Swal.fire({
+            title: "⚡ 추가 검색 중",
+            html: `신뢰채널 결과가 부족하여 전체 YouTube에서 추가 검색 중...<br/><small>키워드: ${expandedKeywords.join(", ")}</small>`,
+            icon: "info",
+            showConfirmButton: false,
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            didOpen: () => {
+              Swal.showLoading();
+            },
+          });
+
+          // 첫 번째 키워드로 검색 (가장 관련성 높음)
+          const youtubeVideos = await searchYouTubeVideos(
+            expandedKeywords[0],
+            15,
+            preferredDuration,
+            subject
+          );
+
+          // 중복 제거 후 합치기
+          const existingIds = new Set(trustedVideos.map(v => v.videoId));
+          const newVideos = youtubeVideos.filter(v => !existingIds.has(v.videoId));
+          trustedVideos = [...trustedVideos, ...newVideos].slice(0, 20);
+          fromTrustedChannels = false;
+
+          console.log(`✅ 전체 검색 완료: 총 ${trustedVideos.length}개`);
+        }
+
+        // 💾 검색 결과를 캐시에 저장 (24시간)
+        await setCachedSearchResults(cacheParams, trustedVideos);
       }
 
       if (trustedVideos.length === 0) {
@@ -360,7 +415,7 @@ export default function VideoRecommendationDirect({ onBack }) {
 
       // 안전도 70점 초과 영상만 필터링
       const safeResults = allResults.filter((video) => video.safetyScore > 70);
-      console.log(`✅ 안전도 필터링: ${allResults.length}개 → ${safeResults.length}개 (70점 초과)`);
+      console.log(`🛡️ 안전도 필터링: ${allResults.length}개 → ${safeResults.length}개 (안전한 영상)`);
 
       if (safeResults.length === 0) {
         Swal.close();
